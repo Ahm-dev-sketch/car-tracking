@@ -1,0 +1,23 @@
+# Cloudflare Workers & Durable Objects Configuration
+# DEPLOYMENT NOTE: Active in Phase 8 (Production Deployment to Cloudflare)
+# Local development uses scripts/realtime-dev.mjs dev shim.
+
+name = "car-tracking-realtime"
+main = "realtime/durable-object.ts"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [
+  { name = "LOCATION_HUB", class_name = "LocationHub" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["LocationHub"]
+
+# WebSocket routing for realtime tracking hub
+# Production route: https://car-tracking.example.com/ws/*
+# [routes]
+# pattern = "*/ws/*"
+# zone_name = "example.com"

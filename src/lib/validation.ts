@@ -475,3 +475,41 @@ export const locationIngestSchema = z
     points: z.array(z.any()).min(1, 'Points array must contain at least 1 point').max(5, 'Maximum batch size is 5 points'),
   });
 
+import type {
+  ClientRealtimeMessage,
+  ServerRealtimeMessage,
+} from '@/types/realtime';
+
+export const clientAuthMessageSchema = z.object({
+  type: z.literal('auth'),
+  token: z.string().min(1, 'Token is required'),
+});
+
+export const clientSubscribeMessageSchema = z.object({
+  type: z.literal('subscribe'),
+  vehicles: z.array(z.string()).optional(),
+  all: z.boolean().optional(),
+});
+
+export const clientRealtimeMessageSchema = z.discriminatedUnion('type', [
+  clientAuthMessageSchema,
+  clientSubscribeMessageSchema,
+]);
+
+export function parseClientMessage(raw: unknown): ClientRealtimeMessage {
+  let parsedJson = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsedJson = JSON.parse(raw);
+    } catch {
+      throw new Error('Invalid JSON string');
+    }
+  }
+  return clientRealtimeMessageSchema.parse(parsedJson);
+}
+
+export function serializeEvent(event: ServerRealtimeMessage): string {
+  return JSON.stringify(event);
+}
+
+

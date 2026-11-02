@@ -289,6 +289,24 @@ export async function transitionBooking(
 
   // 3. Execute transition in transaction
   const updated = await prisma.$transaction(async (tx) => {
+    // Row lock booking to serialize concurrent transitions
+    const lockedBookings = await tx.$queryRawUnsafe<
+      Array<{ id: string; status: BookingStatus }>
+    >('SELECT id, status FROM bookings WHERE id = $1 FOR UPDATE', bookingId);
+
+    if (!lockedBookings || lockedBookings.length === 0) {
+      throw new ApiError(404, 'NOT_FOUND', 'Booking not found');
+    }
+
+    const currentStatus = lockedBookings[0].status;
+    if (currentStatus !== from) {
+      throw new ApiError(
+        409,
+        'INVALID_TRANSITION',
+        `Cannot transition booking from ${currentStatus} to ${to}`
+      );
+    }
+
     if (to === BookingStatus.APPROVED) {
       if (booking.vehicleId) {
         await assertVehicleAvailableForWindow(

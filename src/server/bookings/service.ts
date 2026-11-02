@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/errors';
 import { logAuditEvent } from '@/server/audit';
 import { notify, notifyAdmins } from '@/server/notifications/service';
 import { AuthenticatedUser } from '@/lib/auth-guard';
+import { publishEvent } from '@/server/realtime/hub';
 
 export interface BookingMutationContext {
   actorUserId?: string | null;
@@ -528,6 +529,15 @@ export async function transitionBooking(
       data: { bookingId: updated.id },
     });
   }
+
+  await publishEvent({
+    type: 'booking:update',
+    data: {
+      bookingId: updated.id,
+      status: updated.status,
+      userId: updated.userId,
+    },
+  });
 
   return updated;
 }

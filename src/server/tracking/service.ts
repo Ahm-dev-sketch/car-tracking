@@ -3,6 +3,7 @@ import { ApiError } from '@/lib/errors';
 import { TRACKING_CONFIG } from './config';
 import { MovementStatus, TripStatus, BookingStatus } from '@prisma/client';
 import { AuthenticatedUser } from '@/lib/auth-guard';
+import { publishEvent } from '@/server/realtime/hub';
 
 export interface LocationPointInput {
   lat: number;
@@ -75,7 +76,11 @@ export async function ingestLocations(
 ): Promise<IngestResult> {
   const activeTrip = await prisma.trip.findFirst({
     where: { driverId, status: TripStatus.ACTIVE },
-    include: { driver: true },
+    include: {
+      driver: { include: { user: true } },
+      vehicle: true,
+      booking: true,
+    },
   });
 
   if (!activeTrip) {
@@ -210,6 +215,26 @@ export async function ingestLocations(
         recordedAt: latestPoint.recordedAt,
         receivedAt: new Date(),
         movement,
+      },
+    });
+
+    await publishEvent({
+      type: 'location:update',
+      data: {
+        vehicleId: activeTrip.vehicleId,
+        lat: latestPoint.lat,
+        lng: latestPoint.lng,
+        accuracyM: latestPoint.accuracyM,
+        speedMps: latestPoint.speedMps ?? null,
+        headingDeg: latestPoint.headingDeg ?? null,
+        recordedAt: latestPoint.recordedAt.toISOString(),
+        receivedAt: new Date().toISOString(),
+        movement,
+        driverName: activeTrip.driver?.user?.name ?? null,
+        driverPhone: activeTrip.driver?.user?.phone ?? null,
+        plateNumber: activeTrip.vehicle?.plateNumber ?? null,
+        tripOrigin: activeTrip.booking?.pickupLocation ?? null,
+        tripDestination: activeTrip.booking?.destination ?? null,
       },
     });
   }

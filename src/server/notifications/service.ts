@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
 import { Prisma, RoleCode } from '@prisma/client';
+import { publishEvent } from '@/server/realtime/hub';
 
 export interface NotificationPayload {
   type: string;
@@ -58,7 +59,21 @@ export async function notify(
     },
   });
 
-  return serializeNotification(row);
+  const serialized = serializeNotification(row);
+
+  await publishEvent({
+    type: 'notification',
+    data: {
+      id: serialized.id,
+      userId: serialized.userId,
+      type: serialized.type,
+      title: serialized.title,
+      body: serialized.body,
+      createdAt: serialized.createdAt.toISOString(),
+    },
+  });
+
+  return serialized;
 }
 
 export async function notifyAdmins(payload: NotificationPayload): Promise<void> {

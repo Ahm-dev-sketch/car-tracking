@@ -146,7 +146,7 @@ function UserTrackingContent() {
               vehicles={mergedVehicles}
               selectedVehicleId={selectedVehicleId}
               onSelectVehicle={(v) => setSelectedVehicleId(v.vehicleId)}
-              className="h-[550px] w-full"
+              className="h-[340px] sm:h-[460px] lg:h-[550px] w-full rounded-lg overflow-hidden border border-zinc-200"
             />
           </div>
 

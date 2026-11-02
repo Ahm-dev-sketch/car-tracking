@@ -39,12 +39,12 @@ export function Pagination({
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="px-3 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          className="min-h-[44px] px-3.5 py-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
         >
           Previous
         </button>
 
-        <span className="text-xs text-zinc-500 font-mono">
+        <span className="text-xs text-zinc-500 font-mono px-1">
           {page} / {Math.max(1, totalPages)}
         </span>
 
@@ -52,7 +52,7 @@ export function Pagination({
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="px-3 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          className="min-h-[44px] px-3.5 py-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
         >
           Next
         </button>

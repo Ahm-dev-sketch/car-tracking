@@ -112,14 +112,14 @@ export function NavBar() {
       : 'bg-zinc-100 text-zinc-800 border-zinc-200';
 
   return (
-    <nav className="bg-white border-b border-zinc-200 sticky top-0 z-40">
+    <nav className="bg-white border-b border-zinc-200 sticky top-0 z-40 pt-[env(safe-area-inset-top)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Brand & Left Nav */}
           <div className="flex items-center gap-6">
             <Link
               href={role === 'ADMIN' ? '/admin' : role === 'DRIVER' ? '/driver' : '/user'}
-              className="flex items-center gap-2 font-bold text-zinc-900 tracking-tight text-sm uppercase"
+              className="flex items-center gap-2 font-bold text-zinc-900 tracking-tight text-sm uppercase min-h-[44px]"
             >
               <div className="w-6 h-6 rounded bg-zinc-900 text-white flex items-center justify-center font-mono text-xs font-bold">
                 F
@@ -149,25 +149,25 @@ export function NavBar() {
           </div>
 
           {/* Right Actions: Notifications, User, Signout */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Notifications Bell */}
             <div className="relative" ref={notifRef}>
               <button
                 type="button"
                 onClick={() => setNotificationsOpen((v) => !v)}
-                className="relative p-1.5 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-md cursor-pointer"
+                className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-md cursor-pointer"
                 aria-label="View notifications"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-600" />
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-600" />
                 )}
               </button>
 
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-zinc-200 overflow-hidden z-50">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white rounded-lg shadow-xl border border-zinc-200 overflow-hidden z-50">
                   <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-200">
                     <span className="text-xs font-semibold text-zinc-800">Notifications</span>
                     {unreadCount > 0 && (
@@ -223,7 +223,7 @@ export function NavBar() {
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="px-2.5 py-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded hover:bg-zinc-100 cursor-pointer"
+              className="min-h-[44px] px-3 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded hover:bg-zinc-100 cursor-pointer flex items-center justify-center"
             >
               Sign out
             </button>
@@ -232,7 +232,7 @@ export function NavBar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen((o) => !o)}
-              className="md:hidden p-1.5 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-md cursor-pointer"
+              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-md cursor-pointer"
               aria-label="Toggle navigation menu"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -257,7 +257,7 @@ export function NavBar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`block px-3 py-2 rounded-md text-xs font-medium ${
+                className={`flex items-center min-h-[44px] px-3 py-2 rounded-md text-xs font-medium ${
                   isActive
                     ? 'bg-zinc-100 text-zinc-900 font-semibold'
                     : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'

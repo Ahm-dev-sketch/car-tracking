@@ -25,8 +25,13 @@ export function DataTable<T extends Record<string, any>>({
   onRowClick,
 }: DataTableProps<T>) {
   return (
-    <div className="w-full overflow-x-auto border border-zinc-200 rounded-md bg-white">
-      <table className="w-full text-left text-sm border-collapse">
+    <div className="w-full border border-zinc-200 rounded-md bg-white overflow-hidden">
+      <div className="sm:hidden text-[10px] uppercase font-semibold text-zinc-400 px-3 py-1 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
+        <span>Table view</span>
+        <span>Swipe horizontally →</span>
+      </div>
+      <div className="w-full overflow-x-auto">
+        <table className="w-full text-left text-sm border-collapse min-w-[580px] sm:min-w-full">
         <thead className="bg-zinc-50 border-b border-zinc-200 text-xs font-semibold text-zinc-600 uppercase tracking-wider">
           <tr>
             {columns.map((col, idx) => (
@@ -79,6 +84,7 @@ export function DataTable<T extends Record<string, any>>({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

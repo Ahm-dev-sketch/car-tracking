@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Modal } from '@/components/ui/Modal';
+import { IosInstallHint } from '@/components/providers/InstallPrompt';
 
 interface ActiveTrip {
   id: string;
@@ -107,6 +108,7 @@ export default function DriverDashboardPage() {
     permissionDenied,
     error: geoError,
     lastUpdated,
+    isStale,
     getCurrentPosition,
     startTracking,
     stopTracking,
@@ -114,6 +116,14 @@ export default function DriverDashboardPage() {
     intervalSec: tripIntervalSec,
     onFlush: handleLocationFlush,
   });
+
+  // Signal lost or stale calculation (watchPosition error or >2x interval staleness)
+  const isSignalLostOrStale =
+    isStale ||
+    signalStatus === 'red' ||
+    movement === 'GPS_LOST' ||
+    Boolean(geoError) ||
+    (lastUpdated ? Date.now() - lastUpdated.getTime() > tripIntervalSec * 2 * 1000 : false);
 
   // Load config & active trip
   const loadDashboardData = async () => {
@@ -315,38 +325,108 @@ export default function DriverDashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${activeTrip ? 'pb-24 sm:pb-6' : ''}`}>
       {/* Persistent "Tracking active" banner when on trip */}
       {activeTrip && (
-        <div className="bg-emerald-600 text-white px-4 py-3 rounded-lg shadow-md flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-            </span>
-            <div>
-              <div className="font-bold text-sm tracking-wide uppercase">Tracking Session Active</div>
-              <div className="text-xs text-emerald-100">
-                Transmitting telemetry every {tripIntervalSec} seconds
+        <div
+          className={`sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-30 -mt-6 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 transition-colors shadow-md ${
+            isSignalLostOrStale
+              ? 'bg-amber-950 text-amber-50 border-b border-amber-800'
+              : 'bg-emerald-800 text-white border-b border-emerald-700'
+          }`}
+        >
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3">
+              <span className="relative flex h-3.5 w-3.5 shrink-0 mt-0.5 sm:mt-0">
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    isSignalLostOrStale ? 'bg-amber-400' : 'bg-emerald-400'
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex rounded-full h-3.5 w-3.5 ${
+                    isSignalLostOrStale ? 'bg-amber-500' : 'bg-emerald-400'
+                  }`}
+                />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-xs sm:text-sm tracking-wide uppercase">
+                    {isSignalLostOrStale ? 'GPS Signal Interrupted' : 'Tracking Active'}
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-bold border ${
+                      isSignalLostOrStale
+                        ? 'bg-amber-900 text-amber-200 border-amber-700'
+                        : 'bg-emerald-900 text-emerald-200 border-emerald-600'
+                    }`}
+                  >
+                    {isSignalLostOrStale ? 'Signal Lost / Paused' : 'Broadcasting Live'}
+                  </span>
+                </div>
+                {isSignalLostOrStale ? (
+                  <p className="text-xs text-amber-200 mt-1 leading-normal font-medium">
+                    Location updates pause when this tab is backgrounded or the screen locks — reopen to resume
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-100 mt-0.5">
+                    Transmitting telemetry every {tripIntervalSec} seconds
+                  </p>
+                )}
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4 text-xs font-mono">
-            <div>
-              <span className="text-emerald-200 block text-[10px] uppercase font-sans">Duration</span>
-              <span className="text-base font-bold">{elapsedDuration || '00:00:00'}</span>
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 sm:gap-4 text-xs font-mono border-t border-white/10 md:border-0 pt-2 md:pt-0">
+              <div className="flex items-center gap-2">
+                <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold uppercase font-sans border ${
+                    signalStatus === 'green'
+                      ? 'bg-emerald-900/60 text-emerald-200 border-emerald-600'
+                      : signalStatus === 'amber'
+                      ? 'bg-amber-900/60 text-amber-200 border-amber-600'
+                      : 'bg-rose-900/60 text-rose-200 border-rose-600'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      signalStatus === 'green'
+                        ? 'bg-emerald-400'
+                        : signalStatus === 'amber'
+                        ? 'bg-amber-400'
+                        : 'bg-rose-400'
+                    }`}
+                  />
+                  {signalStatus}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-sans opacity-70 block">Duration</span>
+                <span className="text-sm sm:text-base font-bold">{elapsedDuration || '00:00:00'}</span>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-sans opacity-70 block">Last Update</span>
+                <span className="text-xs font-sans text-white/90">
+                  {lastUpdated ? <RelativeTime date={lastUpdated} /> : 'Waiting...'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowEndConfirm(true)}
+                className="hidden sm:inline-flex min-h-[38px] px-3.5 py-1.5 bg-white text-rose-700 hover:bg-rose-50 active:bg-rose-100 font-bold rounded shadow-xs cursor-pointer uppercase tracking-wider text-xs font-sans items-center"
+              >
+                End Trip
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowEndConfirm(true)}
-              className="px-3.5 py-1.5 bg-white text-rose-700 hover:bg-rose-50 font-bold rounded shadow-xs cursor-pointer uppercase tracking-wider text-xs font-sans"
-            >
-              End Trip
-            </button>
           </div>
         </div>
       )}
+
+      {/* iOS install tip for driver when not on active trip */}
+      {!activeTrip && <IosInstallHint />}
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
@@ -405,6 +485,19 @@ export default function DriverDashboardPage() {
               <div>
                 <span className="text-zinc-400 uppercase font-semibold">Destination</span>
                 <p className="font-medium text-zinc-900 mt-0.5">{activeTrip.booking.destination}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Warning banner when GPS is stale or signal lost */}
+          {isSignalLostOrStale && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-start gap-2.5">
+              <span className="text-base shrink-0">⚠️</span>
+              <div>
+                <span className="font-bold block text-amber-900">GPS Signal Paused</span>
+                <p className="mt-0.5 text-amber-800 leading-relaxed">
+                  Location updates pause when this tab is backgrounded or the screen locks — reopen to resume.
+                </p>
               </div>
             </div>
           )}
@@ -473,7 +566,7 @@ export default function DriverDashboardPage() {
             <button
               type="button"
               onClick={() => setShowEndConfirm(true)}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold cursor-pointer uppercase tracking-wider"
+              className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded text-xs font-semibold cursor-pointer uppercase tracking-wider flex items-center justify-center"
             >
               Finish & End Trip
             </button>
@@ -536,7 +629,7 @@ export default function DriverDashboardPage() {
                     <button
                       type="button"
                       onClick={() => handleStartBookingTrip(b)}
-                      className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full min-h-[44px] py-2.5 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <span>🚀 Start Trip from Booking</span>
                     </button>
@@ -567,7 +660,7 @@ export default function DriverDashboardPage() {
                   placeholder="e.g. B 1234 ABC"
                   value={manualPlate}
                   onChange={(e) => searchVehicle(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded uppercase font-mono focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                  className="w-full px-3 py-2.5 text-base sm:text-xs border border-zinc-300 rounded uppercase font-mono focus:outline-none focus:ring-1 focus:ring-zinc-800"
                 />
               </div>
 
@@ -581,7 +674,7 @@ export default function DriverDashboardPage() {
                         setSelectedVehicle(v);
                         setManualPlate(v.plateNumber);
                       }}
-                      className="p-2 hover:bg-zinc-50 cursor-pointer text-xs flex items-center justify-between"
+                      className="p-3 hover:bg-zinc-50 cursor-pointer text-xs flex items-center justify-between min-h-[44px]"
                     >
                       <span className="font-mono font-semibold">{v.plateNumber}</span>
                       <span className="text-zinc-500">{v.brand} {v.model}</span>
@@ -602,12 +695,37 @@ export default function DriverDashboardPage() {
                 type="button"
                 disabled={!selectedVehicle}
                 onClick={handleStartVehicleTrip}
-                className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full min-h-[44px] py-2.5 bg-zinc-900 hover:bg-zinc-800 active:bg-black text-white rounded text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
               >
                 Start Trip with Vehicle
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Mobile Sticky Bottom Bar for End Trip */}
+      {activeTrip && (
+        <div className="fixed bottom-0 inset-x-0 z-30 sm:hidden bg-white/95 backdrop-blur-md border-t border-zinc-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Active Vehicle
+            </div>
+            <div className="text-xs font-mono font-bold text-zinc-900 truncate">
+              {activeTrip.vehicle.plateNumber}
+            </div>
+            <div className="text-[11px] font-mono text-emerald-600 font-semibold">
+              ⏱ {elapsedDuration || '00:00:00'}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowEndConfirm(true)}
+            className="min-h-[44px] px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold rounded-lg uppercase tracking-wider text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+          >
+            <span>Finish Trip</span>
+          </button>
         </div>
       )}
 

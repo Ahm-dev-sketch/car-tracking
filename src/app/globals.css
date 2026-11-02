@@ -37,3 +37,37 @@ body {
   animation: markerPulse 1.8s infinite;
   border-radius: 9999px;
 }
+
+/* Mobile Safari & touch optimizations */
+button,
+[role="button"],
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* iOS Safari font zoom prevention: inputs must be >= 16px to prevent auto-zoom */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Momentum scrolling for table and drawer containers */
+.overflow-x-auto,
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area utilities */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

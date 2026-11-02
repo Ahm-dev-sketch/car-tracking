@@ -128,7 +128,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-100 p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-zinc-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
       <Suspense fallback={<Spinner size="lg" />}>
         <LoginForm />
       </Suspense>

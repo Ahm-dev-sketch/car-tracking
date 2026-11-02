@@ -39,7 +39,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 disabled:opacity-50 cursor-pointer"
+            className="min-h-[44px] px-4 py-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-50 cursor-pointer flex items-center justify-center"
           >
             {cancelLabel}
           </button>
@@ -47,10 +47,10 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`px-3.5 py-1.5 rounded text-xs font-semibold text-white cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 ${
+            className={`min-h-[44px] px-4 py-2 rounded text-xs font-semibold text-white cursor-pointer inline-flex items-center justify-center gap-1.5 disabled:opacity-50 ${
               isDestructive
-                ? 'bg-rose-600 hover:bg-rose-700'
-                : 'bg-zinc-900 hover:bg-zinc-800'
+                ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800'
+                : 'bg-zinc-900 hover:bg-zinc-800 active:bg-black'
             }`}
           >
             {isLoading && <Spinner size="sm" className="text-white" />}

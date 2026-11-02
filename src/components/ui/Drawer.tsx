@@ -34,9 +34,9 @@ export function Drawer({
   if (!isOpen) return null;
 
   const widthClasses = {
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
+    md: 'sm:max-w-md',
+    lg: 'sm:max-w-lg',
+    xl: 'sm:max-w-xl',
   };
 
   return (
@@ -50,9 +50,9 @@ export function Drawer({
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="fixed inset-y-0 right-0 flex pl-10 max-w-full">
+      <div className="fixed inset-y-0 right-0 flex pl-0 sm:pl-10 max-w-full">
         <div
-          className={`w-screen ${widthClasses[width]} bg-white border-l border-zinc-200 shadow-2xl flex flex-col`}
+          className={`w-screen max-w-full ${widthClasses[width]} bg-white border-l border-zinc-200 shadow-2xl flex flex-col pt-[env(safe-area-inset-top)] pb-[max(0.75rem,env(safe-area-inset-bottom))]`}
         >
           <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 bg-zinc-50">
             <div>
@@ -62,7 +62,7 @@ export function Drawer({
             <button
               type="button"
               onClick={onClose}
-              className="text-zinc-400 hover:text-zinc-700 p-1.5 rounded hover:bg-zinc-100 cursor-pointer"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-zinc-400 hover:text-zinc-700 p-2 rounded hover:bg-zinc-100 cursor-pointer"
               aria-label="Close panel"
             >
               ✕

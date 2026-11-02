@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { RelativeTime } from '@/components/ui/RelativeTime';
+import { IosInstallHint } from '@/components/providers/InstallPrompt';
 
 interface Booking {
   id: string;
@@ -74,6 +75,8 @@ export default function UserOverviewPage() {
 
   return (
     <div className="space-y-6">
+      <IosInstallHint />
+
       {/* Welcome header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
         <div>

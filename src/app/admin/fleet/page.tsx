@@ -137,7 +137,7 @@ export default function AdminFleetMapPage() {
               vehicles={mergedVehicles}
               selectedVehicleId={selectedVehicleId}
               onSelectVehicle={(v) => setSelectedVehicleId(v.vehicleId)}
-              className="h-[600px] w-full"
+              className="h-[360px] sm:h-[480px] lg:h-[600px] w-full rounded-lg overflow-hidden border border-zinc-200"
             />
           </div>
 

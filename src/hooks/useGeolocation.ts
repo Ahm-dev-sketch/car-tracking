@@ -29,6 +29,7 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isStale, setIsStale] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
   const bufferRef = useRef<GeoPoint[]>([]);
@@ -143,6 +144,7 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
         setSignalStatus(s);
         setMovement(m);
         setLastUpdated(now);
+        setIsStale(false);
         setError(null);
 
         // Append to buffer, cap at 20 points
@@ -182,7 +184,45 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
     // Final flush
     flushBuffer();
     setIsTracking(false);
+    setIsStale(false);
   }, [flushBuffer]);
+
+  // Staleness monitor: if last update is older than 2x interval while tracking
+  useEffect(() => {
+    if (!isTracking) {
+      setIsStale(false);
+      return;
+    }
+
+    const checkStaleness = () => {
+      if (!lastUpdated) return;
+      const diffMs = Date.now() - lastUpdated.getTime();
+      const thresholdMs = intervalSec * 2 * 1000;
+      if (diffMs > thresholdMs) {
+        setIsStale(true);
+        setSignalStatus((prev) => (prev === 'green' ? 'amber' : prev));
+      } else {
+        setIsStale(false);
+      }
+    };
+
+    const timer = setInterval(checkStaleness, 1000);
+    return () => clearInterval(timer);
+  }, [isTracking, lastUpdated, intervalSec]);
+
+  // Foreground recovery: immediately fetch position when returning to visible tab
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isTracking) {
+        getCurrentPosition().catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [isTracking, getCurrentPosition]);
 
   useEffect(() => {
     return () => {
@@ -204,6 +244,7 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
     permissionDenied,
     error,
     lastUpdated,
+    isStale,
     getCurrentPosition,
     startTracking,
     stopTracking,

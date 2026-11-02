@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run --exclude='**/*.integration.test.ts'",
+    "test:integration": "vitest run src/server/__tests__/phase2.integration.test.ts",
+    "test:all": "vitest run"
   },
   "prisma": {
     "seed": "node --experimental-strip-types prisma/seed.ts"

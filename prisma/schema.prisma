@@ -54,39 +54,42 @@ model Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
   name         String
   phone        String
-  roleId       String   @map("role_id")
-  role         Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  avatarUrl    String?  @map("avatar_url")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  roleId       String     @map("role_id")
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  avatarUrl    String?    @map("avatar_url")
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
 
   driver       Driver?
+  auditLogs    AuditLog[]
 
   @@index([roleId])
   @@map("users")
 }
 
 model Vehicle {
-  id              String         @id @default(cuid())
-  plateNumber     String         @unique @map("plate_number")
+  id              String              @id @default(cuid())
+  plateNumber     String              @unique @map("plate_number")
   brand           String
   model           String
-  vehicleType     VehicleType    @map("vehicle_type")
-  seatingCapacity Int            @map("seating_capacity")
+  vehicleType     VehicleType         @map("vehicle_type")
+  seatingCapacity Int                 @map("seating_capacity")
   transmission    Transmission?
-  imageUrl        String?        @map("image_url")
-  status          VehicleStatus  @default(AVAILABLE)
-  currentDriverId String?        @unique @map("current_driver_id")
-  currentDriver   Driver?        @relation("VehicleCurrentDriver", fields: [currentDriverId], references: [id], onDelete: SetNull)
-  assignedDriver  Driver?        @relation("DriverCurrentVehicle")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  imageUrl        String?             @map("image_url")
+  status          VehicleStatus       @default(AVAILABLE)
+  currentDriverId String?             @unique @map("current_driver_id")
+  currentDriver   Driver?             @relation("VehicleCurrentDriver", fields: [currentDriverId], references: [id], onDelete: SetNull)
+  assignedDriver  Driver?             @relation("DriverCurrentVehicle")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  assignments     VehicleAssignment[]
 
   @@index([status])
   @@index([seatingCapacity])
@@ -94,16 +97,52 @@ model Vehicle {
 }
 
 model Driver {
-  id               String       @id @default(cuid())
-  userId           String       @unique @map("user_id")
-  user             User         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  licenseNumber    String       @unique @map("license_number")
-  status           DriverStatus @default(OFFLINE)
-  currentVehicleId String?      @unique @map("current_vehicle_id")
-  currentVehicle   Vehicle?     @relation("DriverCurrentVehicle", fields: [currentVehicleId], references: [id], onDelete: SetNull)
-  drivenVehicle    Vehicle?     @relation("VehicleCurrentDriver")
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  id               String              @id @default(cuid())
+  userId           String              @unique @map("user_id")
+  user             User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  licenseNumber    String              @unique @map("license_number")
+  status           DriverStatus        @default(OFFLINE)
+  currentVehicleId String?             @unique @map("current_vehicle_id")
+  currentVehicle   Vehicle?            @relation("DriverCurrentVehicle", fields: [currentVehicleId], references: [id], onDelete: SetNull)
+  drivenVehicle    Vehicle?            @relation("VehicleCurrentDriver")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  assignments      VehicleAssignment[]
 
   @@map("drivers")
+}
+
+model VehicleAssignment {
+  id           BigInt    @id @default(autoincrement())
+  vehicleId    String    @map("vehicle_id")
+  driverId     String    @map("driver_id")
+  assignedAt   DateTime  @default(now()) @map("assigned_at")
+  unassignedAt DateTime? @map("unassigned_at")
+  reason       String?
+
+  vehicle      Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver       Driver    @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  @@index([driverId])
+  @@index([vehicleId])
+  @@map("vehicle_assignments")
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  actorUserId String?  @map("actor_user_id")
+  actorUser   User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  ip          String?
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId])
+  @@map("audit_logs")
 }

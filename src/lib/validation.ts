@@ -343,3 +343,135 @@ export const assignBookingDriverSchema = z.object({
 export const updateBookingStatusSchema = z.object({
   status: z.enum(['IN_PROGRESS', 'COMPLETED']),
 });
+
+export const tripStatusEnum = z.enum(['ACTIVE', 'COMPLETED', 'ABORTED']);
+export const movementStatusEnum = z.enum([
+  'MOVING',
+  'STOPPED',
+  'GPS_LOST',
+  'OFFLINE',
+]);
+
+export const startTripSchema = z
+  .object({
+    booking_id: z.string().trim().min(1).optional(),
+    bookingId: z.string().trim().min(1).optional(),
+    vehicle_id: z.string().trim().min(1).optional(),
+    vehicleId: z.string().trim().min(1).optional(),
+    start_lat: z.coerce.number().min(-90).max(90).optional(),
+    startLat: z.coerce.number().min(-90).max(90).optional(),
+    start_lng: z.coerce.number().min(-180).max(180).optional(),
+    startLng: z.coerce.number().min(-180).max(180).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const booking = data.booking_id ?? data.bookingId;
+    const vehicle = data.vehicle_id ?? data.vehicleId;
+    if (!booking && !vehicle) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Either bookingId or vehicleId is required',
+        path: ['bookingId'],
+      });
+    }
+    const lat = data.start_lat ?? data.startLat;
+    if (lat === undefined || isNaN(lat) || lat < -90 || lat > 90) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Valid start_lat between -90 and 90 is required',
+        path: ['start_lat'],
+      });
+    }
+    const lng = data.start_lng ?? data.startLng;
+    if (lng === undefined || isNaN(lng) || lng < -180 || lng > 180) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Valid start_lng between -180 and 180 is required',
+        path: ['start_lng'],
+      });
+    }
+  })
+  .transform((data) => ({
+    bookingId: data.booking_id ?? data.bookingId ?? null,
+    vehicleId: data.vehicle_id ?? data.vehicleId ?? null,
+    startLat: (data.start_lat ?? data.startLat)!,
+    startLng: (data.start_lng ?? data.startLng)!,
+  }));
+
+export const endTripSchema = z
+  .object({
+    end_lat: z.coerce.number().min(-90).max(90).optional(),
+    endLat: z.coerce.number().min(-90).max(90).optional(),
+    end_lng: z.coerce.number().min(-180).max(180).optional(),
+    endLng: z.coerce.number().min(-180).max(180).optional(),
+    distance_meters: z.coerce.number().nonnegative().optional(),
+    distanceMeters: z.coerce.number().nonnegative().optional(),
+  })
+  .transform((data) => ({
+    endLat: data.end_lat ?? data.endLat ?? null,
+    endLng: data.end_lng ?? data.endLng ?? null,
+    distanceMeters: data.distance_meters ?? data.distanceMeters ?? null,
+  }));
+
+export const abortTripSchema = z.object({
+  reason: z.string().trim().optional(),
+});
+
+export const tripQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+  status: tripStatusEnum.optional(),
+  vehicle_id: z.string().optional(),
+  vehicleId: z.string().optional(),
+  driver_id: z.string().optional(),
+  driverId: z.string().optional(),
+  start_date: z.coerce.date().optional(),
+  startDate: z.coerce.date().optional(),
+  end_date: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+});
+
+export const locationPointSchema = z
+  .object({
+    lat: z.coerce.number().min(-90).max(90),
+    lng: z.coerce.number().min(-180).max(180),
+    accuracy_m: z.coerce.number().min(0).max(5000).optional(),
+    accuracyM: z.coerce.number().min(0).max(5000).optional(),
+    speed_mps: z.coerce.number().min(0).max(150).optional().nullable(),
+    speedMps: z.coerce.number().min(0).max(150).optional().nullable(),
+    heading_deg: z.coerce.number().min(0).max(360).optional().nullable(),
+    headingDeg: z.coerce.number().min(0).max(360).optional().nullable(),
+    recorded_at: z.coerce.date().optional(),
+    recordedAt: z.coerce.date().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const accuracy = data.accuracy_m ?? data.accuracyM;
+    if (accuracy === undefined || isNaN(accuracy)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'accuracy_m is required',
+        path: ['accuracy_m'],
+      });
+    }
+    const recordedAt = data.recorded_at ?? data.recordedAt;
+    if (!recordedAt || isNaN(recordedAt.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'recorded_at is required',
+        path: ['recorded_at'],
+      });
+    }
+  })
+  .transform((data) => ({
+    lat: data.lat,
+    lng: data.lng,
+    accuracyM: (data.accuracy_m ?? data.accuracyM)!,
+    speedMps: data.speed_mps ?? data.speedMps ?? null,
+    headingDeg: data.heading_deg ?? data.headingDeg ?? null,
+    recordedAt: (data.recorded_at ?? data.recordedAt)!,
+  }));
+
+export const locationIngestSchema = z
+  .object({
+    points: z.array(z.any()).min(1, 'Points array must contain at least 1 point').max(5, 'Maximum batch size is 5 points'),
+  });
+

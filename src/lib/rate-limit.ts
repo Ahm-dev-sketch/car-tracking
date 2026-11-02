@@ -81,6 +81,11 @@ export const RATE_LIMIT_CONFIG = {
     limit: 10,
     windowMs: 60 * 1000,
   },
+  // GPS location ingest: 120 requests per minute per driver
+  LOCATION_INGEST: {
+    limit: 120,
+    windowMs: 60 * 1000,
+  },
 } as const;
 
 export function getClientIp(req: NextRequest): string {

@@ -4,6 +4,12 @@ import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
 import { logAuditEvent } from '@/server/audit';
 
+export interface UserMutationContext {
+  actorUserId?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+}
+
 export interface CreateUserInput {
   email: string;
   name: string;
@@ -23,7 +29,10 @@ export interface UserQueryFilters {
   search?: string;
 }
 
-export async function createUser(input: CreateUserInput, actorUserId?: string) {
+export async function createUser(
+  input: CreateUserInput,
+  ctx?: UserMutationContext
+) {
   const email = input.email.toLowerCase().trim();
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -58,18 +67,24 @@ export async function createUser(input: CreateUserInput, actorUserId?: string) {
     },
   });
 
-  logAuditEvent({
-    actorUserId,
+  await logAuditEvent({
+    actorUserId: ctx?.actorUserId,
     action: 'CREATE_USER',
     entityType: 'User',
     entityId: user.id,
-    details: { email: user.email, role: user.role.code },
+    newValue: { email: user.email, role: user.role.code },
+    ip: ctx?.ip,
+    userAgent: ctx?.userAgent,
   });
 
   return user;
 }
 
-export async function updateUser(id: string, input: UpdateUserInput, actorUserId?: string) {
+export async function updateUser(
+  id: string,
+  input: UpdateUserInput,
+  ctx?: UserMutationContext
+) {
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) {
     throw new ApiError(404, 'NOT_FOUND', 'User not found');
@@ -98,12 +113,18 @@ export async function updateUser(id: string, input: UpdateUserInput, actorUserId
     },
   });
 
-  logAuditEvent({
-    actorUserId,
+  await logAuditEvent({
+    actorUserId: ctx?.actorUserId,
     action: 'UPDATE_USER',
     entityType: 'User',
     entityId: user.id,
-    details: { isActive: user.isActive, passwordReset: Boolean(input.password) },
+    oldValue: { isActive: existing.isActive },
+    newValue: {
+      isActive: user.isActive,
+      passwordReset: Boolean(input.password),
+    },
+    ip: ctx?.ip,
+    userAgent: ctx?.userAgent,
   });
 
   return user;

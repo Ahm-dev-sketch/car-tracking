@@ -154,6 +154,37 @@ export const createDriverSchema = z
     };
   });
 
+export const updateDriverSchema = z.object({
+  license_number: z.string().trim().min(1).optional(),
+  licenseNumber: z.string().trim().min(1).optional(),
+  status: driverStatusEnum.optional(),
+}).transform((data) => {
+  const licenseNumber = data.license_number ?? data.licenseNumber;
+  return {
+    ...(licenseNumber ? { licenseNumber } : {}),
+    ...(data.status ? { status: data.status } : {}),
+  };
+});
+
+export const assignVehicleSchema = z.object({
+  vehicle_id: z.string().trim().min(1).optional(),
+  vehicleId: z.string().trim().min(1).optional(),
+}).superRefine((data, ctx) => {
+  if (!data.vehicle_id && !data.vehicleId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'vehicleId is required',
+      path: ['vehicleId'],
+    });
+  }
+}).transform((data) => ({
+  vehicleId: (data.vehicle_id ?? data.vehicleId)!,
+}));
+
+export const unassignVehicleSchema = z.object({
+  reason: z.string().trim().optional(),
+});
+
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
@@ -165,6 +196,8 @@ export const vehicleQuerySchema = z.object({
   search: z.string().trim().optional(),
   seats: z.coerce.number().int().positive().optional(),
   status: vehicleStatusEnum.optional(),
+  sortBy: z.enum(['created_at', 'plate_number', 'brand', 'status']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
 export const userQuerySchema = z.object({
@@ -178,4 +211,7 @@ export const driverQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(10),
   search: z.string().trim().optional(),
   status: driverStatusEnum.optional(),
+  assignment: z.enum(['assigned', 'unassigned', 'all']).optional(),
+  sortBy: z.enum(['name', 'license_number', 'created_at']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });

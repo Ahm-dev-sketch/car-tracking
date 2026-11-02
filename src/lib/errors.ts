@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { logger } from './logger';
 
-// Rate limiting: In-memory/Redis sliding-window rate limiter scheduled for Phase 2+ (ARCHITECTURE.md §4).
-// Stub note: rate limiting checks will return 429 RATE_LIMIT_EXCEEDED when enabled.
+// Rate limiting: In-memory sliding-window limiter per user+IP (Phase 2).
+// Cloudflare edge migration note: swap to Durable Objects or Redis for distributed rate-limiting.
 
 export class ApiError extends Error {
   constructor(
@@ -17,13 +17,15 @@ export class ApiError extends Error {
   }
 }
 
-type RouteHandler<T = unknown> = (
+export type RouteHandler<T = any> = (
   req: NextRequest,
-  ctx?: T
-) => Promise<NextResponse> | NextResponse;
+  ctx: T
+) => Promise<Response> | Response;
 
-export function withErrorHandling<T = unknown>(handler: RouteHandler<T>): RouteHandler<T> {
-  return async (req: NextRequest, ctx?: T): Promise<NextResponse> => {
+export function withErrorHandling<T = any>(
+  handler: (req: NextRequest, ctx: T) => Promise<Response> | Response
+): (req: NextRequest, ctx: T) => Promise<Response> {
+  return async (req: NextRequest, ctx: T): Promise<Response> => {
     try {
       return await handler(req, ctx);
     } catch (err: unknown) {
@@ -57,7 +59,11 @@ export function withErrorHandling<T = unknown>(handler: RouteHandler<T>): RouteH
       }
 
       const message = err instanceof Error ? err.message : 'Internal server error';
-      logger.error({ msg: 'Unhandled error in API route', error: message, path: req.nextUrl?.pathname });
+      logger.error({
+        msg: 'Unhandled error in API route',
+        error: message,
+        path: req.nextUrl?.pathname,
+      });
 
       return NextResponse.json(
         {

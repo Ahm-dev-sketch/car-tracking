@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandling } from '@/lib/errors';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
+import { getClientContext } from '@/lib/request-context';
 import { updateVehicleSchema } from '@/lib/validation';
 import { getVehicleById, updateVehicle, deleteVehicle } from '@/server/vehicles/service';
 
@@ -39,13 +40,14 @@ export const PATCH = withErrorHandling(
     const body = await req.json();
     const validated = updateVehicleSchema.parse(body);
 
-    const vehicle = await updateVehicle(id, validated, user.id);
+    const ctx = getClientContext(req, user.id);
+    const vehicle = await updateVehicle(id, validated, ctx);
     return NextResponse.json({ data: vehicle });
   }
 );
 
 export const DELETE = withErrorHandling(
-  async (_req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
     requireRole(user, 'ADMIN');
 
@@ -58,7 +60,8 @@ export const DELETE = withErrorHandling(
       );
     }
 
-    const vehicle = await deleteVehicle(id, user.id);
+    const ctx = getClientContext(req, user.id);
+    const vehicle = await deleteVehicle(id, ctx);
     return NextResponse.json({ data: vehicle, message: 'Vehicle deactivated' });
   }
 );

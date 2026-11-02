@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandling } from '@/lib/errors';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
+import { getClientContext } from '@/lib/request-context';
 import { updateUserSchema } from '@/lib/validation';
 import { updateUser } from '@/server/users/service';
 
@@ -24,13 +25,14 @@ export const PATCH = withErrorHandling(
     const isActive =
       validated.is_active !== undefined ? validated.is_active : validated.isActive;
 
+    const ctx = getClientContext(req, user.id);
     const updated = await updateUser(
       id,
       {
         isActive,
         password: validated.password,
       },
-      user.id
+      ctx
     );
 
     return NextResponse.json({ data: updated });

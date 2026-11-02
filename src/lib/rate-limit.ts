@@ -76,6 +76,11 @@ export const RATE_LIMIT_CONFIG = {
     limit: 30,
     windowMs: 60 * 1000,
   },
+  // User booking creation: 10 requests per minute
+  BOOKING_CREATE: {
+    limit: 10,
+    windowMs: 60 * 1000,
+  },
 } as const;
 
 export function getClientIp(req: NextRequest): string {

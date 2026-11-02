@@ -11,6 +11,15 @@ export const vehicleStatusEnum = z.enum([
 export const transmissionEnum = z.enum(['MANUAL', 'AUTOMATIC']);
 export const driverStatusEnum = z.enum(['OFFLINE', 'AVAILABLE', 'ON_TRIP']);
 export const roleCodeEnum = z.enum(['ADMIN', 'USER', 'DRIVER']);
+export const bookingStatusEnum = z.enum([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'DRIVER_ASSIGNED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
+]);
 
 export const createUserSchema = z
   .object({
@@ -214,4 +223,123 @@ export const driverQuerySchema = z.object({
   assignment: z.enum(['assigned', 'unassigned', 'all']).optional(),
   sortBy: z.enum(['name', 'license_number', 'created_at']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+});
+
+export const createBookingSchema = z
+  .object({
+    vehicle_id: z.string().trim().min(1).optional().nullable(),
+    vehicleId: z.string().trim().min(1).optional().nullable(),
+    pickup_location: z.string().trim().min(1, 'Pickup location is required').optional(),
+    pickupLocation: z.string().trim().min(1, 'Pickup location is required').optional(),
+    destination: z.string().trim().min(1, 'Destination is required'),
+    departure_at: z.coerce.date().optional(),
+    departureAt: z.coerce.date().optional(),
+    expected_return_at: z.coerce.date().optional(),
+    expectedReturnAt: z.coerce.date().optional(),
+    passenger_count: z.coerce.number().int().min(1, 'Passenger count must be at least 1').optional(),
+    passengerCount: z.coerce.number().int().min(1, 'Passenger count must be at least 1').optional(),
+    purpose: z.string().trim().min(1, 'Purpose is required'),
+    notes: z.string().trim().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const pickup = data.pickup_location ?? data.pickupLocation;
+    if (!pickup) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Pickup location is required',
+        path: ['pickup_location'],
+      });
+    }
+
+    const departure = data.departure_at ?? data.departureAt;
+    if (!departure || isNaN(departure.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Valid departure time is required',
+        path: ['departure_at'],
+      });
+    }
+
+    const expectedReturn = data.expected_return_at ?? data.expectedReturnAt;
+    if (!expectedReturn || isNaN(expectedReturn.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Valid expected return time is required',
+        path: ['expected_return_at'],
+      });
+    }
+
+    if (departure && expectedReturn && expectedReturn <= departure) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Expected return time must be after departure time',
+        path: ['expected_return_at'],
+      });
+    }
+
+    const passengers = data.passenger_count ?? data.passengerCount;
+    if (passengers === undefined || passengers < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Passenger count must be at least 1',
+        path: ['passenger_count'],
+      });
+    }
+  })
+  .transform((data) => {
+    const vehicleId = data.vehicle_id ?? data.vehicleId ?? null;
+    const pickupLocation = (data.pickup_location ?? data.pickupLocation)!;
+    const departureAt = (data.departure_at ?? data.departureAt)!;
+    const expectedReturnAt = (data.expected_return_at ?? data.expectedReturnAt)!;
+    const passengerCount = (data.passenger_count ?? data.passengerCount)!;
+
+    return {
+      vehicleId,
+      pickupLocation,
+      destination: data.destination,
+      departureAt,
+      expectedReturnAt,
+      passengerCount,
+      purpose: data.purpose,
+      notes: data.notes ?? null,
+    };
+  });
+
+export const bookingQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+  status: bookingStatusEnum.optional(),
+  vehicle_id: z.string().optional(),
+  vehicleId: z.string().optional(),
+  start_date: z.coerce.date().optional(),
+  startDate: z.coerce.date().optional(),
+  end_date: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+});
+
+export const rejectBookingSchema = z.object({
+  reason: z.string().trim().min(1, 'Rejection reason is required'),
+});
+
+export const cancelBookingSchema = z.object({
+  reason: z.string().trim().optional(),
+});
+
+export const assignBookingDriverSchema = z.object({
+  driver_id: z.string().trim().min(1).optional(),
+  driverId: z.string().trim().min(1).optional(),
+}).superRefine((data, ctx) => {
+  if (!data.driver_id && !data.driverId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'driverId is required',
+      path: ['driverId'],
+    });
+  }
+}).transform((data) => ({
+  driverId: (data.driver_id ?? data.driverId)!,
+}));
+
+export const updateBookingStatusSchema = z.object({
+  status: z.enum(['IN_PROGRESS', 'COMPLETED']),
 });

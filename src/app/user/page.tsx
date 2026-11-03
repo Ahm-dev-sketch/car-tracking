@@ -66,7 +66,15 @@ export default function UserOverviewPage() {
   }, []);
 
   const activeBooking = bookings.find((b) =>
-    ['APPROVED', 'DRIVER_ASSIGNED', 'IN_PROGRESS'].includes(b.status)
+    [
+      'SEARCHING_DRIVER',
+      'DRIVER_NOTIFIED',
+      'DRIVER_ASSIGNED',
+      'DRIVER_EN_ROUTE',
+      'ARRIVED',
+      'IN_PROGRESS',
+      'APPROVED',
+    ].includes(b.status)
   );
 
   const upcomingBooking = bookings

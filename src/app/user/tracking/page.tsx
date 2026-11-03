@@ -9,6 +9,32 @@ import { MovementBadge } from '@/components/ui/MovementBadge';
 import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Spinner } from '@/components/ui/Spinner';
+import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
+
+interface ActiveBookingInfo {
+  id: string;
+  bookingNumber: string;
+  status: string;
+  pickupLocation: string;
+  destination: string;
+  etaSeconds?: number | null;
+  etaEstimated?: boolean;
+  passengerCount?: number;
+  vehicleId?: string | null;
+  vehicle?: {
+    id: string;
+    plateNumber: string;
+    brand: string;
+    model: string;
+  } | null;
+  driver?: {
+    id: string;
+    user: {
+      name: string;
+      phone: string;
+    };
+  } | null;
+}
 
 function UserTrackingContent() {
   const searchParams = useSearchParams();
@@ -16,7 +42,38 @@ function UserTrackingContent() {
 
   const [liveVehicles, setLiveVehicles] = useState<VehicleMarkerData[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(initialVehicleId);
+  const [activeBookings, setActiveBookings] = useState<ActiveBookingInfo[]>([]);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch active bookings
+  const fetchActiveBookings = async () => {
+    try {
+      const res = await fetch('/api/bookings?limit=10');
+      if (res.ok) {
+        const json = await res.json();
+        const list: any[] = json.data || [];
+        const active = list.filter((b) =>
+          [
+            'SEARCHING_DRIVER',
+            'DRIVER_NOTIFIED',
+            'DRIVER_ASSIGNED',
+            'DRIVER_EN_ROUTE',
+            'ARRIVED',
+            'IN_PROGRESS',
+          ].includes(b.status)
+        );
+        setActiveBookings(active);
+        if (active.length > 0 && !selectedBookingId) {
+          // If vehicleId in query matches a booking, select that; otherwise pick first
+          const matched = active.find((b) => b.vehicle?.id === initialVehicleId);
+          setSelectedBookingId(matched ? matched.id : active[0].id);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   // Initial fetch from GET /api/tracking/live
   const fetchLiveTracking = async () => {
@@ -57,13 +114,19 @@ function UserTrackingContent() {
 
   useEffect(() => {
     fetchLiveTracking();
-    const interval = setInterval(fetchLiveTracking, 10000);
+    fetchActiveBookings();
+    const interval = setInterval(() => {
+      fetchLiveTracking();
+      fetchActiveBookings();
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
   // Connect to realtime WS
   const vehicleIds = useMemo(() => liveVehicles.map((v) => v.vehicleId), [liveVehicles]);
-  const { vehicles: realtimeVehicles, connectionState } = useRealtime({ vehicleIds });
+  const { vehicles: realtimeVehicles, bookings: realtimeBookings, connectionState } = useRealtime({
+    vehicleIds,
+  });
 
   // Merge live REST data with realtime WebSocket push
   const mergedVehicles = useMemo(() => {
@@ -90,8 +153,33 @@ function UserTrackingContent() {
     });
   }, [liveVehicles, realtimeVehicles]);
 
-  const selectedVehicle = mergedVehicles.find((v) => v.vehicleId === selectedVehicleId);
+  // Current selected booking
+  const selectedBooking = useMemo(() => {
+    if (!selectedBookingId) return activeBookings[0] || null;
+    const found = activeBookings.find((b) => b.id === selectedBookingId);
+    if (!found) return null;
+    // Check if realtime updated booking status
+    const rt = realtimeBookings.get(found.id);
+    if (rt) {
+      return {
+        ...found,
+        status: rt.status,
+      };
+    }
+    return found;
+  }, [activeBookings, selectedBookingId, realtimeBookings]);
 
+  // If a booking is selected, ensure its vehicle is selected if tracked
+  useEffect(() => {
+    if (selectedBooking?.vehicle?.id) {
+      const exists = mergedVehicles.some((v) => v.vehicleId === selectedBooking.vehicle?.id);
+      if (exists) {
+        setSelectedVehicleId(selectedBooking.vehicle.id);
+      }
+    }
+  }, [selectedBooking, mergedVehicles]);
+
+  const selectedVehicle = mergedVehicles.find((v) => v.vehicleId === selectedVehicleId);
   const rawPhone = selectedVehicle?.driverPhone ? selectedVehicle.driverPhone.replace(/\D/g, '') : '';
   const waUrl = rawPhone ? `https://wa.me/${rawPhone}` : null;
 
@@ -126,6 +214,41 @@ function UserTrackingContent() {
         </div>
       </div>
 
+      {/* Booking Status Header Banner */}
+      {selectedBooking && (
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-zinc-900">
+                  Reservation #{selectedBooking.bookingNumber}
+                </span>
+                <StatusBadge status={selectedBooking.status} />
+              </div>
+              <p className="text-xs text-zinc-600 mt-0.5">
+                {selectedBooking.pickupLocation} → {selectedBooking.destination}
+              </p>
+            </div>
+
+            {/* ETA estimate */}
+            <div className="flex items-center gap-2">
+              {selectedBooking.etaSeconds !== undefined && selectedBooking.etaSeconds !== null && (
+                <div className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded text-xs font-mono font-semibold">
+                  ETA: {formatEta(selectedBooking.etaSeconds, selectedBooking.etaEstimated)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Dispatch Progress Tracker */}
+          <DispatchProgress
+            status={selectedBooking.status}
+            etaSeconds={selectedBooking.etaSeconds}
+            etaEstimated={selectedBooking.etaEstimated}
+          />
+        </div>
+      )}
+
       {isLoading ? (
         <div className="py-24 text-center text-zinc-500 text-sm bg-white rounded-lg border border-zinc-200">
           <Spinner size="lg" className="mb-2" />
@@ -133,9 +256,9 @@ function UserTrackingContent() {
         </div>
       ) : mergedVehicles.length === 0 ? (
         <div className="p-12 text-center bg-white border border-dashed border-zinc-300 rounded-lg text-zinc-500 text-sm">
-          <p className="font-semibold text-zinc-700">No active vehicle trips found</p>
+          <p className="font-semibold text-zinc-700">No active vehicle trips reporting live GPS</p>
           <p className="text-xs text-zinc-400 mt-1">
-            Tracking is displayed once a booking is approved and the vehicle starts moving.
+            Tracking is displayed once a driver starts a trip or an online driver shares telemetry.
           </p>
         </div>
       ) : (
@@ -220,51 +343,54 @@ function UserTrackingContent() {
                   </div>
 
                   {selectedVehicle.driverName && (
-                    <div className="pt-2 border-t border-zinc-100 space-y-1.5">
+                    <div className="pt-2 border-t border-zinc-100 space-y-1">
                       <span className="text-[10px] text-zinc-400 uppercase font-semibold">
-                        Driver Information
+                        Driver
                       </span>
-                      <div className="font-bold text-zinc-900">{selectedVehicle.driverName}</div>
+                      <div className="font-medium text-zinc-900">
+                        {selectedVehicle.driverName}
+                      </div>
                       {selectedVehicle.driverPhone && selectedVehicle.driverPhone !== 'REDACTED' && (
-                        <div>
-                          {waUrl ? (
-                            <a
-                              href={waUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold hover:underline"
-                            >
-                              <span>📱 WhatsApp {selectedVehicle.driverPhone}</span>
-                            </a>
-                          ) : (
-                            <span className="text-zinc-600">{selectedVehicle.driverPhone}</span>
-                          )}
+                        <div className="text-zinc-500">
+                          {selectedVehicle.driverPhone}
                         </div>
                       )}
                     </div>
                   )}
 
-                  {(selectedVehicle.tripOrigin || selectedVehicle.tripDestination) && (
-                    <div className="pt-2 border-t border-zinc-100 text-[11px] text-zinc-600 space-y-0.5">
-                      {selectedVehicle.tripOrigin && (
-                        <div>
-                          <strong className="text-zinc-700">Origin:</strong> {selectedVehicle.tripOrigin}
-                        </div>
-                      )}
+                  {selectedVehicle.tripOrigin && (
+                    <div className="pt-2 border-t border-zinc-100 space-y-1 text-zinc-600">
+                      <div>
+                        <span className="font-semibold text-zinc-700">Origin: </span>
+                        {selectedVehicle.tripOrigin}
+                      </div>
                       {selectedVehicle.tripDestination && (
                         <div>
-                          <strong className="text-zinc-700">Destination:</strong> {selectedVehicle.tripDestination}
+                          <span className="font-semibold text-zinc-700">Destination: </span>
+                          {selectedVehicle.tripDestination}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-zinc-400 py-6 text-center">
-                  Select a vehicle marker on the map to inspect driver and telemetry.
-                </div>
+                <p className="text-xs text-zinc-400 italic">Select a vehicle to inspect details</p>
               )}
             </div>
+
+            {/* Direct driver communication */}
+            {waUrl && (
+              <div className="pt-4 border-t border-zinc-100 mt-4">
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <span>Chat Driver on WhatsApp</span>
+                </a>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -278,7 +404,7 @@ export default function UserTrackingPage() {
       fallback={
         <div className="py-20 text-center text-zinc-500 text-sm">
           <Spinner size="lg" className="mb-2" />
-          <p>Loading tracking view...</p>
+          <p>Loading tracking map...</p>
         </div>
       }
     >

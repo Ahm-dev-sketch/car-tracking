@@ -1,16 +1,19 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LocationBadge } from '@/components/ui/LocationBadge';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { Pagination } from '@/components/ui/Pagination';
+import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Drawer } from '@/components/ui/Drawer';
-import { Modal } from '@/components/ui/Modal';
-import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
+import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 
 interface Booking {
   id: string;
@@ -24,6 +27,13 @@ interface Booking {
   notes?: string | null;
   status: string;
   createdAt: string;
+  etaSeconds?: number | null;
+  etaEstimated?: boolean;
+  operationalLocation?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   vehicle?: {
     id: string;
     plateNumber: string;
@@ -31,6 +41,9 @@ interface Booking {
     model: string;
     vehicleType: string;
     status: string;
+    homeLocation?: { id: string; name: string; code: string } | null;
+    currentLocation?: { id: string; name: string; code: string } | null;
+    currentOperationalLocation?: { id: string; name: string; code: string } | null;
   } | null;
   driver?: {
     id: string;
@@ -43,12 +56,22 @@ interface Booking {
   } | null;
 }
 
-export default function UserBookingsPage() {
+function UserBookingsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState('');
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [locationFilter, setLocationFilter] = useState(
+    searchParams.get('locationId') || searchParams.get('location_id') || ''
+  );
+
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -62,17 +85,31 @@ export default function UserBookingsPage() {
 
   // Create Booking Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [availableVehicles, setAvailableVehicles] = useState<Array<{ id: string; plateNumber: string; brand: string; model: string; seatingCapacity: number }>>([]);
-  const [createVehicleId, setCreateVehicleId] = useState('');
-  const [createPickup, setCreatePickup] = useState('');
-  const [createDest, setCreateDest] = useState('');
-  const [createDeparture, setCreateDeparture] = useState('');
-  const [createReturn, setCreateReturn] = useState('');
-  const [createPassengers, setCreatePassengers] = useState(1);
-  const [createPurpose, setCreatePurpose] = useState('');
-  const [createNotes, setCreateNotes] = useState('');
-  const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+
+  // Fetch locations
+  useEffect(() => {
+    async function loadLocations() {
+      try {
+        const res = await fetch('/api/locations');
+        if (res.ok) {
+          const json = await res.json();
+          setLocations(json.data || []);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadLocations();
+  }, []);
+
+  const syncUrlParams = (newParams: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    });
+    router.replace(`/user/bookings?${params.toString()}`);
+  };
 
   const fetchBookings = async (targetPage = 1) => {
     setIsLoading(true);
@@ -83,6 +120,7 @@ export default function UserBookingsPage() {
         limit: '10',
       });
       if (statusFilter) params.set('status', statusFilter);
+      if (locationFilter) params.set('locationId', locationFilter);
 
       const res = await fetch(`/api/bookings?${params.toString()}`);
       if (res.ok) {
@@ -105,80 +143,11 @@ export default function UserBookingsPage() {
 
   useEffect(() => {
     fetchBookings(1);
-  }, [statusFilter]);
-
-  const handleOpenCreateModal = async () => {
-    setCreateError(null);
-    setIsCreateOpen(true);
-    // Suggest default dates
-    const now = new Date();
-    now.setHours(now.getHours() + 1, 0, 0, 0);
-    const returnTime = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const toLocalISO = (d: Date) =>
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
-    setCreateDeparture(toLocalISO(now));
-    setCreateReturn(toLocalISO(returnTime));
-
-    // Load available vehicles for dropdown
-    try {
-      const res = await fetch('/api/vehicles?status=AVAILABLE&limit=50');
-      if (res.ok) {
-        const json = await res.json();
-        setAvailableVehicles(json.data || []);
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingCreate(true);
-    setCreateError(null);
-
-    const depDate = new Date(createDeparture);
-    const retDate = new Date(createReturn);
-
-    if (retDate <= depDate) {
-      setCreateError('Return time must be after departure time');
-      setIsSubmittingCreate(false);
-      return;
-    }
-
-    try {
-      const payload = {
-        vehicleId: createVehicleId || undefined,
-        pickupLocation: createPickup.trim(),
-        destination: createDest.trim(),
-        departureAt: depDate.toISOString(),
-        expectedReturnAt: retDate.toISOString(),
-        passengerCount: createPassengers,
-        purpose: createPurpose.trim(),
-        notes: createNotes.trim() || undefined,
-      };
-
-      const res = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        setIsCreateOpen(false);
-        fetchBookings(1);
-      } else {
-        const err = await res.json();
-        setCreateError(err.error?.message || 'Failed to create booking');
-      }
-    } catch {
-      setCreateError('Network error creating booking');
-    } finally {
-      setIsSubmittingCreate(false);
-    }
-  };
+    syncUrlParams({
+      status: statusFilter,
+      locationId: locationFilter,
+    });
+  }, [statusFilter, locationFilter]);
 
   const handleCancelConfirm = async () => {
     if (!cancellingBooking) return;
@@ -209,7 +178,16 @@ export default function UserBookingsPage() {
     {
       header: 'Booking #',
       accessorKey: 'bookingNumber',
-      cell: (b) => <span className="font-semibold text-zinc-900">{b.bookingNumber}</span>,
+      cell: (b) => (
+        <div>
+          <span className="font-semibold text-zinc-900">{b.bookingNumber}</span>
+          {b.operationalLocation && (
+            <div className="text-[11px] text-zinc-500 font-medium">
+              {b.operationalLocation.name} ({b.operationalLocation.code})
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       header: 'Route',
@@ -253,15 +231,30 @@ export default function UserBookingsPage() {
     },
     {
       header: 'Status',
-      cell: (b) => <StatusBadge status={b.status} />,
+      cell: (b) => (
+        <div className="space-y-1">
+          <StatusBadge status={b.status} />
+          {b.etaSeconds !== undefined && b.etaSeconds !== null && (
+            <div className="text-[10px] font-mono text-indigo-700">
+              ETA: {formatEta(b.etaSeconds, b.etaEstimated)}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       header: 'Actions',
       cell: (b) => {
-        const canCancel = ['PENDING', 'APPROVED', 'DRIVER_ASSIGNED'].includes(b.status);
+        const canCancel = [
+          'PENDING',
+          'SEARCHING_DRIVER',
+          'DRIVER_NOTIFIED',
+          'DRIVER_ASSIGNED',
+        ].includes(b.status);
+
         const canTrack =
           Boolean(b.vehicle) &&
-          ['APPROVED', 'DRIVER_ASSIGNED', 'IN_PROGRESS'].includes(b.status);
+          ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(b.status);
 
         return (
           <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -305,7 +298,7 @@ export default function UserBookingsPage() {
         </div>
         <button
           type="button"
-          onClick={handleOpenCreateModal}
+          onClick={() => setIsCreateOpen(true)}
           className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
         >
           <span>+ New Reservation</span>
@@ -314,24 +307,47 @@ export default function UserBookingsPage() {
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
-      {/* Filter */}
-      <div className="bg-white p-3 rounded-lg border border-zinc-200 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-zinc-500">Status:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
-          >
-            <option value="">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="DRIVER_ASSIGNED">Driver Assigned</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
+      {/* Filters */}
+      <div className="bg-white p-3 rounded-lg border border-zinc-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Location filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Location:</span>
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="">All Locations</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="">All Statuses</option>
+              <option value="SEARCHING_DRIVER">Searching Driver</option>
+              <option value="DRIVER_NOTIFIED">Driver Notified</option>
+              <option value="DRIVER_ASSIGNED">Driver Assigned</option>
+              <option value="DRIVER_EN_ROUTE">Driver En Route</option>
+              <option value="ARRIVED">Arrived</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
+              <option value="ADMIN_INTERVENTION">Admin Intervention</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -340,10 +356,11 @@ export default function UserBookingsPage() {
         columns={columns}
         data={bookings}
         isLoading={isLoading}
-        emptyMessage="No bookings found"
         onRowClick={(b) => setSelectedBooking(b)}
+        emptyMessage="No reservations found"
       />
 
+      {/* Pagination */}
       <Pagination
         page={page}
         totalPages={totalPages}
@@ -351,246 +368,261 @@ export default function UserBookingsPage() {
         onPageChange={(p) => fetchBookings(p)}
       />
 
-      {/* Detail Drawer */}
+      {/* Booking Details Drawer */}
       <Drawer
         isOpen={Boolean(selectedBooking)}
         onClose={() => setSelectedBooking(null)}
-        title={selectedBooking ? selectedBooking.bookingNumber : 'Booking'}
-        description={selectedBooking ? `Purpose: ${selectedBooking.purpose}` : ''}
+        title={selectedBooking ? `Reservation #${selectedBooking.bookingNumber}` : 'Booking'}
+        description={
+          selectedBooking
+            ? `Created ${new Date(selectedBooking.createdAt).toLocaleDateString([], {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}`
+            : ''
+        }
         footer={
-          selectedBooking && ['PENDING', 'APPROVED', 'DRIVER_ASSIGNED'].includes(selectedBooking.status) ? (
-            <button
-              type="button"
-              onClick={() => {
-                const target = selectedBooking;
-                setSelectedBooking(null);
-                setCancellingBooking(target);
-              }}
-              className="px-3 py-1.5 border border-rose-300 text-rose-700 bg-white hover:bg-rose-50 rounded text-xs font-semibold cursor-pointer"
-            >
-              Cancel Reservation
-            </button>
-          ) : null
+          selectedBooking && (
+            <div className="flex items-center justify-between w-full">
+              {['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(
+                selectedBooking.status
+              ) &&
+                selectedBooking.vehicle && (
+                  <Link
+                    href={`/user/tracking?vehicleId=${selectedBooking.vehicle.id}`}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold"
+                  >
+                    Track Vehicle Live
+                  </Link>
+                )}
+              {[
+                'PENDING',
+                'SEARCHING_DRIVER',
+                'DRIVER_NOTIFIED',
+                'DRIVER_ASSIGNED',
+              ].includes(selectedBooking.status) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const b = selectedBooking;
+                    setSelectedBooking(null);
+                    setCancellingBooking(b);
+                  }}
+                  className="px-3.5 py-2 text-rose-700 border border-rose-200 rounded hover:bg-rose-50 text-xs font-medium cursor-pointer"
+                >
+                  Cancel Reservation
+                </button>
+              )}
+            </div>
+          )
         }
       >
         {selectedBooking && (
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <span className="font-semibold uppercase text-zinc-500">Status</span>
-              <StatusBadge status={selectedBooking.status} />
+          <div className="space-y-4 text-sm">
+            {/* Dispatch progress visual */}
+            <DispatchProgress
+              status={selectedBooking.status}
+              etaSeconds={selectedBooking.etaSeconds}
+              etaEstimated={selectedBooking.etaEstimated}
+            />
+
+            {/* Operational Location */}
+            {selectedBooking.operationalLocation && (
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100 text-xs">
+                <span className="font-semibold uppercase text-zinc-500">Operational Hub</span>
+                <span className="font-medium text-zinc-800">
+                  {selectedBooking.operationalLocation.name} ({selectedBooking.operationalLocation.code})
+                </span>
+              </div>
+            )}
+
+            {/* Route details */}
+            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Pickup</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.pickupLocation}</span>
+              </div>
+              <div className="pt-2 border-t border-zinc-200">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Destination</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.destination}</span>
+              </div>
             </div>
 
-            <div className="space-y-3 pb-3 border-b border-zinc-100">
+            {/* Trip Schedule & Purpose */}
+            <div className="grid grid-cols-2 gap-3 text-xs pb-3 border-b border-zinc-100">
               <div>
-                <span className="text-zinc-400 uppercase font-semibold">Route</span>
-                <p className="font-medium text-zinc-900 mt-0.5">
-                  {selectedBooking.pickupLocation} → {selectedBooking.destination}
-                </p>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Departure</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.departureAt).toLocaleString()}
+                </span>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-zinc-400 uppercase font-semibold">Departure</span>
-                  <p className="font-medium text-zinc-800 mt-0.5">
-                    {new Date(selectedBooking.departureAt).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-zinc-400 uppercase font-semibold">Return</span>
-                  <p className="font-medium text-zinc-800 mt-0.5">
-                    {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
               <div>
-                <span className="text-zinc-400 uppercase font-semibold">Passengers</span>
-                <p className="font-medium text-zinc-800 mt-0.5">{selectedBooking.passengerCount} persons</p>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Expected Return</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
+                </span>
               </div>
-
-              {selectedBooking.notes && (
-                <div>
-                  <span className="text-zinc-400 uppercase font-semibold">Notes</span>
-                  <p className="text-zinc-700 mt-0.5">{selectedBooking.notes}</p>
-                </div>
-              )}
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Passengers</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.passengerCount} Persons</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Purpose</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.purpose}</span>
+              </div>
             </div>
 
-            {/* Vehicle / Driver Assignment */}
-            <div className="space-y-3">
-              <span className="font-semibold uppercase text-zinc-500 block">Fleet Assignment</span>
-              {selectedBooking.vehicle ? (
-                <div className="p-3 bg-zinc-50 rounded border border-zinc-200 space-y-1">
-                  <div className="font-bold text-zinc-900">
-                    {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
+            {/* Vehicle info */}
+            {selectedBooking.vehicle && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1.5">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Asset</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-mono font-bold text-zinc-900">
+                      {selectedBooking.vehicle.plateNumber}
+                    </span>
+                    <span className="text-zinc-600 ml-2">
+                      {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
+                    </span>
                   </div>
-                  <div className="font-mono text-zinc-600">{selectedBooking.vehicle.plateNumber}</div>
+                  <StatusBadge status={selectedBooking.vehicle.status} />
                 </div>
-              ) : (
-                <p className="text-zinc-500 italic">No vehicle assigned yet.</p>
-              )}
-
-              {selectedBooking.driver?.user && (
-                <div className="p-3 bg-zinc-50 rounded border border-zinc-200 space-y-1">
-                  <div className="text-[11px] text-zinc-400 uppercase font-semibold">Driver</div>
-                  <div className="font-bold text-zinc-900">{selectedBooking.driver.user.name}</div>
-                  {selectedBooking.driver.user.phone && selectedBooking.driver.user.phone !== 'REDACTED' && (
-                    <div className="text-emerald-700">
-                      <a
-                        href={`https://wa.me/${selectedBooking.driver.user.phone.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline font-medium"
-                      >
-                        WhatsApp: {selectedBooking.driver.user.phone}
-                      </a>
-                    </div>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {selectedBooking.vehicle.homeLocation && (
+                    <LocationBadge
+                      type="home"
+                      name={selectedBooking.vehicle.homeLocation.name}
+                      code={selectedBooking.vehicle.homeLocation.code}
+                    />
+                  )}
+                  {(selectedBooking.vehicle.currentLocation ||
+                    selectedBooking.vehicle.currentOperationalLocation) && (
+                    <LocationBadge
+                      type="current"
+                      name={
+                        (
+                          selectedBooking.vehicle.currentLocation ||
+                          selectedBooking.vehicle.currentOperationalLocation
+                        )?.name
+                      }
+                      code={
+                        (
+                          selectedBooking.vehicle.currentLocation ||
+                          selectedBooking.vehicle.currentOperationalLocation
+                        )?.code
+                      }
+                    />
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Driver info */}
+            {selectedBooking.driver && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Driver</span>
+                <div className="font-semibold text-zinc-900">
+                  {selectedBooking.driver.user.name}
+                </div>
+                <div className="text-zinc-500 flex items-center gap-2">
+                  <span>Phone: {selectedBooking.driver.user.phone}</span>
+                  {selectedBooking.driver.user.phone && (
+                    <a
+                      href={`https://wa.me/${selectedBooking.driver.user.phone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-600 hover:text-emerald-700 font-semibold underline"
+                    >
+                      WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            {selectedBooking.notes && (
+              <div className="text-xs text-zinc-600 pt-2 border-t border-zinc-100">
+                <span className="font-semibold text-zinc-700 block">Notes:</span>
+                <p className="mt-0.5">{selectedBooking.notes}</p>
+              </div>
+            )}
           </div>
         )}
       </Drawer>
 
-      {/* Cancel Confirmation Dialog */}
-      <ConfirmDialog
+      {/* Cancel Confirmation Modal */}
+      <Modal
         isOpen={Boolean(cancellingBooking)}
         onClose={() => setCancellingBooking(null)}
-        onConfirm={handleCancelConfirm}
         title="Cancel Reservation"
-        message={`Are you sure you want to cancel booking ${cancellingBooking?.bookingNumber}? This action cannot be reversed.`}
-        confirmLabel="Yes, Cancel Booking"
-        isDestructive={true}
-        isLoading={isCancelling}
-      />
-
-      {/* Standalone New Booking Modal */}
-      <Modal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        title="Create Vehicle Reservation"
-        maxWidth="lg"
-      >
-        {createError && <ErrorBanner message={createError} className="mb-4" onDismiss={() => setCreateError(null)} />}
-
-        <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <FormField label="Assigned Vehicle (Optional)">
-            <select
-              value={createVehicleId}
-              onChange={(e) => setCreateVehicleId(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-800 focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            >
-              <option value="">Let Administrator Assign</option>
-              {availableVehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.brand} {v.model} ({v.plateNumber}) - {v.seatingCapacity} seats
-                </option>
-              ))}
-            </select>
-          </FormField>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Pickup Location" required>
-              <input
-                type="text"
-                required
-                placeholder="HQ Lobby, Building A"
-                value={createPickup}
-                onChange={(e) => setCreatePickup(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-              />
-            </FormField>
-
-            <FormField label="Destination" required>
-              <input
-                type="text"
-                required
-                placeholder="Client Office, South Jakarta"
-                value={createDest}
-                onChange={(e) => setCreateDest(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-              />
-            </FormField>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Departure Date & Time" required>
-              <input
-                type="datetime-local"
-                required
-                value={createDeparture}
-                onChange={(e) => setCreateDeparture(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-              />
-            </FormField>
-
-            <FormField label="Expected Return" required>
-              <input
-                type="datetime-local"
-                required
-                value={createReturn}
-                onChange={(e) => setCreateReturn(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-              />
-            </FormField>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Passenger Count" required>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                required
-                value={createPassengers}
-                onChange={(e) => setCreatePassengers(parseInt(e.target.value) || 1)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-              />
-            </FormField>
-
-            <FormField label="Trip Purpose" required>
-              <input
-                type="text"
-                required
-                placeholder="Client Meeting / Site Inspection"
-                value={createPurpose}
-                onChange={(e) => setCreatePurpose(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-              />
-            </FormField>
-          </div>
-
-          <FormField label="Notes / Special Instructions (Optional)">
-            <textarea
-              rows={2}
-              placeholder="Additional baggage, flight number, contact info"
-              value={createNotes}
-              onChange={(e) => setCreateNotes(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            />
-          </FormField>
-
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+        maxWidth="sm"
+        footer={
+          <>
             <button
               type="button"
-              disabled={isSubmittingCreate}
-              onClick={() => setIsCreateOpen(false)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              onClick={() => setCancellingBooking(null)}
+              disabled={isCancelling}
+              className="min-h-[44px] px-4 py-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 disabled:opacity-50 cursor-pointer"
             >
-              Cancel
+              Keep Booking
             </button>
             <button
-              type="submit"
-              disabled={isSubmittingCreate}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              type="button"
+              onClick={handleCancelConfirm}
+              disabled={isCancelling}
+              className="min-h-[44px] px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              {isSubmittingCreate && <Spinner size="sm" className="text-white" />}
-              Submit Reservation
+              {isCancelling && <Spinner size="sm" className="text-white" />}
+              Cancel Reservation
             </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-zinc-600">
+            Are you sure you want to cancel booking #{cancellingBooking?.bookingNumber}?
+          </p>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 block mb-1">
+              Reason for cancellation (optional)
+            </label>
+            <input
+              type="text"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="e.g. Schedule changed, trip postponed"
+              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            />
           </div>
-        </form>
+        </div>
       </Modal>
+
+      {/* Reworked Booking Modal */}
+      <BookingModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={() => {
+          fetchBookings(1);
+        }}
+        initialLocationId={locationFilter || undefined}
+      />
     </div>
+  );
+}
+
+export default function UserBookingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          <Spinner size="lg" className="mb-2" />
+          <p>Loading bookings...</p>
+        </div>
+      }
+    >
+      <UserBookingsContent />
+    </Suspense>
   );
 }

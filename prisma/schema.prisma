@@ -46,10 +46,29 @@ enum BookingStatus {
   PENDING
   APPROVED
   REJECTED
+  SEARCHING_DRIVER
+  DRIVER_NOTIFIED
   DRIVER_ASSIGNED
+  DRIVER_EN_ROUTE
+  ARRIVED
   IN_PROGRESS
   COMPLETED
   CANCELLED
+  NO_DRIVER_AVAILABLE
+  ADMIN_INTERVENTION
+}
+
+enum OfferStatus {
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum DriverSessionStatus {
+  ACTIVE
+  ENDED
 }
 
 enum TripStatus {
@@ -63,6 +82,22 @@ enum MovementStatus {
   STOPPED
   GPS_LOST
   OFFLINE
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String
+  code      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  homeVehicles               Vehicle[] @relation("VehicleHomeLocation")
+  currentVehicles            Vehicle[] @relation("VehicleCurrentLocation")
+  bookings                   Booking[]
+
+  @@index([code])
+  @@map("locations")
 }
 
 model Role {
@@ -111,14 +146,20 @@ model Vehicle {
   currentDriverId String?             @unique @map("current_driver_id")
   currentDriver   Driver?             @relation("VehicleCurrentDriver", fields: [currentDriverId], references: [id], onDelete: SetNull)
   assignedDriver  Driver?             @relation("DriverCurrentVehicle")
+  homeLocationId    String?           @map("home_location_id")
+  homeLocation      Location?         @relation("VehicleHomeLocation", fields: [homeLocationId], references: [id], onDelete: SetNull)
+  currentLocationId String?           @map("current_location_id")
+  currentOperationalLocation Location? @relation("VehicleCurrentLocation", fields: [currentLocationId], references: [id], onDelete: SetNull)
   createdAt       DateTime            @default(now()) @map("created_at")
   updatedAt       DateTime            @updatedAt @map("updated_at")
 
-  assignments     VehicleAssignment[]
-  bookings        Booking[]
-  trips           Trip[]
-  currentLocation VehicleLocation?
-  driverLocations DriverLocation[]
+  assignments       VehicleAssignment[]
+  bookings          Booking[]
+  preferredBookings Booking[]         @relation("BookingVehiclePreference")
+  trips             Trip[]
+  currentLocation   VehicleLocation?
+  driverLocations   DriverLocation[]
+  driverSessions    DriverSession[]
 
   @@index([status])
   @@index([seatingCapacity])
@@ -142,6 +183,8 @@ model Driver {
   trips            Trip[]
   vehicleLocations VehicleLocation[]
   driverLocations  DriverLocation[]
+  sessions         DriverSession[]
+  offers           BookingOffer[]
 
   @@map("drivers")
 }
@@ -181,32 +224,42 @@ model AuditLog {
 }
 
 model Booking {
-  id               String        @id @default(cuid())
-  bookingNumber    String        @unique @map("booking_number")
-  userId           String        @map("user_id")
-  user             User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  vehicleId        String?       @map("vehicle_id")
-  vehicle          Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  driverId         String?       @map("driver_id")
-  driver           Driver?       @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  pickupLocation   String        @map("pickup_location")
-  destination      String
-  departureAt      DateTime      @map("departure_at")
-  expectedReturnAt DateTime      @map("expected_return_at")
-  passengerCount   Int           @map("passenger_count")
-  purpose          String
-  notes            String?
-  status           BookingStatus @default(PENDING)
-  cancelledReason  String?       @map("cancelled_reason")
-  rejectedReason   String?       @map("rejected_reason")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id                    String        @id @default(cuid())
+  bookingNumber         String        @unique @map("booking_number")
+  userId                String        @map("user_id")
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  vehicleId             String?       @map("vehicle_id")
+  vehicle               Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driverId              String?       @map("driver_id")
+  driver                Driver?       @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  operationalLocationId String        @map("operational_location_id")
+  operationalLocation   Location      @relation(fields: [operationalLocationId], references: [id], onDelete: Restrict)
+  vehiclePreferenceId   String?       @map("vehicle_preference_id")
+  vehiclePreference     Vehicle?      @relation("BookingVehiclePreference", fields: [vehiclePreferenceId], references: [id], onDelete: SetNull)
+  pickupLocation        String        @map("pickup_location")
+  destination           String
+  pickupLat             Float?        @map("pickup_lat")
+  pickupLng             Float?        @map("pickup_lng")
+  destinationLat        Float?        @map("destination_lat")
+  destinationLng        Float?        @map("destination_lng")
+  departureAt           DateTime      @map("departure_at")
+  expectedReturnAt      DateTime      @map("expected_return_at")
+  passengerCount        Int           @map("passenger_count")
+  purpose               String
+  notes                 String?
+  status                BookingStatus @default(PENDING)
+  cancelledReason       String?       @map("cancelled_reason")
+  rejectedReason        String?       @map("rejected_reason")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
 
-  trips            Trip[]
+  trips                 Trip[]
+  offers                BookingOffer[]
 
   @@index([status, departureAt])
   @@index([userId])
   @@index([vehicleId, departureAt, expectedReturnAt])
+  @@index([operationalLocationId])
   @@map("bookings")
 }
 
@@ -226,23 +279,26 @@ model Notification {
 }
 
 model Trip {
-  id             String     @id @default(cuid())
-  bookingId      String?    @map("booking_id")
-  booking        Booking?   @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  vehicleId      String     @map("vehicle_id")
-  vehicle        Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  driverId       String     @map("driver_id")
-  driver         Driver     @relation(fields: [driverId], references: [id], onDelete: Restrict)
-  startedAt      DateTime   @default(now()) @map("started_at")
-  endedAt        DateTime?  @map("ended_at")
-  startLat       Float      @map("start_lat")
-  startLng       Float      @map("start_lng")
-  endLat         Float?     @map("end_lat")
-  endLng         Float?     @map("end_lng")
-  distanceMeters Float?     @map("distance_meters")
-  status         TripStatus @default(ACTIVE)
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
+  id               String            @id @default(cuid())
+  bookingId        String?           @map("booking_id")
+  booking          Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  vehicleId        String            @map("vehicle_id")
+  vehicle          Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driverId         String            @map("driver_id")
+  driver           Driver            @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  startedAt        DateTime          @default(now()) @map("started_at")
+  endedAt          DateTime?         @map("ended_at")
+  startLat         Float             @map("start_lat")
+  startLng         Float             @map("start_lng")
+  endLat           Float?            @map("end_lat")
+  endLng           Float?            @map("end_lng")
+  distanceMeters   Float?            @map("distance_meters")
+  status           TripStatus        @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  vehicleLocations VehicleLocation[]
+  driverLocations  DriverLocation[]
 
   @@index([vehicleId, startedAt(sort: Desc)])
   @@index([driverId, startedAt(sort: Desc)])
@@ -254,6 +310,8 @@ model VehicleLocation {
   vehicle    Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   driverId   String         @map("driver_id")
   driver     Driver         @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  tripId     String?        @map("trip_id")
+  trip       Trip?          @relation(fields: [tripId], references: [id], onDelete: SetNull)
   lat        Float
   lng        Float
   accuracyM  Float          @map("accuracy_m")
@@ -272,6 +330,8 @@ model DriverLocation {
   driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
   vehicleId  String   @map("vehicle_id")
   vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  tripId     String?  @map("trip_id")
+  trip       Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
   lat        Float
   lng        Float
   accuracyM  Float    @map("accuracy_m")
@@ -283,4 +343,42 @@ model DriverLocation {
   @@id([id, recordedAt])
   @@index([driverId, recordedAt(sort: Desc)])
   @@map("driver_locations")
+}
+
+model BookingOffer {
+  id           String      @id @default(cuid())
+  bookingId    String      @map("booking_id")
+  booking      Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  driverId     String      @map("driver_id")
+  driver       Driver      @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  attemptNo    Int         @map("attempt_no")
+  status       OfferStatus @default(SENT)
+  sentAt       DateTime    @default(now()) @map("sent_at")
+  expiresAt    DateTime    @map("expires_at")
+  respondedAt  DateTime?   @map("responded_at")
+  rank         Int
+  etaSeconds   Int?        @map("eta_seconds")
+  etaEstimated Boolean     @default(false) @map("eta_estimated")
+
+  @@index([bookingId, attemptNo])
+  @@index([driverId, status])
+  @@index([status, expiresAt])
+  @@map("booking_offers")
+}
+
+model DriverSession {
+  id        String              @id @default(cuid())
+  driverId  String              @map("driver_id")
+  driver    Driver              @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicleId String?             @map("vehicle_id")
+  vehicle   Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  status    DriverSessionStatus @default(ACTIVE)
+  startedAt DateTime            @default(now()) @map("started_at")
+  endedAt   DateTime?           @map("ended_at")
+  startLat  Float?              @map("start_lat")
+  startLng  Float?              @map("start_lng")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  @@index([driverId, status])
+  @@map("driver_sessions")
 }

@@ -18,6 +18,28 @@ async function main() {
   }
 
   console.log('Roles seeded successfully');
+
+  const locations = [
+    { name: 'Halim', code: '102' },
+    { name: 'Karawang', code: '201' },
+    { name: 'Karawang', code: '202' },
+    { name: 'Padalarang', code: '802' },
+    { name: 'Tegalluar Station', code: '402' },
+    { name: 'Tegalluar Depot', code: '202' },
+  ];
+
+  for (const loc of locations) {
+    const existing = await prisma.location.findFirst({
+      where: { name: loc.name, code: loc.code },
+    });
+    if (!existing) {
+      await prisma.location.create({
+        data: loc,
+      });
+    }
+  }
+
+  console.log('Locations seeded successfully');
 }
 
 main()

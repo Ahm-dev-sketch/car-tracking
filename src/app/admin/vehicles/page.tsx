@@ -1,14 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LocationBadge } from '@/components/ui/LocationBadge';
 import { Pagination } from '@/components/ui/Pagination';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+
+interface OperationalLocation {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface VehicleItem {
   id: string;
@@ -20,6 +28,16 @@ interface VehicleItem {
   transmission?: string | null;
   imageUrl?: string | null;
   status: string;
+  homeLocation?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
+  currentOperationalLocation?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   currentDriver?: {
     id: string;
     licenseNumber: string;
@@ -39,13 +57,20 @@ interface DriverOption {
   };
 }
 
-export default function AdminVehiclesPage() {
+function AdminVehiclesContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
+  const [locations, setLocations] = useState<OperationalLocation[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [locationFilter, setLocationFilter] = useState(
+    searchParams.get('locationId') || searchParams.get('location_id') || ''
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -74,6 +99,31 @@ export default function AdminVehiclesPage() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
 
+  // Load operational locations
+  useEffect(() => {
+    async function loadLocations() {
+      try {
+        const res = await fetch('/api/locations');
+        if (res.ok) {
+          const json = await res.json();
+          setLocations(json.data || []);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadLocations();
+  }, []);
+
+  const syncUrlParams = (newParams: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    });
+    router.replace(`/admin/vehicles?${params.toString()}`);
+  };
+
   const fetchVehicles = async (targetPage = 1) => {
     setIsLoading(true);
     setApiError(null);
@@ -84,6 +134,7 @@ export default function AdminVehiclesPage() {
       });
       if (search.trim()) params.set('search', search.trim());
       if (statusFilter) params.set('status', statusFilter);
+      if (locationFilter) params.set('locationId', locationFilter);
 
       const res = await fetch(`/api/vehicles?${params.toString()}`);
       if (res.ok) {
@@ -106,7 +157,12 @@ export default function AdminVehiclesPage() {
 
   useEffect(() => {
     fetchVehicles(1);
-  }, [statusFilter]);
+    syncUrlParams({
+      search,
+      status: statusFilter,
+      locationId: locationFilter,
+    });
+  }, [statusFilter, locationFilter]);
 
   const handleOpenAdd = () => {
     setEditingVehicle(null);
@@ -253,6 +309,30 @@ export default function AdminVehiclesPage() {
       ),
     },
     {
+      header: 'Operational Hub',
+      cell: (v) => (
+        <div className="flex flex-wrap items-center gap-1">
+          {v.homeLocation && (
+            <LocationBadge
+              type="home"
+              name={v.homeLocation.name}
+              code={v.homeLocation.code}
+            />
+          )}
+          {v.currentOperationalLocation && (
+            <LocationBadge
+              type="current"
+              name={v.currentOperationalLocation.name}
+              code={v.currentOperationalLocation.code}
+            />
+          )}
+          {!v.homeLocation && !v.currentOperationalLocation && (
+            <span className="text-zinc-400 italic text-xs">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
       header: 'Assigned Driver',
       cell: (v) =>
         v.currentDriver ? (
@@ -333,20 +413,38 @@ export default function AdminVehiclesPage() {
           </button>
         </form>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-zinc-500">Status:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
-          >
-            <option value="">All Statuses</option>
-            <option value="AVAILABLE">Available</option>
-            <option value="RESERVED">Reserved</option>
-            <option value="IN_USE">In Use</option>
-            <option value="MAINTENANCE">Maintenance</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Hub:</span>
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="">All Hubs</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="">All Statuses</option>
+              <option value="AVAILABLE">Available</option>
+              <option value="RESERVED">Reserved</option>
+              <option value="IN_USE">In Use</option>
+              <option value="MAINTENANCE">Maintenance</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -555,5 +653,20 @@ export default function AdminVehiclesPage() {
         </form>
       </Modal>
     </div>
+  );
+}
+
+export default function AdminVehiclesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-24 text-center text-zinc-500 text-xs">
+          <Spinner size="md" className="mb-2" />
+          <p>Loading vehicle inventory...</p>
+        </div>
+      }
+    >
+      <AdminVehiclesContent />
+    </Suspense>
   );
 }

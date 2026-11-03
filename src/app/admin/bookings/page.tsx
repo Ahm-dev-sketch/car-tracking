@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LocationBadge } from '@/components/ui/LocationBadge';
 import { Pagination } from '@/components/ui/Pagination';
 import { Modal } from '@/components/ui/Modal';
 import { Drawer } from '@/components/ui/Drawer';
@@ -10,6 +12,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
+import { FleetMap, VehicleMarkerData } from '@/components/map';
 
 interface AdminBooking {
   id: string;
@@ -23,6 +27,13 @@ interface AdminBooking {
   notes?: string | null;
   status: string;
   createdAt: string;
+  etaSeconds?: number | null;
+  etaEstimated?: boolean;
+  operationalLocation?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   user: {
     id: string;
     name: string;
@@ -35,6 +46,9 @@ interface AdminBooking {
     brand: string;
     model: string;
     status: string;
+    homeLocation?: { id: string; name: string; code: string } | null;
+    currentLocation?: { id: string; name: string; code: string } | null;
+    currentOperationalLocation?: { id: string; name: string; code: string } | null;
   } | null;
   driver?: {
     id: string;
@@ -46,45 +60,90 @@ interface AdminBooking {
   } | null;
 }
 
-interface DriverOption {
-  id: string;
-  licenseNumber: string;
-  user: {
-    name: string;
-  };
+interface CandidateDriver {
+  driverId: string;
+  driverName?: string;
+  name?: string;
+  phone?: string | null;
+  licenseNumber?: string;
+  vehicleId?: string;
+  plateNumber?: string;
+  vehiclePlateNumber?: string;
+  vehicleBrand?: string;
+  vehicleModel?: string;
+  vehicleType?: string;
+  seatingCapacity?: number;
+  lat?: number | null;
+  lng?: number | null;
+  accuracyM?: number;
+  receivedAt?: string | Date | null;
+  etaSeconds?: number | null;
+  etaEstimated?: boolean;
 }
 
-export default function AdminBookingsPage() {
+interface LocationOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+function AdminBookingsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState('');
+
+  // Filters synced with URL
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [locationFilter, setLocationFilter] = useState(
+    searchParams.get('locationId') || searchParams.get('location_id') || ''
+  );
+
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
   // Detail Drawer
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
 
-  // Reject Modal
-  const [rejectingBooking, setRejectingBooking] = useState<AdminBooking | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [rejectError, setRejectError] = useState<string | null>(null);
-
-  // Assign Driver Modal
-  const [assigningBooking, setAssigningBooking] = useState<AdminBooking | null>(null);
-  const [availableDrivers, setAvailableDrivers] = useState<DriverOption[]>([]);
-  const [selectedDriverId, setSelectedDriverId] = useState('');
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [assignError, setAssignError] = useState<string | null>(null);
+  // Intervention / Candidates Modal
+  const [interventionBooking, setInterventionBooking] = useState<AdminBooking | null>(null);
+  const [candidates, setCandidates] = useState<CandidateDriver[]>([]);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [assigningCandidateId, setAssigningCandidateId] = useState<string | null>(null);
+  const [interventionError, setInterventionError] = useState<string | null>(null);
 
   // Cancel Confirm
   const [cancellingBooking, setCancellingBooking] = useState<AdminBooking | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  // Approve State
-  const [approvingId, setApprovingId] = useState<string | null>(null);
+  // Fetch locations
+  useEffect(() => {
+    async function loadLocations() {
+      try {
+        const res = await fetch('/api/locations');
+        if (res.ok) {
+          const json = await res.json();
+          setLocations(json.data || []);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadLocations();
+  }, []);
+
+  const syncUrlParams = (newParams: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    });
+    router.replace(`/admin/bookings?${params.toString()}`);
+  };
 
   const fetchBookings = async (targetPage = 1) => {
     setIsLoading(true);
@@ -95,6 +154,7 @@ export default function AdminBookingsPage() {
         limit: '10',
       });
       if (statusFilter) params.set('status', statusFilter);
+      if (locationFilter) params.set('locationId', locationFilter);
 
       const res = await fetch(`/api/bookings?${params.toString()}`);
       if (res.ok) {
@@ -117,93 +177,57 @@ export default function AdminBookingsPage() {
 
   useEffect(() => {
     fetchBookings(1);
-  }, [statusFilter]);
+    syncUrlParams({
+      status: statusFilter,
+      locationId: locationFilter,
+    });
+  }, [statusFilter, locationFilter]);
 
-  const handleApprove = async (id: string) => {
-    setApprovingId(id);
-    setApiError(null);
+  // Open manual assign / candidates modal
+  const handleOpenIntervention = async (b: AdminBooking) => {
+    setInterventionBooking(b);
+    setCandidates([]);
+    setInterventionError(null);
+    setLoadingCandidates(true);
     try {
-      const res = await fetch(`/api/bookings/${id}/approve`, {
-        method: 'POST',
-      });
-      if (res.ok) {
-        fetchBookings(page);
-      } else {
-        const err = await res.json();
-        setApiError(err.error?.message || 'Failed to approve booking');
-      }
-    } catch {
-      setApiError('Network error approving booking');
-    } finally {
-      setApprovingId(null);
-    }
-  };
-
-  const handleRejectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rejectingBooking || !rejectReason.trim()) return;
-    setIsRejecting(true);
-    setRejectError(null);
-
-    try {
-      const res = await fetch(`/api/bookings/${rejectingBooking.id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: rejectReason.trim() }),
-      });
-      if (res.ok) {
-        setRejectingBooking(null);
-        setRejectReason('');
-        fetchBookings(page);
-      } else {
-        const err = await res.json();
-        setRejectError(err.error?.message || 'Failed to reject booking');
-      }
-    } catch {
-      setRejectError('Network error rejecting booking');
-    } finally {
-      setIsRejecting(false);
-    }
-  };
-
-  const handleOpenAssign = async (b: AdminBooking) => {
-    setAssigningBooking(b);
-    setSelectedDriverId('');
-    setAssignError(null);
-    try {
-      const res = await fetch('/api/drivers?limit=50');
+      const res = await fetch(`/api/admin/dispatch/${b.id}/candidates`);
       if (res.ok) {
         const json = await res.json();
-        setAvailableDrivers(json.data || []);
+        setCandidates(json.data || []);
+      } else {
+        const err = await res.json();
+        setInterventionError(err.error?.message || 'Failed to load eligible candidates');
       }
     } catch {
-      // ignore
+      setInterventionError('Network error loading eligible candidates');
+    } finally {
+      setLoadingCandidates(false);
     }
   };
 
-  const handleAssignSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assigningBooking || !selectedDriverId) return;
-    setIsAssigning(true);
-    setAssignError(null);
+  const handleManualAssign = async (driverId: string) => {
+    if (!interventionBooking) return;
+    setAssigningCandidateId(driverId);
+    setInterventionError(null);
 
     try {
-      const res = await fetch(`/api/bookings/${assigningBooking.id}/assign-driver`, {
+      const res = await fetch(`/api/admin/bookings/${interventionBooking.id}/manual-assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverId: selectedDriverId }),
+        body: JSON.stringify({ driverId }),
       });
+
       if (res.ok) {
-        setAssigningBooking(null);
+        setInterventionBooking(null);
         fetchBookings(page);
       } else {
         const err = await res.json();
-        setAssignError(err.error?.message || 'Failed to assign driver');
+        setInterventionError(err.error?.message || 'Failed to assign candidate driver');
       }
     } catch {
-      setAssignError('Network error assigning driver');
+      setInterventionError('Network error assigning driver');
     } finally {
-      setIsAssigning(false);
+      setAssigningCandidateId(null);
     }
   };
 
@@ -233,144 +257,267 @@ export default function AdminBookingsPage() {
   const columns: Column<AdminBooking>[] = [
     {
       header: 'Booking #',
+      accessorKey: 'bookingNumber',
       cell: (b) => (
         <div>
           <span className="font-semibold text-zinc-900">{b.bookingNumber}</span>
-          <span className="text-zinc-500 block text-[11px]">{b.user.name}</span>
+          {b.operationalLocation && (
+            <div className="mt-1">
+              <LocationBadge
+                type="home"
+                name={b.operationalLocation.name}
+                code={b.operationalLocation.code}
+              />
+            </div>
+          )}
         </div>
       ),
     },
     {
-      header: 'Route & Timing',
+      header: 'Route',
       cell: (b) => (
-        <div className="max-w-[200px] text-xs">
-          <div className="font-medium text-zinc-800 truncate">{b.pickupLocation} → {b.destination}</div>
+        <div className="max-w-[200px]">
+          <div className="font-medium text-zinc-800 truncate">{b.pickupLocation}</div>
+          <div className="text-xs text-zinc-500 truncate">→ {b.destination}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Departure',
+      cell: (b) => (
+        <div className="text-xs">
+          <div>
+            {new Date(b.departureAt).toLocaleDateString([], {
+              month: 'short',
+              day: 'numeric',
+            })}
+          </div>
           <div className="text-zinc-500">
-            {new Date(b.departureAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            {new Date(b.departureAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </div>
         </div>
       ),
     },
     {
-      header: 'Vehicle / Driver',
+      header: 'Employee',
       cell: (b) => (
         <div className="text-xs">
+          <div className="font-medium text-zinc-800">{b.user?.name}</div>
+          <div className="text-zinc-500 text-[11px]">{b.user?.phone}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Vehicle & Driver',
+      cell: (b) => (
+        <div className="text-xs space-y-0.5">
           {b.vehicle ? (
-            <div className="font-mono font-medium text-zinc-900">{b.vehicle.plateNumber}</div>
+            <div>
+              <div className="flex items-center gap-1 font-mono font-semibold text-zinc-800">
+                <span>{b.vehicle.plateNumber}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                {b.vehicle.homeLocation && (
+                  <LocationBadge
+                    type="home"
+                    name={b.vehicle.homeLocation.name}
+                    code={b.vehicle.homeLocation.code}
+                  />
+                )}
+                {(b.vehicle.currentOperationalLocation || b.vehicle.currentLocation) && (
+                  <LocationBadge
+                    type="current"
+                    name={(b.vehicle.currentOperationalLocation || b.vehicle.currentLocation)?.name}
+                    code={(b.vehicle.currentOperationalLocation || b.vehicle.currentLocation)?.code}
+                  />
+                )}
+              </div>
+            </div>
           ) : (
-            <span className="text-zinc-400 italic">No vehicle</span>
+            <span className="text-zinc-400 italic">No Vehicle</span>
           )}
           {b.driver ? (
-            <div className="text-[11px] text-zinc-600">Driver: {b.driver.user.name}</div>
+            <div className="text-[11px] text-zinc-600 truncate max-w-[120px]">
+              Driver: {b.driver.user.name}
+            </div>
           ) : (
-            <span className="text-[11px] text-zinc-400">Driver unassigned</span>
+            <div className="text-[11px] text-zinc-400 italic">No Driver</div>
           )}
         </div>
       ),
     },
     {
       header: 'Status',
-      cell: (b) => <StatusBadge status={b.status} />,
+      cell: (b) => (
+        <div className="space-y-1">
+          <StatusBadge status={b.status} />
+          {b.etaSeconds !== undefined && b.etaSeconds !== null && (
+            <div className="text-[10px] font-mono text-indigo-700">
+              ETA: {formatEta(b.etaSeconds, b.etaEstimated)}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       header: 'Actions',
-      cell: (b) => (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          {b.status === 'PENDING' && (
-            <>
+      cell: (b) => {
+        const isIntervention = b.status === 'ADMIN_INTERVENTION' || b.status === 'PENDING';
+        const canCancel = !['COMPLETED', 'CANCELLED', 'REJECTED'].includes(b.status);
+
+        return (
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            {isIntervention && (
               <button
                 type="button"
-                disabled={approvingId === b.id}
-                onClick={() => handleApprove(b.id)}
-                className="px-2 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                onClick={() => handleOpenIntervention(b)}
+                className="px-2 py-1 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded cursor-pointer"
               >
-                {approvingId === b.id && <Spinner size="sm" className="text-white" />}
-                Approve
+                Assign
               </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelectedBooking(b)}
+              className="px-2 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+            >
+              Details
+            </button>
+            {canCancel && (
               <button
                 type="button"
-                onClick={() => {
-                  setRejectingBooking(b);
-                  setRejectReason('');
-                  setRejectError(null);
-                }}
-                className="px-2 py-1 text-xs font-medium border border-rose-200 text-rose-700 rounded hover:bg-rose-50 cursor-pointer"
+                onClick={() => setCancellingBooking(b)}
+                className="px-2 py-1 text-xs font-medium text-rose-700 border border-rose-200 rounded hover:bg-rose-50 cursor-pointer"
               >
-                Reject
+                Cancel
               </button>
-            </>
-          )}
-
-          {b.status === 'APPROVED' && (
-            <button
-              type="button"
-              onClick={() => handleOpenAssign(b)}
-              className="px-2 py-1 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded cursor-pointer"
-            >
-              Assign Driver
-            </button>
-          )}
-
-          {['PENDING', 'APPROVED', 'DRIVER_ASSIGNED'].includes(b.status) && (
-            <button
-              type="button"
-              onClick={() => setCancellingBooking(b)}
-              className="px-2 py-1 text-xs font-medium text-zinc-600 border border-zinc-200 rounded hover:bg-zinc-50 cursor-pointer"
-            >
-              Cancel
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setSelectedBooking(b)}
-            className="px-2 py-1 text-xs font-medium text-zinc-700 border border-zinc-200 rounded hover:bg-zinc-50 cursor-pointer"
-          >
-            Details
-          </button>
-        </div>
-      ),
+            )}
+          </div>
+        );
+      },
     },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="pb-4 border-b border-zinc-200">
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900">Reservations & Dispatches</h1>
-        <p className="text-xs text-zinc-500 mt-0.5">Approve, dispatch drivers, and manage corporate vehicle bookings</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-900">Reservations & Dispatch</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Monitor auto-dispatch states, operational locations, and admin intervention escalations
+          </p>
+        </div>
       </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
-      {/* Filter and Search */}
-      <div className="bg-white p-3 rounded-lg border border-zinc-200 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-zinc-500">Filter Status:</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+      {/* Filter and quick selection bar */}
+      <div className="bg-white p-3.5 rounded-lg border border-zinc-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick filter pills */}
+          <button
+            type="button"
+            onClick={() => setStatusFilter('')}
+            className={`px-2.5 py-1 text-xs rounded font-medium border cursor-pointer ${
+              statusFilter === ''
+                ? 'bg-zinc-900 text-white border-zinc-900'
+                : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+            }`}
           >
-            <option value="">All Statuses</option>
-            <option value="PENDING">PENDING</option>
-            <option value="APPROVED">APPROVED</option>
-            <option value="DRIVER_ASSIGNED">DRIVER_ASSIGNED</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="REJECTED">REJECTED</option>
-            <option value="CANCELLED">CANCELLED</option>
-          </select>
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('ADMIN_INTERVENTION')}
+            className={`px-2.5 py-1 text-xs rounded font-bold border cursor-pointer ${
+              statusFilter === 'ADMIN_INTERVENTION'
+                ? 'bg-orange-600 text-white border-orange-600'
+                : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
+            }`}
+          >
+            ⚠️ Intervention Required
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('SEARCHING_DRIVER')}
+            className={`px-2.5 py-1 text-xs rounded font-medium border cursor-pointer ${
+              statusFilter === 'SEARCHING_DRIVER'
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            Searching
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('IN_PROGRESS')}
+            className={`px-2.5 py-1 text-xs rounded font-medium border cursor-pointer ${
+              statusFilter === 'IN_PROGRESS'
+                ? 'bg-emerald-600 text-white border-emerald-600'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            In Progress
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Operational Hub filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Hub:</span>
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="">All Hubs</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status dropdown */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Status:</span>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="">All Statuses</option>
+              <option value="SEARCHING_DRIVER">Searching Driver</option>
+              <option value="DRIVER_NOTIFIED">Driver Notified</option>
+              <option value="DRIVER_ASSIGNED">Driver Assigned</option>
+              <option value="DRIVER_EN_ROUTE">Driver En Route</option>
+              <option value="ARRIVED">Arrived</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
+              <option value="ADMIN_INTERVENTION">Admin Intervention</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="PENDING">Legacy Pending</option>
+            </select>
+          </div>
         </div>
       </div>
 
+      {/* Table */}
       <DataTable
         columns={columns}
         data={bookings}
         isLoading={isLoading}
-        emptyMessage="No reservations match the filter"
         onRowClick={(b) => setSelectedBooking(b)}
+        emptyMessage="No reservations found"
       />
 
+      {/* Pagination */}
       <Pagination
         page={page}
         totalPages={totalPages}
@@ -378,192 +525,260 @@ export default function AdminBookingsPage() {
         onPageChange={(p) => fetchBookings(p)}
       />
 
-      {/* Reject Modal */}
-      <Modal
-        isOpen={Boolean(rejectingBooking)}
-        onClose={() => setRejectingBooking(null)}
-        title="Reject Booking Request"
-        description={rejectingBooking?.bookingNumber}
-        maxWidth="sm"
+      {/* Booking Details Drawer */}
+      <Drawer
+        isOpen={Boolean(selectedBooking)}
+        onClose={() => setSelectedBooking(null)}
+        title={selectedBooking ? `Reservation #${selectedBooking.bookingNumber}` : 'Booking'}
+        description={
+          selectedBooking
+            ? `Requested by ${selectedBooking.user?.name} (${selectedBooking.user?.email})`
+            : ''
+        }
+        footer={
+          selectedBooking && (
+            <div className="flex items-center justify-between w-full">
+              {(selectedBooking.status === 'ADMIN_INTERVENTION' ||
+                selectedBooking.status === 'PENDING') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const b = selectedBooking;
+                    setSelectedBooking(null);
+                    handleOpenIntervention(b);
+                  }}
+                  className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-semibold cursor-pointer"
+                >
+                  Candidate Drivers & Assign
+                </button>
+              )}
+              {!['COMPLETED', 'CANCELLED', 'REJECTED'].includes(selectedBooking.status) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const b = selectedBooking;
+                    setSelectedBooking(null);
+                    setCancellingBooking(b);
+                  }}
+                  className="px-3.5 py-2 text-rose-700 border border-rose-200 rounded hover:bg-rose-50 text-xs font-medium cursor-pointer"
+                >
+                  Cancel Booking
+                </button>
+              )}
+            </div>
+          )
+        }
       >
-        {rejectError && <ErrorBanner message={rejectError} className="mb-4" onDismiss={() => setRejectError(null)} />}
-
-        <form onSubmit={handleRejectSubmit} className="space-y-4">
-          <FormField label="Rejection Reason" required>
-            <textarea
-              required
-              rows={3}
-              placeholder="e.g. No vehicles available at requested time, unauthorized trip"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+        {selectedBooking && (
+          <div className="space-y-4 text-sm">
+            <DispatchProgress
+              status={selectedBooking.status}
+              etaSeconds={selectedBooking.etaSeconds}
+              etaEstimated={selectedBooking.etaEstimated}
             />
-          </FormField>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              disabled={isRejecting}
-              onClick={() => setRejectingBooking(null)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isRejecting || !rejectReason.trim()}
-              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              {isRejecting && <Spinner size="sm" className="text-white" />}
-              Confirm Rejection
-            </button>
+            {/* Operational Hub */}
+            {selectedBooking.operationalLocation && (
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100 text-xs">
+                <span className="font-semibold uppercase text-zinc-500">Operational Hub</span>
+                <LocationBadge
+                  type="home"
+                  name={selectedBooking.operationalLocation.name}
+                  code={selectedBooking.operationalLocation.code}
+                />
+              </div>
+            )}
+
+            {/* Route */}
+            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Pickup</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.pickupLocation}</span>
+              </div>
+              <div className="pt-2 border-t border-zinc-200">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Destination</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.destination}</span>
+              </div>
+            </div>
+
+            {/* Schedule */}
+            <div className="grid grid-cols-2 gap-3 text-xs pb-3 border-b border-zinc-100">
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Departure</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.departureAt).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Return</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Passengers</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.passengerCount} Persons</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Purpose</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.purpose}</span>
+              </div>
+            </div>
+
+            {/* Vehicle & Driver */}
+            {selectedBooking.vehicle && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Asset</span>
+                <div className="font-mono font-bold text-zinc-900">{selectedBooking.vehicle.plateNumber}</div>
+                <div className="text-zinc-600">
+                  {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
+                </div>
+              </div>
+            )}
+
+            {selectedBooking.driver && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Driver</span>
+                <div className="font-semibold text-zinc-900">{selectedBooking.driver.user.name}</div>
+                <div className="text-zinc-500">Phone: {selectedBooking.driver.user.phone}</div>
+              </div>
+            )}
           </div>
-        </form>
-      </Modal>
+        )}
+      </Drawer>
 
-      {/* Assign Driver Modal */}
-      <Modal
-        isOpen={Boolean(assigningBooking)}
-        onClose={() => setAssigningBooking(null)}
-        title="Assign Driver to Booking"
-        description={assigningBooking?.bookingNumber}
-        maxWidth="sm"
-      >
-        {assignError && <ErrorBanner message={assignError} className="mb-4" onDismiss={() => setAssignError(null)} />}
+      {/* Intervention / Candidates Manual Assign Modal */}
+      {interventionBooking && (
+        <Modal
+          isOpen={Boolean(interventionBooking)}
+          onClose={() => setInterventionBooking(null)}
+          title="Manual Driver Assignment"
+          description={`Intervention for booking #${interventionBooking.bookingNumber} (${interventionBooking.pickupLocation} → ${interventionBooking.destination})`}
+          maxWidth="xl"
+        >
+          <div className="space-y-4">
+            {interventionError && (
+              <ErrorBanner message={interventionError} onDismiss={() => setInterventionError(null)} />
+            )}
 
-        <form onSubmit={handleAssignSubmit} className="space-y-4">
-          <FormField label="Select Driver" required>
-            <select
-              required
-              value={selectedDriverId}
-              onChange={(e) => setSelectedDriverId(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            >
-              <option value="">-- Choose Driver --</option>
-              {availableDrivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.user.name} ({d.licenseNumber})
-                </option>
-              ))}
-            </select>
-          </FormField>
+            {loadingCandidates ? (
+              <div className="py-12 text-center text-zinc-500 text-xs">
+                <Spinner size="md" className="mb-2" />
+                <p>Loading candidate drivers reporting GPS at this location...</p>
+              </div>
+            ) : candidates.length === 0 ? (
+              <div className="p-8 bg-zinc-50 border border-dashed border-zinc-300 rounded text-center text-xs text-zinc-500">
+                No active eligible drivers found online for this location.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">
+                  Candidate Drivers Ranked by Proximity ({candidates.length})
+                </span>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              disabled={isAssigning}
-              onClick={() => setAssigningBooking(null)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isAssigning || !selectedDriverId}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              {isAssigning && <Spinner size="sm" className="text-white" />}
-              Assign Driver
-            </button>
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {candidates.map((c) => {
+                    const driverName = c.driverName || c.name || 'Driver';
+                    const plate = c.plateNumber || c.vehiclePlateNumber || '—';
+                    const cleanPhone = c.phone ? c.phone.replace(/\D/g, '') : '';
+                    const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
+                    const isAssigning = assigningCandidateId === c.driverId;
+                    const etaText = formatEta(c.etaSeconds, c.etaEstimated);
+
+                    return (
+                      <div
+                        key={c.driverId}
+                        className="p-3 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-zinc-900">{driverName}</span>
+                            {c.phone && <span className="text-zinc-500">({c.phone})</span>}
+                            {etaText && (
+                              <span className="font-mono text-[10px] font-semibold text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                ETA: {etaText}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-zinc-600 flex items-center gap-2">
+                            <span className="font-mono font-semibold text-zinc-800">{plate}</span>
+                            {(c.vehicleBrand || c.vehicleModel) && (
+                              <span>
+                                • {c.vehicleBrand} {c.vehicleModel}
+                              </span>
+                            )}
+                            {c.seatingCapacity && <span>• {c.seatingCapacity} seats</span>}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {waUrl && (
+                            <a
+                              href={waUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1.5 border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded text-xs font-semibold inline-flex items-center gap-1"
+                            >
+                              <span>WhatsApp</span>
+                            </a>
+                          )}
+
+                          <button
+                            type="button"
+                            disabled={Boolean(assigningCandidateId)}
+                            onClick={() => handleManualAssign(c.driverId)}
+                            className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+                          >
+                            {isAssigning ? <Spinner size="sm" /> : 'Assign'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end pt-2 border-t border-zinc-100">
+              <button
+                type="button"
+                onClick={() => setInterventionBooking(null)}
+                className="px-4 py-1.5 border border-zinc-300 hover:bg-zinc-50 text-zinc-700 rounded text-xs font-medium cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        </form>
-      </Modal>
+        </Modal>
+      )}
 
-      {/* Cancel Confirm Dialog */}
+      {/* Cancel Confirmation Dialog */}
       <ConfirmDialog
         isOpen={Boolean(cancellingBooking)}
         onClose={() => setCancellingBooking(null)}
         onConfirm={handleCancelConfirm}
         title="Cancel Booking"
-        message={`Are you sure you want to cancel booking ${cancellingBooking?.bookingNumber}?`}
+        message={`Are you sure you want to cancel booking #${cancellingBooking?.bookingNumber}?`}
         confirmLabel="Cancel Booking"
         isDestructive={true}
         isLoading={isCancelling}
       />
-
-      {/* Details Drawer */}
-      <Drawer
-        isOpen={Boolean(selectedBooking)}
-        onClose={() => setSelectedBooking(null)}
-        title={selectedBooking ? selectedBooking.bookingNumber : ''}
-        description={selectedBooking ? `Requester: ${selectedBooking.user.name}` : ''}
-      >
-        {selectedBooking && (
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <span className="text-zinc-400 uppercase font-semibold">Status</span>
-              <StatusBadge status={selectedBooking.status} />
-            </div>
-
-            <div className="space-y-3 pb-3 border-b border-zinc-100">
-              <div>
-                <span className="text-zinc-400 uppercase font-semibold">Requester</span>
-                <p className="font-medium text-zinc-900 mt-0.5">
-                  {selectedBooking.user.name} ({selectedBooking.user.email})
-                </p>
-                <p className="text-zinc-500 font-mono mt-0.5">{selectedBooking.user.phone}</p>
-              </div>
-
-              <div>
-                <span className="text-zinc-400 uppercase font-semibold">Purpose</span>
-                <p className="font-medium text-zinc-800 mt-0.5">{selectedBooking.purpose}</p>
-              </div>
-
-              <div>
-                <span className="text-zinc-400 uppercase font-semibold">Route</span>
-                <p className="font-medium text-zinc-800 mt-0.5">
-                  {selectedBooking.pickupLocation} → {selectedBooking.destination}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <span className="text-zinc-400 uppercase font-semibold">Departure</span>
-                  <p className="font-medium text-zinc-800 mt-0.5">
-                    {new Date(selectedBooking.departureAt).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-zinc-400 uppercase font-semibold">Return</span>
-                  <p className="font-medium text-zinc-800 mt-0.5">
-                    {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-zinc-400 uppercase font-semibold">Passengers</span>
-                <p className="font-medium text-zinc-800 mt-0.5">{selectedBooking.passengerCount} persons</p>
-              </div>
-
-              {selectedBooking.notes && (
-                <div>
-                  <span className="text-zinc-400 uppercase font-semibold">Notes</span>
-                  <p className="text-zinc-700 mt-0.5">{selectedBooking.notes}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Vehicle & Driver */}
-            <div className="space-y-2">
-              <span className="text-zinc-400 uppercase font-semibold block">Asset Assignment</span>
-              {selectedBooking.vehicle && (
-                <div className="p-3 bg-zinc-50 rounded border border-zinc-200">
-                  <div className="font-mono font-bold text-zinc-900">{selectedBooking.vehicle.plateNumber}</div>
-                  <div className="text-zinc-600">{selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}</div>
-                </div>
-              )}
-              {selectedBooking.driver && (
-                <div className="p-3 bg-zinc-50 rounded border border-zinc-200">
-                  <div className="font-bold text-zinc-900">{selectedBooking.driver.user.name}</div>
-                  <div className="text-zinc-500 font-mono">License: {selectedBooking.driver.licenseNumber}</div>
-                  <div className="text-zinc-500 font-mono">Phone: {selectedBooking.driver.user.phone}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </Drawer>
     </div>
+  );
+}
+
+export default function AdminBookingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          <Spinner size="lg" className="mb-2" />
+          <p>Loading bookings management...</p>
+        </div>
+      }
+    >
+      <AdminBookingsContent />
+    </Suspense>
   );
 }

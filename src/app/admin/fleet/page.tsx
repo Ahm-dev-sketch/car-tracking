@@ -1,22 +1,65 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FleetMap, VehicleMarkerData } from '@/components/map';
 import { useRealtime } from '@/hooks/useRealtime';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LocationBadge } from '@/components/ui/LocationBadge';
 import { MovementBadge } from '@/components/ui/MovementBadge';
 import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Spinner } from '@/components/ui/Spinner';
 
-export default function AdminFleetMapPage() {
+interface OperationalLocation {
+  id: string;
+  name: string;
+  code: string;
+}
+
+function AdminFleetMapContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [vehicles, setVehicles] = useState<VehicleMarkerData[]>([]);
+  const [locations, setLocations] = useState<OperationalLocation[]>([]);
+  const [locationFilter, setLocationFilter] = useState(
+    searchParams.get('locationId') || searchParams.get('location_id') || ''
+  );
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load locations
+  useEffect(() => {
+    async function loadLocations() {
+      try {
+        const res = await fetch('/api/locations');
+        if (res.ok) {
+          const json = await res.json();
+          setLocations(json.data || []);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    loadLocations();
+  }, []);
+
+  const syncUrlParams = (newParams: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    });
+    router.replace(`/admin/fleet?${params.toString()}`);
+  };
+
   const fetchLiveFleet = async () => {
     try {
-      const res = await fetch('/api/tracking/live');
+      const url = locationFilter
+        ? `/api/tracking/live?locationId=${encodeURIComponent(locationFilter)}`
+        : '/api/tracking/live';
+      const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
         const rows: any[] = json.data || [];
@@ -37,6 +80,8 @@ export default function AdminFleetMapPage() {
             headingDeg: r.location.headingDeg,
             recordedAt: r.location.recordedAt,
             movement: r.location.movement || 'STOPPED',
+            homeLocation: r.homeLocation || null,
+            currentOperationalLocation: r.currentLocationInfo || null,
           }));
         setVehicles(mapped);
         if (!selectedVehicleId && mapped.length > 0) {
@@ -52,9 +97,10 @@ export default function AdminFleetMapPage() {
 
   useEffect(() => {
     fetchLiveFleet();
+    syncUrlParams({ locationId: locationFilter });
     const interval = setInterval(fetchLiveFleet, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [locationFilter]);
 
   // Admin subscribes to all realtime telemetry via useRealtime
   const { vehicles: realtimeVehicles, connectionState } = useRealtime();
@@ -78,6 +124,8 @@ export default function AdminFleetMapPage() {
           plateNumber: rt.plateNumber ?? v.plateNumber,
           tripOrigin: rt.tripOrigin ?? v.tripOrigin,
           tripDestination: rt.tripDestination ?? v.tripDestination,
+          homeLocation: v.homeLocation,
+          currentOperationalLocation: v.currentOperationalLocation,
         };
       }
       return v;
@@ -100,7 +148,23 @@ export default function AdminFleetMapPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Hub:</span>
+            <select
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            >
+              <option value="">All Hubs</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded font-mono text-[11px] border ${
               connectionState === 'open'
@@ -179,6 +243,24 @@ export default function AdminFleetMapPage() {
                       <p className="text-zinc-600 mt-0.5">
                         {selectedVehicle.brand} {selectedVehicle.model}
                       </p>
+                    )}
+                    {(selectedVehicle.homeLocation || selectedVehicle.currentOperationalLocation) && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {selectedVehicle.homeLocation && (
+                          <LocationBadge
+                            type="home"
+                            name={selectedVehicle.homeLocation.name}
+                            code={selectedVehicle.homeLocation.code}
+                          />
+                        )}
+                        {selectedVehicle.currentOperationalLocation && (
+                          <LocationBadge
+                            type="current"
+                            name={selectedVehicle.currentOperationalLocation.name}
+                            code={selectedVehicle.currentOperationalLocation.code}
+                          />
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -260,5 +342,20 @@ export default function AdminFleetMapPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminFleetMapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-24 text-center text-zinc-500 text-xs">
+          <Spinner size="md" className="mb-2" />
+          <p>Loading fleet command...</p>
+        </div>
+      }
+    >
+      <AdminFleetMapContent />
+    </Suspense>
   );
 }

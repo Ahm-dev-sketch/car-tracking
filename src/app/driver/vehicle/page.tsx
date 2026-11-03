@@ -1,9 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { LocationBadge } from '@/components/ui/LocationBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+
+interface VehicleLocation {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface VehicleDetails {
   id: string;
@@ -15,38 +23,75 @@ interface VehicleDetails {
   transmission?: string | null;
   imageUrl?: string | null;
   status: string;
+  homeLocation?: VehicleLocation | null;
+  currentLocation?: VehicleLocation | null;
+  currentOperationalLocation?: VehicleLocation | null;
 }
 
-export default function DriverVehiclePage() {
+interface LocationOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+function DriverVehicleContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [currentVehicle, setCurrentVehicle] = useState<VehicleDetails | null>(null);
   const [driverStatus, setDriverStatus] = useState<string>('OFFLINE');
   const [licenseNumber, setLicenseNumber] = useState<string>('');
+  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Search for available vehicles
-  const [searchTerm, setSearchTerm] = useState('');
+  // Search & Filter state synced with URL
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [locationFilter, setLocationFilter] = useState(
+    searchParams.get('locationId') || searchParams.get('location_id') || ''
+  );
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [seatsFilter, setSeatsFilter] = useState(searchParams.get('seats') || '');
   const [searchResults, setSearchResults] = useState<VehicleDetails[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const syncUrlParams = (newParams: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    });
+    router.replace(`/driver/vehicle?${params.toString()}`);
+  };
 
   useEffect(() => {
     async function loadDriverVehicle() {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/tracking/config');
-        if (res.ok) {
-          const json = await res.json();
+        const [configRes, locsRes, meRes] = await Promise.all([
+          fetch('/api/tracking/config'),
+          fetch('/api/locations'),
+          fetch('/api/me'),
+        ]);
+
+        if (configRes.ok) {
+          const json = await configRes.json();
           if (json.sessionState?.activeTrip?.vehicle) {
             setCurrentVehicle(json.sessionState.activeTrip.vehicle);
           }
         }
 
-        // Also fetch driver profile if available via drivers list or me
-        const meRes = await fetch('/api/me');
+        if (locsRes.ok) {
+          const lJson = await locsRes.json();
+          setLocations(lJson.data || []);
+        }
+
         if (meRes.ok) {
           const meData = await meRes.json();
-          // Find driver record
-          const dRes = await fetch(`/api/drivers?search=${encodeURIComponent(meData.user?.email || '')}`);
+          const dRes = await fetch(
+            `/api/drivers?search=${encodeURIComponent(meData.user?.email || '')}`
+          );
           if (dRes.ok) {
             const dJson = await dRes.json();
             const dList = dJson.data || [];
@@ -70,22 +115,39 @@ export default function DriverVehiclePage() {
     loadDriverVehicle();
   }, []);
 
-  const handleSearch = async (term: string) => {
-    setSearchTerm(term);
-    if (!term.trim() || term.length < 2) {
-      setSearchResults([]);
-      return;
-    }
+  const handleSearch = async () => {
+    setIsSearching(true);
     try {
-      const res = await fetch(`/api/vehicles?search=${encodeURIComponent(term.trim())}&limit=5`);
+      const params = new URLSearchParams({ limit: '12' });
+      if (searchTerm.trim()) params.set('search', searchTerm.trim());
+      if (locationFilter) params.set('locationId', locationFilter);
+      if (statusFilter) params.set('status', statusFilter);
+      if (seatsFilter) params.set('seats', seatsFilter);
+
+      const res = await fetch(`/api/vehicles?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
         setSearchResults(json.data || json.vehicles || []);
       }
     } catch {
       // ignore
+    } finally {
+      setIsSearching(false);
     }
   };
+
+  useEffect(() => {
+    handleSearch();
+    syncUrlParams({
+      search: searchTerm.trim(),
+      locationId: locationFilter,
+      status: statusFilter,
+      seats: seatsFilter,
+    });
+  }, [locationFilter, statusFilter, seatsFilter]);
+
+  const assignedCurrentLoc =
+    currentVehicle?.currentLocation || currentVehicle?.currentOperationalLocation;
 
   return (
     <div className="space-y-6">
@@ -133,6 +195,24 @@ export default function DriverVehiclePage() {
                   <div className="font-mono text-sm font-semibold text-zinc-700 mt-0.5">
                     {currentVehicle.plateNumber}
                   </div>
+                </div>
+
+                {/* Location Badges */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {currentVehicle.homeLocation && (
+                    <LocationBadge
+                      type="home"
+                      name={currentVehicle.homeLocation.name}
+                      code={currentVehicle.homeLocation.code}
+                    />
+                  )}
+                  {assignedCurrentLoc && (
+                    <LocationBadge
+                      type="current"
+                      name={assignedCurrentLoc.name}
+                      code={assignedCurrentLoc.code}
+                    />
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-zinc-100">
@@ -200,34 +280,107 @@ export default function DriverVehiclePage() {
           <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-800">
             Inspect Fleet Vehicles
           </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">Verify vehicle license plate and specifications</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Filter by operational hub and check vehicle availability
+          </p>
         </div>
 
-        <div className="max-w-md">
+        {/* Filter bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <input
             type="text"
-            placeholder="Search license plate (e.g. B 1234 ABC)..."
+            placeholder="Search license plate, brand, model..."
             value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded font-mono uppercase focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
           />
+
+          <select
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+          >
+            <option value="">All Locations</option>
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.name} ({loc.code})
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+          >
+            <option value="">All Statuses</option>
+            <option value="AVAILABLE">Available</option>
+            <option value="RESERVED">Reserved</option>
+            <option value="IN_USE">In Use</option>
+          </select>
+
+          <button
+            type="button"
+            onClick={handleSearch}
+            className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer shrink-0"
+          >
+            {isSearching ? <Spinner size="sm" /> : 'Filter'}
+          </button>
         </div>
 
         {searchResults.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {searchResults.map((v) => (
-              <div key={v.id} className="p-3 bg-zinc-50 border border-zinc-200 rounded text-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-zinc-900">{v.plateNumber}</span>
-                  <StatusBadge status={v.status} />
+            {searchResults.map((v) => {
+              const currentLoc = v.currentLocation || v.currentOperationalLocation;
+              return (
+                <div key={v.id} className="p-3 bg-zinc-50 border border-zinc-200 rounded text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-zinc-900">{v.plateNumber}</span>
+                    <StatusBadge status={v.status} />
+                  </div>
+                  <div className="text-zinc-600 font-medium">
+                    {v.brand} {v.model}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {v.homeLocation && (
+                      <LocationBadge
+                        type="home"
+                        name={v.homeLocation.name}
+                        code={v.homeLocation.code}
+                      />
+                    )}
+                    {currentLoc && (
+                      <LocationBadge
+                        type="current"
+                        name={currentLoc.name}
+                        code={currentLoc.code}
+                      />
+                    )}
+                  </div>
+                  <div className="text-zinc-400 text-[11px] pt-1">
+                    {v.seatingCapacity} seats • {v.vehicleType}
+                  </div>
                 </div>
-                <div className="text-zinc-600">{v.brand} {v.model}</div>
-                <div className="text-zinc-400 text-[11px]">{v.seatingCapacity} seats • {v.vehicleType}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function DriverVehiclePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          <Spinner size="lg" className="mb-2" />
+          <p>Loading vehicle profile...</p>
+        </div>
+      }
+    >
+      <DriverVehicleContent />
+    </Suspense>
   );
 }

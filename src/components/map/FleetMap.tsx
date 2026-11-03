@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { MovementBadge } from '@/components/ui/MovementBadge';
 import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
+import { LocationBadge } from '@/components/ui/LocationBadge';
 
 export interface VehicleMarkerData {
   vehicleId: string;
@@ -25,6 +26,8 @@ export interface VehicleMarkerData {
   movement: string;
   tripOrigin?: string | null;
   tripDestination?: string | null;
+  homeLocation?: { id: string; name: string; code: string } | null;
+  currentOperationalLocation?: { id: string; name: string; code: string } | null;
 }
 
 interface FleetMapProps {
@@ -144,6 +147,25 @@ export default function FleetMap({
                       <span className="font-bold text-sm tracking-tight">{v.plateNumber}</span>
                       <StatusBadge status={v.status} />
                     </div>
+
+                    {(v.homeLocation || v.currentOperationalLocation) && (
+                      <div className="flex flex-wrap items-center gap-1 pb-2 mb-2 border-b border-zinc-100">
+                        {v.homeLocation && (
+                          <LocationBadge
+                            type="home"
+                            name={v.homeLocation.name}
+                            code={v.homeLocation.code}
+                          />
+                        )}
+                        {v.currentOperationalLocation && (
+                          <LocationBadge
+                            type="current"
+                            name={v.currentOperationalLocation.name}
+                            code={v.currentOperationalLocation.code}
+                          />
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-1.5 text-xs">
                       {v.brand && (

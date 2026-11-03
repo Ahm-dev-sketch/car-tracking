@@ -6,6 +6,7 @@ import {
   LocationUpdateData,
   BookingUpdateData,
   NotificationEventData,
+  OfferEventData,
   ServerRealtimeEvent,
   ServerRealtimeMessage,
   ClientRealtimeMessage,
@@ -21,12 +22,14 @@ export interface UseRealtimeOptions {
   vehicleIds?: string[];
   token?: string;
   wsUrl?: string;
+  onOffer?: (offer: OfferEventData) => void;
 }
 
 export interface UseRealtimeResult {
   vehicles: Map<string, LocationUpdateData>;
   bookings: Map<string, BookingUpdateData>;
   notifications: NotificationEventData[];
+  offers: Map<string, OfferEventData>;
   lastEvent: ServerRealtimeEvent | null;
   connectionState: ConnectionState;
   send: (msg: ClientRealtimeMessage) => void;
@@ -36,6 +39,7 @@ export function useRealtime({
   vehicleIds = [],
   token: customToken,
   wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001',
+  onOffer,
 }: UseRealtimeOptions = {}): UseRealtimeResult {
   const { data: session } = useSession?.() ?? { data: null };
 
@@ -55,9 +59,15 @@ export function useRealtime({
   const [notifications, setNotifications] = useState<NotificationEventData[]>(
     []
   );
+  const [offers, setOffers] = useState<Map<string, OfferEventData>>(
+    () => new Map()
+  );
   const [lastEvent, setLastEvent] = useState<ServerRealtimeEvent | null>(null);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('closed');
+
+  const onOfferRef = useRef(onOffer);
+  onOfferRef.current = onOffer;
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -145,6 +155,14 @@ export function useRealtime({
           } else if (message.type === 'notification') {
             setNotifications((prev) => [message.data, ...prev]);
             setLastEvent(message);
+          } else if (message.type === 'offer') {
+            setOffers((prev) => {
+              const next = new Map(prev);
+              next.set(message.data.offerId, message.data);
+              return next;
+            });
+            onOfferRef.current?.(message.data);
+            setLastEvent(message);
           }
         } catch {
           // Ignore invalid incoming payloads
@@ -214,6 +232,7 @@ export function useRealtime({
     vehicles,
     bookings,
     notifications,
+    offers,
     lastEvent,
     connectionState,
     send,

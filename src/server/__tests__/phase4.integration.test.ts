@@ -145,7 +145,7 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
     await prisma.$disconnect();
   });
 
-  it('1. startTrip transitions: booking IN_PROGRESS, vehicle IN_USE, driver ON_TRIP', async () => {
+  it('1. startTrip transitions: booking DRIVER_EN_ROUTE, vehicle IN_USE, driver ON_TRIP', async () => {
     const booking = await createBooking(userActor.id, {
       vehicleId: vehicle1Id,
       pickupLocation: 'Hanoi',
@@ -179,7 +179,8 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
     const updatedBooking = await prisma.booking.findUniqueOrThrow({
       where: { id: booking.id },
     });
-    expect(updatedBooking.status).toBe(BookingStatus.IN_PROGRESS);
+    // Phase 9 flow: trip start sets booking to DRIVER_EN_ROUTE
+    expect(updatedBooking.status).toBe(BookingStatus.DRIVER_EN_ROUTE);
 
     const updatedVehicle = await prisma.vehicle.findUniqueOrThrow({
       where: { id: vehicle1Id },
@@ -410,7 +411,8 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
     expect(result.rejected.map((r) => r.index)).toEqual([0, 1, 2, 3]);
   });
 
-  it('6. ingest without active trip -> 403 TRACKING_SESSION_REQUIRED', async () => {
+  // Phase 9: ingest requires ACTIVE driver_session (trip OR online idle)
+  it('6. ingest without active driver_session / trip -> 403 TRACKING_SESSION_REQUIRED', async () => {
     await expect(
       ingestLocations(driver2Id, [
         {

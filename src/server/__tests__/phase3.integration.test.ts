@@ -41,6 +41,7 @@ describe('Phase 3 PostgreSQL Integration Tests', () => {
   let vehicle2Id: string;
   let driver1Id: string;
   let driver2Id: string;
+  let locationId: string;
 
   beforeAll(async () => {
     // Seed standard roles
@@ -157,6 +158,11 @@ describe('Phase 3 PostgreSQL Integration Tests', () => {
       seatingCapacity: 7,
     });
     vehicle2Id = v2.id;
+
+    const loc =
+      (await prisma.location.findFirst()) ??
+      (await prisma.location.create({ data: { name: 'Phase3 Loc', code: 'P3' } }));
+    locationId = loc.id;
   });
 
   afterAll(async () => {
@@ -261,6 +267,7 @@ describe('Phase 3 PostgreSQL Integration Tests', () => {
         bookingNumber: 'BK-2026-0010',
         userId: user1Actor.id,
         vehicleId: vehicle1Id,
+        operationalLocationId: locationId,
         pickupLocation: 'Hanoi',
         destination: 'Ninh Binh',
         departureAt: new Date('2026-12-10T08:00:00Z'),
@@ -276,6 +283,7 @@ describe('Phase 3 PostgreSQL Integration Tests', () => {
         bookingNumber: 'BK-2026-0011',
         userId: user2Actor.id,
         vehicleId: vehicle1Id,
+        operationalLocationId: locationId,
         pickupLocation: 'Hanoi',
         destination: 'Ha Long',
         departureAt: new Date('2026-12-10T10:00:00Z'),
@@ -317,6 +325,7 @@ describe('Phase 3 PostgreSQL Integration Tests', () => {
         bookingNumber: 'BK-2026-0020',
         userId: user1Actor.id,
         vehicleId: vehicle1Id,
+        operationalLocationId: locationId,
         pickupLocation: 'Loc A',
         destination: 'Loc B',
         departureAt: new Date('2026-12-15T08:00:00Z'),
@@ -344,6 +353,7 @@ describe('Phase 3 PostgreSQL Integration Tests', () => {
         bookingNumber: 'BK-2026-0021',
         userId: user2Actor.id,
         vehicleId: vehicle2Id,
+        operationalLocationId: locationId,
         pickupLocation: 'Loc C',
         destination: 'Loc D',
         departureAt: new Date('2026-12-15T10:00:00Z'),

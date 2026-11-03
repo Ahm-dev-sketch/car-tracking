@@ -9,6 +9,7 @@ import {
   DriverStatus,
   BookingStatus,
   MovementStatus,
+  DriverSessionStatus,
   Prisma,
 } from '@prisma/client';
 
@@ -204,12 +205,28 @@ export async function startTrip(
       },
     });
 
-    // 5. If booking, set status IN_PROGRESS
+    // 4b. Ensure active driver_session exists
+    const existingSession = await tx.driverSession.findFirst({
+      where: { driverId: driver.id, status: DriverSessionStatus.ACTIVE },
+    });
+    if (!existingSession) {
+      await tx.driverSession.create({
+        data: {
+          driverId: driver.id,
+          vehicleId: targetVehicleId,
+          status: DriverSessionStatus.ACTIVE,
+          startLat: input.startLat,
+          startLng: input.startLng,
+        },
+      });
+    }
+
+    // 5. If booking, set status DRIVER_EN_ROUTE (Phase 9 flow)
     if (linkedBookingId) {
       await tx.booking.update({
         where: { id: linkedBookingId },
         data: {
-          status: BookingStatus.IN_PROGRESS,
+          status: BookingStatus.DRIVER_EN_ROUTE,
           driverId: driver.id,
         },
       });
@@ -322,6 +339,12 @@ export async function endTrip(
       data: { movement: MovementStatus.OFFLINE },
     });
 
+    // 6. End active driver session associated with trip
+    await tx.driverSession.updateMany({
+      where: { driverId: trip.driverId, status: DriverSessionStatus.ACTIVE },
+      data: { status: DriverSessionStatus.ENDED, endedAt: new Date() },
+    });
+
     return completed;
   });
 
@@ -422,6 +445,12 @@ export async function abortTrip(
       data: { movement: MovementStatus.OFFLINE },
     });
 
+    // End active driver session
+    await tx.driverSession.updateMany({
+      where: { driverId: trip.driverId, status: DriverSessionStatus.ACTIVE },
+      data: { status: DriverSessionStatus.ENDED, endedAt: new Date() },
+    });
+
     return aborted;
   });
 
@@ -439,6 +468,70 @@ export async function abortTrip(
   });
 
   return updatedTrip;
+}
+
+export async function arriveTrip(
+  actor: AuthenticatedUser,
+  tripId: string,
+  ctx?: TripMutationContext
+) {
+  const trip = await prisma.trip.findUnique({
+    where: { id: tripId },
+    include: { driver: true, booking: true, vehicle: true },
+  });
+
+  if (!trip) {
+    throw new ApiError(404, 'TRIP_NOT_FOUND', 'Trip not found');
+  }
+
+  const isAssignedDriver =
+    trip.driver.userId === actor.id || trip.driver.id === actor.id;
+  const isAdmin = actor.role === 'ADMIN';
+
+  if (!isAssignedDriver && !isAdmin) {
+    throw new ApiError(403, 'FORBIDDEN', 'Only assigned driver or admin can mark arrival');
+  }
+
+  if (trip.status !== TripStatus.ACTIVE) {
+    throw new ApiError(409, 'TRIP_NOT_ACTIVE', `Cannot mark arrival for trip in status ${trip.status}`);
+  }
+
+  if (!trip.bookingId) {
+    throw new ApiError(400, 'NO_BOOKING_LINKED', 'Trip has no linked booking');
+  }
+
+  const updatedBooking = await prisma.$transaction(async (tx) => {
+    return tx.booking.update({
+      where: { id: trip.bookingId! },
+      data: { status: BookingStatus.ARRIVED },
+      include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+    });
+  });
+
+  await logAuditEvent({
+    actorUserId: ctx?.actorUserId ?? trip.driver.userId,
+    action: 'trip.arrived',
+    entityType: 'Trip',
+    entityId: trip.id,
+    newValue: {
+      status: BookingStatus.ARRIVED,
+      tripId: trip.id,
+      bookingId: trip.bookingId,
+    },
+    ip: ctx?.ip,
+    userAgent: ctx?.userAgent,
+  });
+
+  if (trip.booking) {
+    await notify(trip.booking.userId, {
+      type: 'DRIVER_ARRIVED',
+      title: 'Driver Arrived',
+      body: `Your driver has arrived at the pickup location for booking ${trip.booking.bookingNumber}`,
+      data: { tripId: trip.id, bookingId: trip.booking.id },
+    });
+  }
+
+  return { trip, booking: updatedBooking };
 }
 
 export async function listTrips(

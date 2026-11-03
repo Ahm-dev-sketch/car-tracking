@@ -30,10 +30,21 @@ export interface NotificationEventData {
   createdAt: string;
 }
 
+export interface OfferEventData {
+  offerId: string;
+  bookingId: string;
+  etaSeconds: number | null;
+  etaEstimated: boolean;
+  pickupLocation: string;
+  destination: string;
+  expiresAt: string;
+}
+
 export type ServerRealtimeEvent =
   | { type: 'location:update'; data: LocationUpdateData }
   | { type: 'booking:update'; data: BookingUpdateData }
-  | { type: 'notification'; data: NotificationEventData };
+  | { type: 'notification'; data: NotificationEventData }
+  | { type: 'offer'; data: OfferEventData };
 
 export type ClientAuthMessage = {
   type: 'auth';

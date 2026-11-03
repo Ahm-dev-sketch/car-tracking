@@ -37,6 +37,7 @@ export interface VehicleQueryFilters {
   search?: string;
   seats?: number;
   status?: VehicleStatus;
+  locationId?: string;
   isAdmin?: boolean;
   sortBy?: 'created_at' | 'plate_number' | 'brand' | 'status';
   sortOrder?: 'asc' | 'desc';
@@ -60,6 +61,18 @@ export async function listVehicles(filters: VehicleQueryFilters) {
 
   if (filters.seats) {
     where.seatingCapacity = filters.seats;
+  }
+
+  if (filters.locationId) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      {
+        OR: [
+          { homeLocationId: filters.locationId },
+          { currentLocationId: filters.locationId },
+        ],
+      },
+    ];
   }
 
   if (filters.search) {
@@ -91,6 +104,8 @@ export async function listVehicles(filters: VehicleQueryFilters) {
       take: limit,
       orderBy,
       include: {
+        homeLocation: { select: { id: true, name: true, code: true } },
+        currentOperationalLocation: { select: { id: true, name: true, code: true } },
         currentDriver: {
           select: {
             id: true,

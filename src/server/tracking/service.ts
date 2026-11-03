@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
 import { TRACKING_CONFIG } from './config';
-import { MovementStatus, TripStatus, BookingStatus } from '@prisma/client';
+import { MovementStatus, TripStatus, BookingStatus, DriverSessionStatus } from '@prisma/client';
 import { AuthenticatedUser } from '@/lib/auth-guard';
 import { publishEvent } from '@/server/realtime/hub';
 
@@ -83,7 +83,15 @@ export async function ingestLocations(
     },
   });
 
-  if (!activeTrip) {
+  const activeSession = await prisma.driverSession.findFirst({
+    where: { driverId, status: DriverSessionStatus.ACTIVE },
+    include: {
+      driver: { include: { user: true } },
+      vehicle: true,
+    },
+  });
+
+  if (!activeTrip && !activeSession) {
     throw new ApiError(
       403,
       'TRACKING_SESSION_REQUIRED',
@@ -91,11 +99,30 @@ export async function ingestLocations(
     );
   }
 
+  const isTrip = Boolean(activeTrip);
+  const targetVehicleId =
+    activeTrip?.vehicleId ??
+    activeSession?.vehicleId ??
+    activeSession?.driver.currentVehicleId;
+
+  if (!targetVehicleId) {
+    throw new ApiError(
+      400,
+      'VEHICLE_REQUIRED_FOR_TRACKING',
+      'No vehicle associated with active session or driver'
+    );
+  }
+
   const now = Date.now();
   const maxFutureSkewMs = TRACKING_CONFIG.maxFutureSkewSec * 1000;
+  const intervalSec = isTrip
+    ? TRACKING_CONFIG.tripIntervalSec
+    : TRACKING_CONFIG.idleIntervalSec;
   const maxStaleMs =
-    TRACKING_CONFIG.tripIntervalSec * TRACKING_CONFIG.maxStaleMultiplier * 1000;
-  const accuracyCap = TRACKING_CONFIG.accuracyCapTripM;
+    intervalSec * TRACKING_CONFIG.maxStaleMultiplier * 1000;
+  const accuracyCap = isTrip
+    ? TRACKING_CONFIG.accuracyCapTripM
+    : TRACKING_CONFIG.accuracyCapIdleM;
 
   const accepted: LocationPointInput[] = [];
   const rejected: Array<{ index: number; reason: string }> = [];
@@ -168,7 +195,8 @@ export async function ingestLocations(
       await prisma.driverLocation.create({
         data: {
           driverId,
-          vehicleId: activeTrip.vehicleId,
+          vehicleId: targetVehicleId,
+          tripId: activeTrip?.id ?? null,
           lat: p.lat,
           lng: p.lng,
           accuracyM: p.accuracyM,
@@ -183,7 +211,7 @@ export async function ingestLocations(
     // Upsert current vehicle location
     const latestPoint = accepted[accepted.length - 1];
     const prevLocation = await prisma.vehicleLocation.findUnique({
-      where: { vehicleId: activeTrip.vehicleId },
+      where: { vehicleId: targetVehicleId },
     });
 
     const movement = classifyMovement(
@@ -192,10 +220,11 @@ export async function ingestLocations(
     );
 
     await prisma.vehicleLocation.upsert({
-      where: { vehicleId: activeTrip.vehicleId },
+      where: { vehicleId: targetVehicleId },
       create: {
-        vehicleId: activeTrip.vehicleId,
+        vehicleId: targetVehicleId,
         driverId,
+        tripId: activeTrip?.id ?? null,
         lat: latestPoint.lat,
         lng: latestPoint.lng,
         accuracyM: latestPoint.accuracyM,
@@ -207,6 +236,7 @@ export async function ingestLocations(
       },
       update: {
         driverId,
+        tripId: activeTrip?.id ?? null,
         lat: latestPoint.lat,
         lng: latestPoint.lng,
         accuracyM: latestPoint.accuracyM,
@@ -221,7 +251,7 @@ export async function ingestLocations(
     await publishEvent({
       type: 'location:update',
       data: {
-        vehicleId: activeTrip.vehicleId,
+        vehicleId: targetVehicleId,
         lat: latestPoint.lat,
         lng: latestPoint.lng,
         accuracyM: latestPoint.accuracyM,
@@ -230,11 +260,11 @@ export async function ingestLocations(
         recordedAt: latestPoint.recordedAt.toISOString(),
         receivedAt: new Date().toISOString(),
         movement,
-        driverName: activeTrip.driver?.user?.name ?? null,
-        driverPhone: activeTrip.driver?.user?.phone ?? null,
-        plateNumber: activeTrip.vehicle?.plateNumber ?? null,
-        tripOrigin: activeTrip.booking?.pickupLocation ?? null,
-        tripDestination: activeTrip.booking?.destination ?? null,
+        driverName: activeTrip?.driver?.user?.name ?? activeSession?.driver?.user?.name ?? null,
+        driverPhone: activeTrip?.driver?.user?.phone ?? activeSession?.driver?.user?.phone ?? null,
+        plateNumber: activeTrip?.vehicle?.plateNumber ?? activeSession?.vehicle?.plateNumber ?? null,
+        tripOrigin: activeTrip?.booking?.pickupLocation ?? null,
+        tripDestination: activeTrip?.booking?.destination ?? null,
       },
     });
   }
@@ -278,6 +308,8 @@ export async function getVehicleTracking(
           in: [
             BookingStatus.APPROVED,
             BookingStatus.DRIVER_ASSIGNED,
+            BookingStatus.DRIVER_EN_ROUTE,
+            BookingStatus.ARRIVED,
             BookingStatus.IN_PROGRESS,
           ],
         },
@@ -338,7 +370,10 @@ export async function getVehicleTracking(
   };
 }
 
-export async function getLiveTracking(actor: AuthenticatedUser) {
+export async function getLiveTracking(
+  actor: AuthenticatedUser,
+  locationId?: string
+) {
   await markStale();
 
   const isAdmin = actor.role === 'ADMIN';
@@ -354,6 +389,8 @@ export async function getLiveTracking(actor: AuthenticatedUser) {
           in: [
             BookingStatus.APPROVED,
             BookingStatus.DRIVER_ASSIGNED,
+            BookingStatus.DRIVER_EN_ROUTE,
+            BookingStatus.ARRIVED,
             BookingStatus.IN_PROGRESS,
           ],
         },
@@ -368,10 +405,20 @@ export async function getLiveTracking(actor: AuthenticatedUser) {
   const vehicles = await prisma.vehicle.findMany({
     where: {
       ...(vehicleIds !== null ? { id: { in: vehicleIds } } : {}),
+      ...(locationId
+        ? {
+            OR: [
+              { homeLocationId: locationId },
+              { currentLocationId: locationId },
+            ],
+          }
+        : {}),
       currentLocation: { isNot: null },
     },
     include: {
       currentLocation: true,
+      homeLocation: { select: { id: true, name: true, code: true } },
+      currentOperationalLocation: { select: { id: true, name: true, code: true } },
       currentDriver: {
         include: { user: { select: { id: true, name: true, phone: true } } },
       },
@@ -388,6 +435,8 @@ export async function getLiveTracking(actor: AuthenticatedUser) {
       brand: v.brand,
       model: v.model,
       status: v.status,
+      homeLocation: v.homeLocation,
+      currentLocationInfo: v.currentOperationalLocation,
       location: v.currentLocation,
       driver: v.currentDriver?.user
         ? {

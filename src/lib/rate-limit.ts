@@ -7,9 +7,29 @@ import { RouteHandler } from './errors';
 
 interface RateLimitEntry {
   timestamps: number[];
+  lastActivity: number;
 }
 
 const store = new Map<string, RateLimitEntry>();
+
+// Sweep idle entries periodically so the Map doesn't grow unbounded
+// (unique keys accumulate from login attempts across many IPs/emails).
+let lastSweep = Date.now();
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
+function sweepStaleEntries(): void {
+  const now = Date.now();
+  if (now - lastSweep < SWEEP_INTERVAL_MS) return;
+  lastSweep = now;
+  const maxWindowMs = Math.max(
+    ...Object.values(RATE_LIMIT_CONFIG).map((c) => c.windowMs)
+  );
+  for (const [key, entry] of store) {
+    if (now - entry.lastActivity > maxWindowMs) {
+      store.delete(key);
+    }
+  }
+}
 
 export interface RateLimitOptions {
   key: string;
@@ -27,11 +47,14 @@ export function rateLimit(options: RateLimitOptions): RateLimitResult {
   const now = Date.now();
   const windowStart = now - options.windowMs;
 
+  sweepStaleEntries();
+
   let entry = store.get(options.key);
   if (!entry) {
-    entry = { timestamps: [] };
+    entry = { timestamps: [], lastActivity: now };
     store.set(options.key, entry);
   }
+  entry.lastActivity = now;
 
   // Remove timestamps outside window
   entry.timestamps = entry.timestamps.filter((t) => t > windowStart);
@@ -84,6 +107,11 @@ export const RATE_LIMIT_CONFIG = {
   // GPS location ingest: 120 requests per minute per driver
   LOCATION_INGEST: {
     limit: 120,
+    windowMs: 60 * 1000,
+  },
+  // Driver session start: 30 requests per minute
+  DRIVER_SESSION: {
+    limit: 30,
     windowMs: 60 * 1000,
   },
 } as const;

@@ -29,6 +29,7 @@ export interface DriverQueryFilters {
   limit?: number;
   search?: string;
   status?: DriverStatus;
+  locationId?: string;
   assignment?: 'assigned' | 'unassigned' | 'all';
   sortBy?: 'name' | 'license_number' | 'created_at';
   sortOrder?: 'asc' | 'desc';
@@ -351,6 +352,15 @@ export async function listDrivers(filters: DriverQueryFilters) {
     where.currentVehicleId = null;
   }
 
+  if (filters.locationId) {
+    where.currentVehicle = {
+      OR: [
+        { homeLocationId: filters.locationId },
+        { currentLocationId: filters.locationId },
+      ],
+    };
+  }
+
   if (filters.search) {
     const s = filters.search.trim();
     where.OR = [
@@ -395,6 +405,8 @@ export async function listDrivers(filters: DriverQueryFilters) {
             brand: true,
             model: true,
             status: true,
+            homeLocation: { select: { id: true, name: true, code: true } },
+            currentOperationalLocation: { select: { id: true, name: true, code: true } },
           },
         },
         assignments: {

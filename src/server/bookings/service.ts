@@ -14,6 +14,12 @@ export interface BookingMutationContext {
 
 export interface CreateBookingInput {
   vehicleId?: string | null;
+  operationalLocationId?: string;
+  vehiclePreferenceId?: string | null;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  destinationLat?: number | null;
+  destinationLng?: number | null;
   pickupLocation: string;
   destination: string;
   departureAt: Date;
@@ -21,6 +27,7 @@ export interface CreateBookingInput {
   passengerCount: number;
   purpose: string;
   notes?: string | null;
+  status?: BookingStatus;
 }
 
 export interface BookingQueryFilters {
@@ -28,6 +35,7 @@ export interface BookingQueryFilters {
   limit?: number;
   userId?: string;
   vehicleId?: string;
+  locationId?: string;
   status?: BookingStatus;
   startDate?: Date;
   endDate?: Date;
@@ -73,11 +81,15 @@ export async function assertVehicleAvailableForWindow(
         BookingStatus.PENDING,
         BookingStatus.APPROVED,
         BookingStatus.DRIVER_ASSIGNED,
+        BookingStatus.DRIVER_EN_ROUTE,
+        BookingStatus.ARRIVED,
         BookingStatus.IN_PROGRESS,
       ]
     : [
         BookingStatus.APPROVED,
         BookingStatus.DRIVER_ASSIGNED,
+        BookingStatus.DRIVER_EN_ROUTE,
+        BookingStatus.ARRIVED,
         BookingStatus.IN_PROGRESS,
       ];
 
@@ -130,6 +142,21 @@ export async function createBooking(
     );
   }
 
+  // Ensure operationalLocationId fallback for backwards compatibility with legacy tests
+  let operationalLocationId = input.operationalLocationId;
+  if (!operationalLocationId) {
+    const loc = await prisma.location.findFirst({ select: { id: true } });
+    if (loc) {
+      operationalLocationId = loc.id;
+    } else {
+      const createdLoc = await prisma.location.create({
+        data: { name: 'Default Location', code: 'DEF' },
+        select: { id: true },
+      });
+      operationalLocationId = createdLoc.id;
+    }
+  }
+
   const year = input.departureAt.getFullYear();
   let retries = 3;
   let created = null;
@@ -155,6 +182,12 @@ export async function createBooking(
             bookingNumber,
             userId,
             vehicleId: input.vehicleId ?? null,
+            operationalLocationId: operationalLocationId!,
+            vehiclePreferenceId: input.vehiclePreferenceId ?? null,
+            pickupLat: input.pickupLat ?? null,
+            pickupLng: input.pickupLng ?? null,
+            destinationLat: input.destinationLat ?? null,
+            destinationLng: input.destinationLng ?? null,
             pickupLocation: input.pickupLocation,
             destination: input.destination,
             departureAt: input.departureAt,
@@ -162,11 +195,12 @@ export async function createBooking(
             passengerCount: input.passengerCount,
             purpose: input.purpose,
             notes: input.notes ?? null,
-            status: BookingStatus.PENDING,
+            status: input.status ?? BookingStatus.PENDING,
           },
           include: {
             user: { select: { id: true, name: true, email: true, phone: true } },
             vehicle: true,
+            operationalLocation: true,
           },
         });
       });
@@ -225,7 +259,7 @@ export async function transitionBooking(
   to: BookingStatus,
   actor: AuthenticatedUser,
   ctx?: BookingMutationContext,
-  payload?: { reason?: string; driverId?: string }
+  payload?: { reason?: string; driverId?: string; vehicleId?: string }
 ) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -233,6 +267,7 @@ export async function transitionBooking(
       user: { select: { id: true, name: true, email: true } },
       driver: { include: { user: { select: { id: true, name: true } } } },
       vehicle: true,
+      operationalLocation: true,
     },
   });
 
@@ -246,12 +281,36 @@ export async function transitionBooking(
     (from === BookingStatus.PENDING &&
       (to === BookingStatus.APPROVED ||
         to === BookingStatus.REJECTED ||
-        to === BookingStatus.CANCELLED)) ||
+        to === BookingStatus.CANCELLED ||
+        to === BookingStatus.SEARCHING_DRIVER)) ||
     (from === BookingStatus.APPROVED &&
       (to === BookingStatus.DRIVER_ASSIGNED || to === BookingStatus.CANCELLED)) ||
+    (from === BookingStatus.SEARCHING_DRIVER &&
+      (to === BookingStatus.DRIVER_NOTIFIED ||
+        to === BookingStatus.NO_DRIVER_AVAILABLE ||
+        to === BookingStatus.ADMIN_INTERVENTION ||
+        to === BookingStatus.DRIVER_ASSIGNED ||
+        to === BookingStatus.CANCELLED)) ||
+    (from === BookingStatus.DRIVER_NOTIFIED &&
+      (to === BookingStatus.DRIVER_ASSIGNED ||
+        to === BookingStatus.SEARCHING_DRIVER ||
+        to === BookingStatus.ADMIN_INTERVENTION ||
+        to === BookingStatus.CANCELLED)) ||
     (from === BookingStatus.DRIVER_ASSIGNED &&
+      (to === BookingStatus.DRIVER_EN_ROUTE ||
+        to === BookingStatus.IN_PROGRESS ||
+        to === BookingStatus.CANCELLED)) ||
+    (from === BookingStatus.DRIVER_EN_ROUTE &&
+      (to === BookingStatus.ARRIVED ||
+        to === BookingStatus.IN_PROGRESS ||
+        to === BookingStatus.CANCELLED)) ||
+    (from === BookingStatus.ARRIVED &&
       (to === BookingStatus.IN_PROGRESS || to === BookingStatus.CANCELLED)) ||
-    (from === BookingStatus.IN_PROGRESS && to === BookingStatus.COMPLETED);
+    (from === BookingStatus.IN_PROGRESS && to === BookingStatus.COMPLETED) ||
+    (from === BookingStatus.ADMIN_INTERVENTION &&
+      (to === BookingStatus.DRIVER_ASSIGNED || to === BookingStatus.CANCELLED)) ||
+    (from === BookingStatus.NO_DRIVER_AVAILABLE &&
+      (to === BookingStatus.ADMIN_INTERVENTION || to === BookingStatus.CANCELLED));
 
   if (!isValidTransition) {
     throw new ApiError(
@@ -276,14 +335,19 @@ export async function transitionBooking(
     if (!isOwner && !isAdmin) {
       throw new ApiError(403, 'FORBIDDEN', 'Only the booking owner or an administrator can cancel this booking');
     }
-  } else if (to === BookingStatus.IN_PROGRESS || to === BookingStatus.COMPLETED) {
+  } else if (
+    to === BookingStatus.DRIVER_EN_ROUTE ||
+    to === BookingStatus.ARRIVED ||
+    to === BookingStatus.IN_PROGRESS ||
+    to === BookingStatus.COMPLETED
+  ) {
     if (!booking.driverId) {
       throw new ApiError(400, 'NO_DRIVER_ASSIGNED', 'Cannot start trip without an assigned driver');
     }
     const isAssignedDriver =
       booking.driver?.userId === actor.id || booking.driver?.id === actor.id;
     if (!isAssignedDriver && actor.role !== 'ADMIN') {
-      throw new ApiError(403, 'FORBIDDEN', 'Only the assigned driver can start or complete this booking');
+      throw new ApiError(403, 'FORBIDDEN', 'Only the assigned driver can update trip progress');
     }
   }
 
@@ -326,7 +390,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.APPROVED },
-        include: { user: true, vehicle: true, driver: { include: { user: true } } },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
       });
     }
 
@@ -337,7 +401,55 @@ export async function transitionBooking(
           status: BookingStatus.REJECTED,
           rejectedReason: payload?.reason ?? null,
         },
-        include: { user: true, vehicle: true, driver: { include: { user: true } } },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+      });
+    }
+
+    if (to === BookingStatus.SEARCHING_DRIVER) {
+      return tx.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.SEARCHING_DRIVER },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+      });
+    }
+
+    if (to === BookingStatus.DRIVER_NOTIFIED) {
+      return tx.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.DRIVER_NOTIFIED },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+      });
+    }
+
+    if (to === BookingStatus.DRIVER_EN_ROUTE) {
+      return tx.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.DRIVER_EN_ROUTE },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+      });
+    }
+
+    if (to === BookingStatus.ARRIVED) {
+      return tx.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.ARRIVED },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+      });
+    }
+
+    if (to === BookingStatus.NO_DRIVER_AVAILABLE) {
+      return tx.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+      });
+    }
+
+    if (to === BookingStatus.ADMIN_INTERVENTION) {
+      return tx.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.ADMIN_INTERVENTION },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
       });
     }
 
@@ -372,6 +484,8 @@ export async function transitionBooking(
             in: [
               BookingStatus.APPROVED,
               BookingStatus.DRIVER_ASSIGNED,
+              BookingStatus.DRIVER_EN_ROUTE,
+              BookingStatus.ARRIVED,
               BookingStatus.IN_PROGRESS,
             ],
           },
@@ -389,11 +503,13 @@ export async function transitionBooking(
         );
       }
 
+      const targetVehicleId = payload.vehicleId ?? booking.vehicleId;
+
       // Check vehicle availability and active assignment conflict
-      if (booking.vehicleId) {
+      if (targetVehicleId) {
         await assertVehicleAvailableForWindow(
           tx,
-          booking.vehicleId,
+          targetVehicleId,
           booking.departureAt,
           booking.expectedReturnAt,
           booking.id,
@@ -401,7 +517,7 @@ export async function transitionBooking(
         );
 
         const openVehicleAssignment = await tx.vehicleAssignment.findFirst({
-          where: { vehicleId: booking.vehicleId, unassignedAt: null },
+          where: { vehicleId: targetVehicleId, unassignedAt: null },
         });
 
         if (
@@ -414,6 +530,11 @@ export async function transitionBooking(
             'Vehicle already actively assigned to another driver'
           );
         }
+
+        await tx.vehicle.update({
+          where: { id: targetVehicleId },
+          data: { status: VehicleStatus.RESERVED },
+        });
       }
 
       return tx.booking.update({
@@ -421,8 +542,9 @@ export async function transitionBooking(
         data: {
           status: BookingStatus.DRIVER_ASSIGNED,
           driverId: payload.driverId,
+          ...(targetVehicleId ? { vehicleId: targetVehicleId } : {}),
         },
-        include: { user: true, vehicle: true, driver: { include: { user: true } } },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
       });
     }
 
@@ -431,7 +553,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.IN_PROGRESS },
-        include: { user: true, vehicle: true, driver: { include: { user: true } } },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
       });
     }
 
@@ -440,7 +562,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.COMPLETED },
-        include: { user: true, vehicle: true, driver: { include: { user: true } } },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
       });
     }
 
@@ -451,7 +573,7 @@ export async function transitionBooking(
           status: BookingStatus.CANCELLED,
           cancelledReason: payload?.reason ?? null,
         },
-        include: { user: true, vehicle: true, driver: { include: { user: true } } },
+        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
       });
     }
 
@@ -520,6 +642,34 @@ export async function transitionBooking(
         data: { bookingId: updated.id },
       });
     }
+  } else if (to === BookingStatus.DRIVER_EN_ROUTE) {
+    await notify(updated.userId, {
+      type: 'DRIVER_EN_ROUTE',
+      title: 'Driver En Route',
+      body: `Driver is on the way to pick you up for booking ${updated.bookingNumber}`,
+      data: { bookingId: updated.id },
+    });
+  } else if (to === BookingStatus.ARRIVED) {
+    await notify(updated.userId, {
+      type: 'DRIVER_ARRIVED',
+      title: 'Driver Arrived',
+      body: `Your driver has arrived at the pickup location for booking ${updated.bookingNumber}`,
+      data: { bookingId: updated.id },
+    });
+  } else if (to === BookingStatus.NO_DRIVER_AVAILABLE) {
+    await notify(updated.userId, {
+      type: 'NO_DRIVER_AVAILABLE',
+      title: 'No Driver Available',
+      body: `We could not find an available driver for booking ${updated.bookingNumber}`,
+      data: { bookingId: updated.id },
+    });
+  } else if (to === BookingStatus.ADMIN_INTERVENTION) {
+    await notifyAdmins({
+      type: 'ADMIN_INTERVENTION',
+      title: 'Admin Intervention Required',
+      body: `Booking ${updated.bookingNumber} needs manual driver assignment`,
+      data: { bookingId: updated.id },
+    });
   } else if (to === BookingStatus.IN_PROGRESS) {
     await notify(updated.userId, {
       type: 'BOOKING_IN_PROGRESS',
@@ -585,6 +735,10 @@ export async function listBookings(
     where.status = filters.status;
   }
 
+  if (filters.locationId) {
+    where.operationalLocationId = filters.locationId;
+  }
+
   if (filters.startDate || filters.endDate) {
     where.departureAt = {
       ...(filters.startDate ? { gte: filters.startDate } : {}),
@@ -602,6 +756,7 @@ export async function listBookings(
       include: {
         user: { select: { id: true, name: true, email: true, phone: true } },
         vehicle: true,
+        operationalLocation: { select: { id: true, name: true, code: true } },
         driver: {
           include: {
             user: { select: { id: true, name: true, phone: true } },
@@ -617,6 +772,8 @@ export async function listBookings(
       b.userId === actor.id &&
       (b.status === BookingStatus.APPROVED ||
         b.status === BookingStatus.DRIVER_ASSIGNED ||
+        b.status === BookingStatus.DRIVER_EN_ROUTE ||
+        b.status === BookingStatus.ARRIVED ||
         b.status === BookingStatus.IN_PROGRESS);
     const canSeeDriverPhone = actor.role === 'ADMIN' || isOwnerActive;
 
@@ -656,6 +813,8 @@ export async function getBookingById(
     include: {
       user: { select: { id: true, name: true, email: true, phone: true } },
       vehicle: true,
+      operationalLocation: { select: { id: true, name: true, code: true } },
+      offers: { orderBy: { attemptNo: 'desc' } },
       driver: {
         include: {
           user: { select: { id: true, name: true, phone: true } },
@@ -681,6 +840,8 @@ export async function getBookingById(
     isOwner &&
     (booking.status === BookingStatus.APPROVED ||
       booking.status === BookingStatus.DRIVER_ASSIGNED ||
+      booking.status === BookingStatus.DRIVER_EN_ROUTE ||
+      booking.status === BookingStatus.ARRIVED ||
       booking.status === BookingStatus.IN_PROGRESS);
 
   const canSeeDriverPhone = isAdmin || isOwnerActive;

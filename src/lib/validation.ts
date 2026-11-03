@@ -15,10 +15,16 @@ export const bookingStatusEnum = z.enum([
   'PENDING',
   'APPROVED',
   'REJECTED',
+  'SEARCHING_DRIVER',
+  'DRIVER_NOTIFIED',
   'DRIVER_ASSIGNED',
+  'DRIVER_EN_ROUTE',
+  'ARRIVED',
   'IN_PROGRESS',
   'COMPLETED',
   'CANCELLED',
+  'NO_DRIVER_AVAILABLE',
+  'ADMIN_INTERVENTION',
 ]);
 
 export const createUserSchema = z
@@ -205,6 +211,8 @@ export const vehicleQuerySchema = z.object({
   search: z.string().trim().optional(),
   seats: z.coerce.number().int().positive().optional(),
   status: vehicleStatusEnum.optional(),
+  location_id: z.string().optional(),
+  locationId: z.string().optional(),
   sortBy: z.enum(['created_at', 'plate_number', 'brand', 'status']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
@@ -220,6 +228,8 @@ export const driverQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(10),
   search: z.string().trim().optional(),
   status: driverStatusEnum.optional(),
+  location_id: z.string().optional(),
+  locationId: z.string().optional(),
   assignment: z.enum(['assigned', 'unassigned', 'all']).optional(),
   sortBy: z.enum(['name', 'license_number', 'created_at']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
@@ -229,6 +239,18 @@ export const createBookingSchema = z
   .object({
     vehicle_id: z.string().trim().min(1).optional().nullable(),
     vehicleId: z.string().trim().min(1).optional().nullable(),
+    operational_location_id: z.string().trim().min(1, 'Operational location is required').optional(),
+    operationalLocationId: z.string().trim().min(1, 'Operational location is required').optional(),
+    vehicle_preference_id: z.string().trim().min(1).optional().nullable(),
+    vehiclePreferenceId: z.string().trim().min(1).optional().nullable(),
+    pickup_lat: z.coerce.number().optional().nullable(),
+    pickupLat: z.coerce.number().optional().nullable(),
+    pickup_lng: z.coerce.number().optional().nullable(),
+    pickupLng: z.coerce.number().optional().nullable(),
+    destination_lat: z.coerce.number().optional().nullable(),
+    destinationLat: z.coerce.number().optional().nullable(),
+    destination_lng: z.coerce.number().optional().nullable(),
+    destinationLng: z.coerce.number().optional().nullable(),
     pickup_location: z.string().trim().min(1, 'Pickup location is required').optional(),
     pickupLocation: z.string().trim().min(1, 'Pickup location is required').optional(),
     destination: z.string().trim().min(1, 'Destination is required'),
@@ -242,6 +264,15 @@ export const createBookingSchema = z
     notes: z.string().trim().optional().nullable(),
   })
   .superRefine((data, ctx) => {
+    const operationalLoc = data.operational_location_id ?? data.operationalLocationId;
+    if (!operationalLoc) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Operational location is required',
+        path: ['operationalLocationId'],
+      });
+    }
+
     const pickup = data.pickup_location ?? data.pickupLocation;
     if (!pickup) {
       ctx.addIssue({
@@ -288,6 +319,12 @@ export const createBookingSchema = z
   })
   .transform((data) => {
     const vehicleId = data.vehicle_id ?? data.vehicleId ?? null;
+    const operationalLocationId = (data.operational_location_id ?? data.operationalLocationId)!;
+    const vehiclePreferenceId = data.vehicle_preference_id ?? data.vehiclePreferenceId ?? null;
+    const pickupLat = data.pickup_lat ?? data.pickupLat ?? null;
+    const pickupLng = data.pickup_lng ?? data.pickupLng ?? null;
+    const destinationLat = data.destination_lat ?? data.destinationLat ?? null;
+    const destinationLng = data.destination_lng ?? data.destinationLng ?? null;
     const pickupLocation = (data.pickup_location ?? data.pickupLocation)!;
     const departureAt = (data.departure_at ?? data.departureAt)!;
     const expectedReturnAt = (data.expected_return_at ?? data.expectedReturnAt)!;
@@ -295,6 +332,12 @@ export const createBookingSchema = z
 
     return {
       vehicleId,
+      operationalLocationId,
+      vehiclePreferenceId,
+      pickupLat,
+      pickupLng,
+      destinationLat,
+      destinationLng,
       pickupLocation,
       destination: data.destination,
       departureAt,
@@ -311,6 +354,8 @@ export const bookingQuerySchema = z.object({
   status: bookingStatusEnum.optional(),
   vehicle_id: z.string().optional(),
   vehicleId: z.string().optional(),
+  location_id: z.string().optional(),
+  locationId: z.string().optional(),
   start_date: z.coerce.date().optional(),
   startDate: z.coerce.date().optional(),
   end_date: z.coerce.date().optional(),
@@ -338,6 +383,34 @@ export const assignBookingDriverSchema = z.object({
   }
 }).transform((data) => ({
   driverId: (data.driver_id ?? data.driverId)!,
+}));
+
+export const manualAssignBookingSchema = z.object({
+  driver_id: z.string().trim().min(1).optional(),
+  driverId: z.string().trim().min(1).optional(),
+}).superRefine((data, ctx) => {
+  if (!data.driver_id && !data.driverId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'driverId is required',
+      path: ['driverId'],
+    });
+  }
+}).transform((data) => ({
+  driverId: (data.driver_id ?? data.driverId)!,
+}));
+
+export const startDriverSessionSchema = z.object({
+  vehicle_id: z.string().trim().optional().nullable(),
+  vehicleId: z.string().trim().optional().nullable(),
+  start_lat: z.coerce.number().optional().nullable(),
+  startLat: z.coerce.number().optional().nullable(),
+  start_lng: z.coerce.number().optional().nullable(),
+  startLng: z.coerce.number().optional().nullable(),
+}).transform((data) => ({
+  vehicleId: data.vehicle_id ?? data.vehicleId ?? null,
+  startLat: data.start_lat ?? data.startLat ?? null,
+  startLng: data.start_lng ?? data.startLng ?? null,
 }));
 
 export const updateBookingStatusSchema = z.object({

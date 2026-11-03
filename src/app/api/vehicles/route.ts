@@ -19,6 +19,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     search: searchParams.get('search') ?? undefined,
     seats: searchParams.get('seats') ?? undefined,
     status: searchParams.get('status') ?? undefined,
+    locationId: searchParams.get('locationId') ?? searchParams.get('location_id') ?? undefined,
     sortBy: searchParams.get('sortBy') ?? undefined,
     sortOrder: searchParams.get('sortOrder') ?? undefined,
   });

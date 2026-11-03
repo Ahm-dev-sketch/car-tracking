@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandling } from '@/lib/errors';
 import { getSessionUser } from '@/lib/auth-guard';
 import { getLiveTracking } from '@/server/tracking/service';
 
 export const dynamic = 'force-dynamic';
 
-export const GET = withErrorHandling(async () => {
+export const GET = withErrorHandling(async (req: NextRequest) => {
   const user = await getSessionUser();
-  const data = await getLiveTracking(user);
+  const { searchParams } = new URL(req.url);
+  const locationId = searchParams.get('locationId') ?? searchParams.get('location_id') ?? undefined;
+  const data = await getLiveTracking(user, locationId);
   return NextResponse.json({ data });
 });

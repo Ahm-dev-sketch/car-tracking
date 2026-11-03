@@ -18,6 +18,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     limit: searchParams.get('limit') ?? undefined,
     search: searchParams.get('search') ?? undefined,
     status: searchParams.get('status') ?? undefined,
+    locationId: searchParams.get('locationId') ?? searchParams.get('location_id') ?? undefined,
     assignment: searchParams.get('assignment') ?? undefined,
     sortBy: searchParams.get('sortBy') ?? undefined,
     sortOrder: searchParams.get('sortOrder') ?? undefined,

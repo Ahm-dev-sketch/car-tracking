@@ -5,6 +5,8 @@ import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { getClientContext } from '@/lib/request-context';
 import { createBookingSchema, bookingQuerySchema } from '@/lib/validation';
 import { createBooking, listBookings } from '@/server/bookings/service';
+import { dispatchBooking } from '@/server/dispatch/service';
+import { BookingStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     limit: searchParams.get('limit') ?? undefined,
     status: searchParams.get('status') ?? undefined,
     vehicleId: searchParams.get('vehicle_id') ?? searchParams.get('vehicleId') ?? undefined,
+    locationId: searchParams.get('location_id') ?? searchParams.get('locationId') ?? undefined,
     startDate: searchParams.get('start_date') ?? searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('end_date') ?? searchParams.get('endDate') ?? undefined,
   });
@@ -33,9 +36,32 @@ export const POST = withRateLimit(
     const validated = createBookingSchema.parse(body);
 
     const ctx = getClientContext(req, user.id);
-    const booking = await createBooking(user.id, validated, ctx);
+    const booking = await createBooking(
+      user.id,
+      {
+        ...validated,
+        status: BookingStatus.SEARCHING_DRIVER,
+      },
+      ctx
+    );
 
-    return NextResponse.json({ data: booking }, { status: 201 });
+    const dispatchResult = await dispatchBooking(booking.id, {
+      actorUserId: user.id,
+      ip: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+
+    return NextResponse.json(
+      {
+        data: {
+          ...booking,
+          status: dispatchResult.booking.status,
+          dispatchState: dispatchResult.dispatchState,
+          alternatives: dispatchResult.alternatives ?? [],
+        },
+      },
+      { status: 201 }
+    );
   }),
   RATE_LIMIT_CONFIG.BOOKING_CREATE
 );

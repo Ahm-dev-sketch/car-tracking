@@ -46,10 +46,11 @@
       "tag": "v1",
       "new_classes": ["LocationHub"]
     }
-  ]
-  // Scheduled trigger for retention cleanup
-  // Recommended in runbook: use a dedicated worker with CRON trigger calling internal API
-  // "triggers": {
-  //   "crons": ["0 3 * * *"]
-  // }
+  ],
+  "triggers": {
+    "crons": [
+      "*/1 * * * *",
+      "0 3 * * *"
+    ]
+  }
 }

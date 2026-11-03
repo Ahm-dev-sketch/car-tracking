@@ -5,7 +5,8 @@ import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { getClientContext } from '@/lib/request-context';
 import { createBookingSchema, bookingQuerySchema } from '@/lib/validation';
 import { createBooking, listBookings } from '@/server/bookings/service';
-import { dispatchBooking } from '@/server/dispatch/service';
+import { dispatchBooking, dispatchSweep } from '@/server/dispatch/service';
+import { logger } from '@/lib/logger';
 import { BookingStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,16 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     startDate: searchParams.get('start_date') ?? searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('end_date') ?? searchParams.get('endDate') ?? undefined,
   });
+
+  // Lazy sweep on read: advance expired offers before listing
+  try {
+    await dispatchSweep();
+  } catch (err: unknown) {
+    logger.warn({
+      msg: 'Lazy dispatch sweep failed in bookings read',
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 
   const result = await listBookings(user, query);
   return NextResponse.json(result);

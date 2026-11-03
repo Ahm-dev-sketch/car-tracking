@@ -184,3 +184,17 @@ Perform these verification checks on the deployed production domain:
 - `src/lib/prisma.ts` dynamically switches:
   - Uses `env.HYPERDRIVE.connectionString` inside Cloudflare Workers runtime.
   - Falls back to `process.env.DATABASE_URL` in Node runtime, local dev, and tests.
+
+---
+
+## 12. Dispatch Sweep Cadence
+
+- **Cloudflare Cron Minimum**: Cloudflare Workers Cron Triggers enforce a 1-minute minimum granularity (`*/1 * * * *` configured in `wrangler.jsonc`). The sequential driver offer timeout is 30 seconds.
+- **Lazy Sweep on Reads**: To bridge the 30s timeout without sub-minute cron triggers, a lazy sweep runs automatically on:
+  - `GET /api/driver/offers` (when drivers check/refresh offers)
+  - `GET /api/bookings` (when users/admins view booking status)
+  This maintains an effective ~30s offer expiry cadence whenever users or drivers are actively monitoring the application.
+- **Background Fallback**: In purely headless/background conditions with zero read traffic, background offers advance via the 1-minute cron sweep (worst-case ~60–90s timeout).
+- **Guarded Sweep Endpoint**: External cron monitors can invoke `POST /api/admin/dispatch/sweep` (guarded with ADMIN role) at any custom sub-minute interval.
+- **Local Dev**: Run `npm run dispatch:sweep` (`scripts/dispatch-sweep.mjs`).
+- **OpenNext Deployment Checkpoint**: As documented in Section 8, OpenNext builds an HTTP server worker entrypoint without raw `scheduled` exports; cron events can be routed via a dedicated cron worker invoking the HTTP sweep endpoint or direct worker pipeline.

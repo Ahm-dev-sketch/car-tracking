@@ -13,6 +13,7 @@
     "retention:run": "node --experimental-strip-types src/server/tracking/retention.ts",
     "dispatch:sweep": "tsx scripts/dispatch-sweep.mjs",
     "realtime:dev": "node scripts/realtime-dev.mjs",
+    "db:seed:demo": "node --experimental-strip-types prisma/seed-demo.ts",
     "dev:all": "concurrently \"next dev\" \"node scripts/realtime-dev.mjs\"",
     "deploy:build": "opennextjs-cloudflare build",
     "deploy:dry": "opennextjs-cloudflare deploy --dry-run",

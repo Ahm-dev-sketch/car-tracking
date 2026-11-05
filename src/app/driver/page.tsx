@@ -607,7 +607,7 @@ export default function DriverDashboardPage() {
 
       <header className="page-intro">
         <div>
-          <p className="eyebrow">FleetTrack / Driver workspace</p>
+          <p className="eyebrow">KCIC Fleet / Driver workspace</p>
           <h1 className="page-heading mt-2">Your driving day.</h1>
           <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-zinc-600">Your availability, assigned journeys, and live trip details, in one place.</p>
         </div>

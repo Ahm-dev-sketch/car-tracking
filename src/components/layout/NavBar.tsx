@@ -67,9 +67,9 @@ export function NavBar() {
     <>
       <header className="app-header">
         <div className="header-island">
-          <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="FleetTrack home">
+          <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="KCIC Fleet home">
             <span className="brand-mark"><Icon name="route" className="size-6 text-black" /></span>
-            <span className="text-xl font-black tracking-tight text-black">Fleet<span className="text-emerald-700 underline decoration-black decoration-2">Track</span></span>
+            <span className="text-xl font-black tracking-tight text-black">KCIC <span className="text-emerald-700 underline decoration-black decoration-2">Fleet</span></span>
           </Link>
           <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
             {links.map((link) => (

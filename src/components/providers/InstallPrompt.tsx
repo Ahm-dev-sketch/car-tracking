@@ -185,7 +185,7 @@ export function InstallPrompt() {
   return (
     <aside
       className="install-toast fixed inset-x-4 bottom-24 z-50 mx-auto max-w-md rounded-2xl border-[2.5px] border-black bg-white p-5 shadow-[6px_6px_0px_0px_#000] sm:bottom-8 sm:right-8 sm:left-auto"
-      aria-label="Install FleetTrack application"
+      aria-label="Install KCIC Fleet application"
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
@@ -201,7 +201,7 @@ export function InstallPrompt() {
                 <span className="text-[10px] font-bold text-zinc-500">Fast Access</span>
               </div>
               <h2 className="mt-0.5 text-base font-black text-black">
-                Install KCIC FleetTrack
+                Install KCIC Fleet
               </h2>
               <p className="mt-1 text-xs font-semibold leading-relaxed text-zinc-600">
                 Akses cepat dari layar utama HP/laptop tanpa buka browser. Offline-ready & notifikasi realtime.
@@ -264,7 +264,7 @@ export function IosInstallHint() {
   return (
     <aside
       className="flex items-start justify-between gap-3 rounded-2xl border-2 border-black bg-emerald-100 p-4 text-sm shadow-[3px_3px_0px_0px_#000]"
-      aria-label="Add FleetTrack to your home screen"
+      aria-label="Add KCIC Fleet to your home screen"
     >
       <div className="flex items-start gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000]">

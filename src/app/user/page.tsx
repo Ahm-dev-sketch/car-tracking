@@ -97,7 +97,7 @@ export default function UserOverviewPage() {
 
       <header className="page-intro flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div><span className="eyebrow">FleetTrack / Your workspace</span></div>
+          <div><span className="eyebrow">KCIC Fleet / Your workspace</span></div>
           <h1 className="page-heading mt-2 text-3xl font-black tracking-tight sm:text-4xl">Let’s get you moving.</h1>
           <p className="mt-1.5 text-sm font-semibold leading-relaxed text-zinc-600">Your journeys, without the back and forth.</p>
         </div>

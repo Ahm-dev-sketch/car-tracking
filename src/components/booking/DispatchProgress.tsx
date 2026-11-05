@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Icon } from '@/components/ui/Icon';
 
 export interface DispatchProgressProps {
   status: string;
@@ -195,7 +196,11 @@ export function DispatchProgress({
                       : 'bg-white text-black'
                   }`}
                 >
-                  {isDone ? '✓' : idx + 1}
+                  {isDone ? (
+                    <Icon name="check" className="size-2.5 text-white" />
+                  ) : (
+                    idx + 1
+                  )}
                 </span>
                 <span className="truncate">{step.label}</span>
               </div>

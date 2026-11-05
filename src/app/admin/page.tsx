@@ -89,7 +89,7 @@ export default function AdminOverviewPage() {
 
       <header className="page-intro">
         <div>
-          <p className="eyebrow">FleetTrack / Operations overview</p>
+          <p className="eyebrow">KCIC Fleet / Operations overview</p>
           <h1 className="page-heading mt-2">Fleet at a glance</h1>
           <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-500">A clear view of your vehicles, people, and journeys. Ready for the decisions ahead.</p>
         </div>

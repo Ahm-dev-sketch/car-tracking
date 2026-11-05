@@ -1,6 +1,7 @@
 {
-  "name": "car-tracking",
+  "name": "kcic-fleet",
   "version": "0.1.0",
+  "description": "Sistem pelacakan armada kendaraan dan driver operasional KCIC",
   "private": true,
   "scripts": {
     "dev": "next dev",

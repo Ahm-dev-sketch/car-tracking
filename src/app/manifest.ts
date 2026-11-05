@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'FleetTrack · Vehicle Tracking',
-    short_name: 'FleetTrack',
+    name: 'KCIC Fleet · Vehicle Tracking',
+    short_name: 'KCIC Fleet',
     description:
-      'Enterprise vehicle fleet management and live GPS tracking system',
+      'Sistem pelacakan armada kendaraan dan driver operasional KCIC',
     start_url: '/',
     id: '/',
     display: 'standalone',

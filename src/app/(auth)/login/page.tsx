@@ -145,7 +145,7 @@ export default function LoginPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black bg-emerald-400 text-black shadow-[2px_2px_0px_0px_#000]">
             <LoginIcon name="route" className="h-6 w-6" />
           </div>
-          <span className="text-xl font-black tracking-tight text-black">FleetTrack<span className="text-emerald-700">.</span></span>
+          <span className="text-xl font-black tracking-tight text-black">KCIC Fleet<span className="text-emerald-700">.</span></span>
         </div>
         <span className="hidden text-[11px] font-black uppercase tracking-wider text-black bg-amber-300 border-1.5 border-black px-2.5 py-0.5 rounded-md shadow-[1.5px_1.5px_0px_0px_#000] sm:block">Workplace mobility</span>
       </header>
@@ -158,7 +158,7 @@ export default function LoginPage() {
           <figure className="mt-8">
             <VehicleTracking3D />
             <figcaption className="mt-4 flex items-center justify-between gap-4 px-1 text-xs font-bold text-black">
-              <span>One fleet. Every journey.</span>
+              <span>KCIC Fleet. Every journey.</span>
               <span className="flex items-center gap-2 text-black"><span className="h-2 w-2 rounded-full border border-black bg-emerald-500" />Connected mobility</span>
             </figcaption>
           </figure>
@@ -173,12 +173,12 @@ export default function LoginPage() {
           }>
             <LoginForm />
           </Suspense>
-          <p className="mt-6 text-center text-xs font-bold text-black lg:hidden">One fleet. Every journey.</p>
+          <p className="mt-6 text-center text-xs font-bold text-black lg:hidden">KCIC Fleet. Every journey.</p>
         </div>
       </div>
 
       <footer className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 text-xs font-semibold leading-relaxed text-zinc-600">
-        <span>FleetTrack &middot; Your workplace, in motion.</span>
+        <span>KCIC Fleet &middot; Operational Mobility.</span>
         <span className="hidden sm:block">For your team. For the road ahead.</span>
       </footer>
     </main>

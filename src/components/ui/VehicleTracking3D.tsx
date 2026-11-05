@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Icon } from '@/components/ui/Icon';
 
 export function VehicleTracking3D() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -720,8 +721,9 @@ export function VehicleTracking3D() {
               <span className={`h-4 w-1.5 rounded-xs border border-black ${speed > 105 ? 'bg-amber-400' : 'bg-zinc-200'}`} />
               <span className={`h-4.5 w-1.5 rounded-xs border border-black ${speed > 120 ? 'bg-rose-500' : 'bg-zinc-200'}`} />
             </div>
-            <span className="font-mono text-[9px] font-black text-emerald-800">
-              {isBoosted ? '⚡ BOOST' : 'CRUISE'}
+            <span className="inline-flex items-center gap-1 font-mono text-[9px] font-black text-emerald-800">
+              <Icon name="bolt" className="size-3 text-emerald-800" />
+              {isBoosted ? 'BOOST' : 'CRUISE'}
             </span>
           </div>
         </div>
@@ -732,38 +734,41 @@ export function VehicleTracking3D() {
           <button
             type="button"
             onClick={toggleBoost}
-            className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+            className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
               isBoosted
                 ? 'bg-amber-400 text-black hover:bg-amber-300'
                 : 'bg-white text-zinc-900 hover:bg-zinc-100'
             }`}
             title="Accelerate vehicle and road stream"
           >
-            <span>{isBoosted ? '⚡ FAST' : '⚡ BOOST'}</span>
+            <Icon name="bolt" className="size-3.5" />
+            <span>{isBoosted ? 'FAST' : 'BOOST'}</span>
           </button>
 
           {/* Radar Ping Button */}
           <button
             type="button"
             onClick={triggerRadar}
-            className="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-black text-zinc-900 shadow-[2px_2px_0px_0px_#000] transition hover:bg-emerald-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-black text-zinc-900 shadow-[2px_2px_0px_0px_#000] transition hover:bg-emerald-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
             title="Broadcast instant radar wave"
           >
-            <span>📡 PING</span>
+            <Icon name="signal" className="size-3.5 text-zinc-900" />
+            <span>PING</span>
           </button>
 
           {/* High Beam Headlight Toggle */}
           <button
             type="button"
             onClick={() => setIsHighBeam((b) => !b)}
-            className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+            className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
               isHighBeam
                 ? 'bg-emerald-300 text-black'
                 : 'bg-zinc-100 text-zinc-600'
             }`}
             title="Toggle headlight intensity"
           >
-            <span>💡 BEAM</span>
+            <Icon name="sun" className="size-3.5" />
+            <span>BEAM</span>
           </button>
         </div>
       </div>
@@ -774,7 +779,7 @@ export function VehicleTracking3D() {
           <span className="font-mono text-[11px] font-black uppercase text-emerald-800">
             HALIM
           </span>
-          <span className="text-zinc-400">➔</span>
+          <Icon name="arrow" className="size-3 text-zinc-500" />
           <span className="font-mono text-[11px] font-black uppercase text-black">
             TEGALLUAR
           </span>

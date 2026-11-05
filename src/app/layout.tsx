@@ -25,13 +25,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Vehicle Fleet & Live Tracking',
-  description: 'Enterprise vehicle fleet management and live GPS tracking system',
+  title: 'KCIC Fleet · Live Tracking',
+  description: 'Sistem pelacakan armada kendaraan dan driver operasional KCIC',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'FleetTrack',
+    title: 'KCIC Fleet',
   },
   icons: {
     icon: '/icons/icon-192.png',

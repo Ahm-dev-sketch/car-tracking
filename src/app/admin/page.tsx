@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { Spinner } from '@/components/ui/Spinner';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { InterventionQueue } from '@/components/admin/InterventionQueue';
 import { Icon } from '@/components/ui/Icon';
+import { GreetingClock } from '@/components/ui/GreetingClock';
 
 interface AdminStats {
   vehicles: {
@@ -46,6 +48,7 @@ interface ActiveTripPreview {
 }
 
 export default function AdminOverviewPage() {
+  const { data: session } = useSession();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [activeTripsList, setActiveTripsList] = useState<ActiveTripPreview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,6 +85,8 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="min-w-0 space-y-6 text-zinc-900 sm:space-y-8">
+      <GreetingClock userName={session?.user?.name} roleLabel="Operations Admin" />
+
       <header className="page-intro">
         <div>
           <p className="eyebrow">FleetTrack / Operations overview</p>

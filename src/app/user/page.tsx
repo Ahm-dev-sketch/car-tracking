@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { IosInstallHint } from '@/components/providers/InstallPrompt';
 import { Icon as OverviewIcon } from '@/components/ui/Icon';
+import { GreetingClock } from '@/components/ui/GreetingClock';
 
 interface Booking {
   id: string;
@@ -39,6 +41,7 @@ const primaryAction = 'inline-flex min-h-11 items-center justify-center gap-2 ro
 const secondaryAction = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-5 py-2.5 text-sm font-bold text-black shadow-[3px_3px_0px_0px_#000] hover:bg-amber-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all outline-none';
 
 export default function UserOverviewPage() {
+  const { data: session } = useSession();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [availableCount, setAvailableCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,6 +92,8 @@ export default function UserOverviewPage() {
   return (
     <div className="min-w-0 space-y-7 pb-[max(1rem,env(safe-area-inset-bottom))] text-black sm:space-y-9">
       <IosInstallHint />
+
+      <GreetingClock userName={session?.user?.name} roleLabel="Passenger" />
 
       <header className="page-intro flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>

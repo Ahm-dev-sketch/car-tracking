@@ -26,10 +26,10 @@ describe('Client Geocode Cache (IndexedDB / LocalStorage / Memory)', () => {
   });
 
   it('serves address from memory cache without network call', async () => {
-    await setCachedGeocode(-6.2440, 106.8880, 'Stasiun Halim KCIC, Jakarta');
+    await setCachedGeocode(-6.2440, 106.8880, 'Halim KCIC, Jakarta');
 
     const cached = await getCachedGeocode(-6.24401, 106.88803);
-    expect(cached).toBe('Stasiun Halim KCIC, Jakarta');
+    expect(cached).toBe('Halim KCIC, Jakarta');
     expect(fetch).not.toHaveBeenCalled();
   });
 

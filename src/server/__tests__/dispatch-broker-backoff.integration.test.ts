@@ -61,7 +61,7 @@ describe('Dispatch Broker, Priority Queue & Backoff Integration Tests', () => {
     `);
 
     const loc = await prisma.location.create({
-      data: { name: 'Halim Stasiun', code: '102' },
+      data: { name: 'Halim', code: '102' },
     });
     locationId = loc.id;
 
@@ -168,7 +168,7 @@ describe('Dispatch Broker, Priority Queue & Backoff Integration Tests', () => {
   it('2. priority queue: fresh driver (Tier 1) prioritized over repeat driver with expired cooldown (Tier 2)', async () => {
     const booking = await createBooking(userActor.id, {
       operationalLocationId: locationId,
-      pickupLocation: 'Halim Stasiun',
+      pickupLocation: 'Halim',
       pickupLat: -6.244,
       pickupLng: 106.888,
       destination: 'Tegalluar',
@@ -200,7 +200,7 @@ describe('Dispatch Broker, Priority Queue & Backoff Integration Tests', () => {
   it('3. cyclic re-offering: when all drivers reject, Driver 1 receives order again after backoff cooldown', async () => {
     const booking = await createBooking(userActor.id, {
       operationalLocationId: locationId,
-      pickupLocation: 'Halim Stasiun',
+      pickupLocation: 'Halim',
       pickupLat: -6.244,
       pickupLng: 106.888,
       destination: 'Tegalluar',
@@ -258,7 +258,7 @@ describe('Dispatch Broker, Priority Queue & Backoff Integration Tests', () => {
   it('4. concurrency & race conditions: preventing duplicate SENT offers for same booking or driver', async () => {
     const booking = await createBooking(userActor.id, {
       operationalLocationId: locationId,
-      pickupLocation: 'Halim Stasiun',
+      pickupLocation: 'Halim',
       pickupLat: -6.244,
       pickupLng: 106.888,
       destination: 'Tegalluar',

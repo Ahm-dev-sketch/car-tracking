@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import { useGeolocation, GeoPoint } from '@/hooks/useGeolocation';
 import { useRealtime } from '@/hooks/useRealtime';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -15,6 +16,7 @@ import { IosInstallHint } from '@/components/providers/InstallPrompt';
 import { OfferCard, DriverOffer } from '@/components/driver/OfferCard';
 import { FleetMap, VehicleMarkerData, RoutePoint } from '@/components/map';
 import { Icon } from '@/components/ui/Icon';
+import { GreetingClock } from '@/components/ui/GreetingClock';
 import { fetchJson } from '@/lib/fetch-json';
 
 interface ActiveTrip {
@@ -111,6 +113,7 @@ function TripRoute({ pickup, destination }: { pickup: string; destination: strin
 }
 
 export default function DriverDashboardPage() {
+  const { data: session } = useSession();
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [assignedBookings, setAssignedBookings] = useState<AssignedBooking[]>([]);
   const [activeSession, setActiveSession] = useState<DriverSession | null>(null);
@@ -600,6 +603,8 @@ export default function DriverDashboardPage() {
 
   return (
     <div className="min-w-0 space-y-6 text-zinc-900">
+      <GreetingClock userName={session?.user?.name} roleLabel="Driver" />
+
       <header className="page-intro">
         <div>
           <p className="eyebrow">FleetTrack / Driver workspace</p>

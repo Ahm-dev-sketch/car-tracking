@@ -7,6 +7,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Drawer } from '@/components/ui/Drawer';
 import { Icon } from '@/components/ui/Icon';
+import { GreetingClock } from '@/components/ui/GreetingClock';
 import { getNavigation, isNavigationActive } from './navigation';
 
 interface NotificationItem {
@@ -75,6 +76,7 @@ export function NavBar() {
             ))}
           </nav>
           <div className="flex shrink-0 items-center gap-2">
+            <GreetingClock variant="navbar" />
             <button type="button" onClick={() => setNotificationsOpen(true)} className="icon-button relative rounded-xl border-2 border-black bg-white shadow-[2px_2px_0px_0px_#000]" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-haspopup="dialog">
               <Icon name="bell" />
               {unreadCount > 0 && <span className="absolute -top-1 -right-1 size-3.5 rounded-full border-1.5 border-black bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">{unreadCount}</span>}
@@ -101,6 +103,7 @@ export function NavBar() {
       </nav>
 
       <Drawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} title="Your workspace" description="Everything you need for the road ahead.">
+        <GreetingClock variant="compact" userName={session?.user?.name} className="w-full justify-between" />
         <div className="flex items-center gap-3 rounded-xl border-2 border-black bg-emerald-300 p-4 shadow-[3px_3px_0px_0px_#000]">
           <span className="grid size-12 shrink-0 place-items-center rounded-lg border-2 border-black bg-white text-base font-black text-black">{initials}</span>
           <div className="min-w-0"><p className="break-words text-sm font-extrabold text-black">{name}</p><p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-emerald-950">{role === 'ADMIN' ? 'Fleet administrator' : role === 'DRIVER' ? 'Driver workspace' : 'Employee workspace'}</p></div>

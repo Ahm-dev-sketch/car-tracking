@@ -1456,6 +1456,17 @@ export async function endDriverSession(
       });
     }
     await tx.vehicleLocation.updateMany({ where: { driverId }, data: { movement: MovementStatus.OFFLINE } });
+    if (session.vehicleId) {
+      await tx.vehicleLocation.updateMany({
+        where: { vehicleId: session.vehicleId },
+        data: {
+          movement: MovementStatus.OFFLINE,
+          speedMps: 0,
+          recordedAt: new Date(),
+          receivedAt: new Date(),
+        },
+      });
+    }
     const offers = await tx.bookingOffer.findMany({
       where: { driverId, status: OfferStatus.SENT },
       select: { id: true, bookingId: true },
@@ -1493,6 +1504,39 @@ export async function endDriverSession(
     ip: ctx?.ip,
     userAgent: ctx?.userAgent,
   });
+
+  if (session.vehicleId) {
+    try {
+      const loc = await prisma.vehicleLocation.findUnique({
+        where: { vehicleId: session.vehicleId },
+        include: { vehicle: true },
+      });
+      if (loc) {
+        const now = new Date();
+        await publishEvent({
+          type: 'location:update',
+          data: {
+            vehicleId: session.vehicleId,
+            lat: loc.lat,
+            lng: loc.lng,
+            accuracyM: loc.accuracyM,
+            speedMps: 0,
+            headingDeg: loc.headingDeg ?? null,
+            recordedAt: now.toISOString(),
+            receivedAt: now.toISOString(),
+            movement: MovementStatus.OFFLINE,
+            driverName: null,
+            driverPhone: null,
+            plateNumber: loc.vehicle?.plateNumber ?? null,
+            tripOrigin: null,
+            tripDestination: null,
+          },
+        });
+      }
+    } catch {
+      // Non-blocking realtime event notification
+    }
+  }
 
   return ended;
 }

@@ -181,10 +181,25 @@ function AdminFleetMapContent() {
       }
     };
     void poll();
-    const interval = setInterval(poll, 10000);
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void poll();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void poll();
+      }
+    }, 5000);
+
     return () => {
       controller.abort();
       clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, [fetchLiveFleet]);
 

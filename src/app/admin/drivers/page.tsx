@@ -115,8 +115,8 @@ function AdminDriversContent() {
     router.replace(`/admin/drivers?${params.toString()}`);
   };
 
-  const fetchDrivers = async (targetPage = 1) => {
-    setIsLoading(true);
+  const fetchDrivers = async (targetPage = 1, isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     setApiError(null);
     try {
       const params = new URLSearchParams({
@@ -135,14 +135,14 @@ function AdminDriversContent() {
         setTotalRecords(json.pagination?.total ?? list.length);
         setTotalPages(json.pagination?.totalPages ?? 1);
         setPage(targetPage);
-      } else {
+      } else if (!isSilent) {
         const err = await res.json();
         setApiError(err.error?.message || 'Failed to load drivers');
       }
     } catch {
-      setApiError('Network error loading drivers');
+      if (!isSilent) setApiError('Network error loading drivers');
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
@@ -154,6 +154,31 @@ function AdminDriversContent() {
       locationId: locationFilter,
     });
   }, [statusFilter, locationFilter]);
+
+  // Keep driver statuses, assigned vehicles, and availability live without manual page refresh
+  useEffect(() => {
+    const isInteracting = isAddOpen || editingDriver || assigningDriver || unassigningDriver || deactivatingDriver;
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible' && !isInteracting) {
+        void fetchDrivers(page, true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && !isInteracting) {
+        void fetchDrivers(page, true);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [page, isAddOpen, editingDriver, assigningDriver, unassigningDriver, deactivatingDriver, search, statusFilter, locationFilter]);
 
   const handleCreateDriver = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -124,8 +124,8 @@ function AdminVehiclesContent() {
     router.replace(`/admin/vehicles?${params.toString()}`);
   };
 
-  const fetchVehicles = async (targetPage = 1) => {
-    setIsLoading(true);
+  const fetchVehicles = async (targetPage = 1, isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     setApiError(null);
     try {
       const params = new URLSearchParams({
@@ -144,14 +144,14 @@ function AdminVehiclesContent() {
         setTotalRecords(json.pagination?.total ?? list.length);
         setTotalPages(json.pagination?.totalPages ?? 1);
         setPage(targetPage);
-      } else {
+      } else if (!isSilent) {
         const err = await res.json();
         setApiError(err.error?.message || 'Failed to load vehicles');
       }
     } catch {
-      setApiError('Network error loading vehicles');
+      if (!isSilent) setApiError('Network error loading vehicles');
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
@@ -163,6 +163,31 @@ function AdminVehiclesContent() {
       locationId: locationFilter,
     });
   }, [statusFilter, locationFilter]);
+
+  // Keep vehicle pool live without manual refresh
+  useEffect(() => {
+    const isInteracting = isModalOpen || deactivatingVehicle || assigningVehicle;
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible' && !isInteracting) {
+        void fetchVehicles(page, true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && !isInteracting) {
+        void fetchVehicles(page, true);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [page, isModalOpen, deactivatingVehicle, assigningVehicle, search, statusFilter, locationFilter]);
 
   const handleOpenAdd = () => {
     setEditingVehicle(null);

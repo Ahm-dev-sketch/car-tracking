@@ -82,8 +82,25 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     loadStats(true);
-    const interval = setInterval(() => loadStats(false), 20000);
-    return () => clearInterval(interval);
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void loadStats(false);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadStats(false);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
   }, []);
 
   const selectedLoc = stats?.byLocation.find((l) => l.locationId === selectedLocationId);

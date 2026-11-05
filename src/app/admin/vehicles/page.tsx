@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -86,6 +86,9 @@ function AdminVehiclesContent() {
   const [formImageUrl, setFormImageUrl] = useState('');
   const [formStatus, setFormStatus] = useState('AVAILABLE');
   const [formLocationId, setFormLocationId] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -201,6 +204,8 @@ function AdminVehiclesContent() {
     setFormImageUrl('');
     setFormStatus('AVAILABLE');
     setFormLocationId(locationFilter || '');
+    setUploadError(null);
+    setIsUploadingImage(false);
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -216,8 +221,59 @@ function AdminVehiclesContent() {
     setFormImageUrl(v.imageUrl || '');
     setFormStatus(v.status);
     setFormLocationId(v.homeLocation?.id || v.currentOperationalLocation?.id || '');
+    setUploadError(null);
+    setIsUploadingImage(false);
     setFormError(null);
     setIsModalOpen(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be re-selected if user cleared
+    e.target.value = '';
+
+    // Validate size client-side (Max 5MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setUploadError('Ukuran file melebihi batas maksimal 5MB.');
+      return;
+    }
+
+    // Validate type client-side
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!allowed.includes(file.type)) {
+      setUploadError('Format gambar harus JPG, PNG, atau WebP.');
+      return;
+    }
+
+    setUploadError(null);
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error?.message || 'Gagal mengupload gambar.');
+      }
+
+      const json = await res.json();
+      if (json.data?.url) {
+        setFormImageUrl(json.data.url);
+      }
+    } catch (err: any) {
+      setUploadError(err.message || 'Gagal mengupload gambar.');
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -332,9 +388,21 @@ function AdminVehiclesContent() {
     {
       header: 'Vehicle',
       cell: (v) => (
-        <div>
-          <span className="font-semibold text-zinc-800">{v.brand} {v.model}</span>
-          <span className="text-zinc-500 block text-xs">{v.vehicleType} • {v.seatingCapacity} seats</span>
+        <div className="flex items-center gap-2.5">
+          {v.imageUrl && (
+            <img
+              src={v.imageUrl}
+              alt={`${v.brand} ${v.model}`}
+              className="w-10 h-8 object-cover rounded border border-zinc-200 shrink-0 bg-zinc-100"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          )}
+          <div>
+            <span className="font-semibold text-zinc-800">{v.brand} {v.model}</span>
+            <span className="text-zinc-500 block text-xs">{v.vehicleType} • {v.seatingCapacity} seats</span>
+          </div>
         </div>
       ),
     },
@@ -610,15 +678,100 @@ function AdminVehiclesContent() {
             </FormField>
           </div>
 
-          <FormField label="Image URL (Optional)">
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-zinc-700">Vehicle Photo</label>
+              <span className="text-[11px] text-zinc-400">Max 5MB (JPG, PNG, WebP)</span>
+            </div>
+
+            {uploadError && (
+              <div className="p-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded flex items-center justify-between">
+                <span>{uploadError}</span>
+                <button
+                  type="button"
+                  onClick={() => setUploadError(null)}
+                  className="text-rose-500 hover:text-rose-800 font-bold ml-2 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             <input
-              type="url"
-              placeholder="https://images.unsplash.com/..."
-              value={formImageUrl}
-              onChange={(e) => setFormImageUrl(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
             />
-          </FormField>
+
+            {formImageUrl ? (
+              <div className="flex items-center gap-3 p-2.5 bg-zinc-50 border border-zinc-200 rounded">
+                <div className="w-16 h-12 bg-zinc-200 rounded overflow-hidden flex-shrink-0 border border-zinc-300">
+                  <img
+                    src={formImageUrl}
+                    alt="Vehicle preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="48" fill="%23d4d4d8" viewBox="0 0 24 24"><path fill="%2371717a" d="M5 7 7 3h10l2 4 2 3v8h-3v-2H6v2H3v-8l2-3Z"/></svg>';
+                    }}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-mono text-zinc-600 truncate">{formImageUrl}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      type="button"
+                      disabled={isUploadingImage || formSubmitting}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-2 py-0.5 text-[11px] font-medium border border-zinc-300 bg-white hover:bg-zinc-100 rounded text-zinc-700 cursor-pointer"
+                    >
+                      {isUploadingImage ? 'Uploading...' : 'Change Photo'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isUploadingImage || formSubmitting}
+                      onClick={() => setFormImageUrl('')}
+                      className="px-2 py-0.5 text-[11px] font-medium border border-rose-200 bg-rose-50 hover:bg-rose-100 rounded text-rose-700 cursor-pointer"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={isUploadingImage || formSubmitting}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full px-3 py-3 border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded bg-zinc-50 hover:bg-zinc-100/80 text-xs text-zinc-700 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              >
+                {isUploadingImage ? (
+                  <>
+                    <Spinner size="sm" />
+                    <span>Uploading photo...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span className="font-medium">Upload Vehicle Photo (Max 5MB)</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <div className="pt-1">
+              <input
+                type="text"
+                placeholder="Or paste image URL (https://... or /uploads/...)"
+                value={formImageUrl}
+                onChange={(e) => setFormImageUrl(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              />
+            </div>
+          </div>
 
           <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
             <button

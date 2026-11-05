@@ -102,6 +102,41 @@ describe('Validation Schemas', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it('accepts valid uploaded image paths and URLs', () => {
+      const uploadedResult = createVehicleSchema.safeParse({
+        plateNumber: 'B-1234-KCIC',
+        brand: 'Toyota',
+        model: 'HiAce',
+        vehicleType: 'VAN',
+        seatingCapacity: 10,
+        imageUrl: '/uploads/vehicles/vehicle-123-abc.jpg',
+      });
+      expect(uploadedResult.success).toBe(true);
+      if (uploadedResult.success) {
+        expect(uploadedResult.data.imageUrl).toBe('/uploads/vehicles/vehicle-123-abc.jpg');
+      }
+
+      const httpsResult = createVehicleSchema.safeParse({
+        plateNumber: 'B-1235-KCIC',
+        brand: 'Toyota',
+        model: 'Innova',
+        vehicleType: 'MPV',
+        seatingCapacity: 7,
+        imageUrl: 'https://example.com/innova.png',
+      });
+      expect(httpsResult.success).toBe(true);
+
+      const invalidResult = createVehicleSchema.safeParse({
+        plateNumber: 'B-1236-KCIC',
+        brand: 'Toyota',
+        model: 'Innova',
+        vehicleType: 'MPV',
+        seatingCapacity: 7,
+        imageUrl: 'javascript:alert(1)',
+      });
+      expect(invalidResult.success).toBe(false);
+    });
   });
 
   describe('createDriverSchema', () => {

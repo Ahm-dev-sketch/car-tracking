@@ -43,3 +43,8 @@ next-env.d.ts
 # cloudflare / open-next
 .open-next
 .wrangler
+
+# uploads
+/public/uploads/*
+!/public/uploads/**/.gitkeep
+

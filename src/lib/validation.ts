@@ -9,6 +9,15 @@ export const vehicleStatusEnum = z.enum([
   'INACTIVE',
 ]);
 export const transmissionEnum = z.enum(['MANUAL', 'AUTOMATIC']);
+export const imageSourceSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) => !val || val.startsWith('/') || /^https?:\/\//i.test(val) || /^data:image\//i.test(val),
+    { message: 'Invalid image URL or path' }
+  )
+  .optional()
+  .nullable();
 export const driverStatusEnum = z.enum(['OFFLINE', 'AVAILABLE', 'ON_TRIP']);
 export const roleCodeEnum = z.enum(['ADMIN', 'USER', 'DRIVER']);
 export const bookingStatusEnum = z.enum([
@@ -61,8 +70,8 @@ export const createVehicleSchema = z
     seating_capacity: z.coerce.number().int().positive('Seating capacity must be greater than 0').optional(),
     seatingCapacity: z.coerce.number().int().positive('Seating capacity must be greater than 0').optional(),
     transmission: transmissionEnum.optional().nullable(),
-    image_url: z.string().url('Invalid image URL').optional().nullable(),
-    imageUrl: z.string().url('Invalid image URL').optional().nullable(),
+    image_url: imageSourceSchema,
+    imageUrl: imageSourceSchema,
     status: vehicleStatusEnum.optional().default('AVAILABLE'),
     location_id: z.string().trim().min(1).optional().nullable(),
     locationId: z.string().trim().min(1).optional().nullable(),
@@ -127,8 +136,8 @@ export const updateVehicleSchema = z.object({
   seating_capacity: z.coerce.number().int().positive('Seating capacity must be greater than 0').optional(),
   seatingCapacity: z.coerce.number().int().positive('Seating capacity must be greater than 0').optional(),
   transmission: transmissionEnum.optional().nullable(),
-  image_url: z.string().url().optional().nullable(),
-  imageUrl: z.string().url().optional().nullable(),
+  image_url: imageSourceSchema,
+  imageUrl: imageSourceSchema,
   status: vehicleStatusEnum.optional(),
   location_id: z.string().trim().min(1).optional().nullable(),
   locationId: z.string().trim().min(1).optional().nullable(),

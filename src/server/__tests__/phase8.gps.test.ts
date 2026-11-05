@@ -15,7 +15,8 @@ import {
   haversineDistanceMeters,
 } from '@/server/tracking/service';
 import { TRACKING_CONFIG } from '@/server/tracking/config';
-import { startTrip, endTrip } from '@/server/trips/service';
+import { startTrip, endTrip, arriveTrip } from '@/server/trips/service';
+import { endDriverSession } from '@/server/dispatch/service';
 import { createVehicle } from '@/server/vehicles/service';
 import { createDriver } from '@/server/drivers/service';
 import { createUser } from '@/server/users/service';
@@ -31,6 +32,7 @@ import { AuthenticatedUser } from '@/lib/auth-guard';
 describe('Phase 8a GPS Edge Cases & Ingest Validation Integration Tests', () => {
   let adminActor: AuthenticatedUser;
   let userActor: AuthenticatedUser;
+  let driverActor: AuthenticatedUser;
   let driverId: string;
   let vehicleId: string;
 
@@ -98,6 +100,12 @@ describe('Phase 8a GPS Edge Cases & Ingest Validation Integration Tests', () => 
       status: DriverStatus.AVAILABLE,
     });
     driverId = driver.id;
+    driverActor = {
+      id: driver.userId,
+      email: driver.user.email,
+      name: driver.user.name,
+      role: 'DRIVER',
+    };
 
     const vehicle = await createVehicle({
       plateNumber: '29A-666.77',
@@ -166,12 +174,17 @@ describe('Phase 8a GPS Edge Cases & Ingest Validation Integration Tests', () => 
     expect(activeRes.accepted).toBe(1);
 
     // End trip
+    await arriveTrip(driverActor, trip.id);
+    await transitionBooking(booking.id, BookingStatus.IN_PROGRESS, driverActor);
     await endTrip(driverId, trip.id, {
       endLat: 21.03,
       endLng: 105.86,
     });
 
-    // Ingest after trip ended fails with 403
+    // Driver ends shift/session from dashboard to go offline
+    await endDriverSession(driverId);
+
+    // Ingest after session ended fails with 403
     await expect(
       ingestLocations(driverId, [
         {

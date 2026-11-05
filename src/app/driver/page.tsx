@@ -557,8 +557,7 @@ export default function DriverDashboardPage() {
     setActionError(null);
 
     try {
-      // Stop accepting new fixes, then drain pending telemetry while the session is active.
-      stopTracking(false);
+      // Drain pending telemetry while the trip is ending
       let telemetryUploaded = true;
       try { await flushBuffer(); } catch { telemetryUploaded = false; }
       const endPayload: { endLat?: number; endLng?: number } = {};
@@ -574,10 +573,8 @@ export default function DriverDashboardPage() {
         body: JSON.stringify(endPayload),
       });
       const trip = json.data;
-      stopTracking();
+      // Driver remains online on standby after ending trip (session & tracking stay active)
       setActiveTrip(null);
-      setActiveSession(null);
-      setOffers([]);
       setShowEndConfirm(false);
       setCompletedTripSummary({
         ...trip,
@@ -586,6 +583,7 @@ export default function DriverDashboardPage() {
         aborted,
       });
       await loadDashboardData();
+      startTracking();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Unable to end trip.');
       await loadDashboardData();

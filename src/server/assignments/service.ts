@@ -125,6 +125,7 @@ export async function assignVehicle(
       const booking = await tx.booking.findFirst({
         where: {
           OR: [{ driverId }, { vehicleId }],
+          NOT: { AND: [{ driverId }, { vehicleId }] },
           status: { in: ['APPROVED', 'SEARCHING_DRIVER', 'DRIVER_NOTIFIED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'ADMIN_INTERVENTION'] },
         },
       });

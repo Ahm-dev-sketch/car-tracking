@@ -320,16 +320,17 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
     const updatedVehicle = await prisma.vehicle.findUniqueOrThrow({
       where: { id: vehicle1Id },
     });
-    expect(updatedVehicle.status).toBe(VehicleStatus.RESERVED);
-    // Denormalized mirror kept until explicit unassign
+    expect(updatedVehicle.status).toBe(VehicleStatus.AVAILABLE);
+    // Denormalized mirror kept until explicit unassign or shift end
     expect(updatedVehicle.currentDriverId).toBe(driver1Id);
 
     const updatedDriver = await prisma.driver.findUniqueOrThrow({
       where: { id: driver1Id },
     });
-    expect(updatedDriver.status).toBe(DriverStatus.OFFLINE);
+    // Driver stays AVAILABLE (online) on standby after completing trip; shift session remains active
+    expect(updatedDriver.status).toBe(DriverStatus.AVAILABLE);
     expect(updatedDriver.currentVehicleId).toBe(vehicle1Id);
-    expect(await prisma.driverSession.count({ where: { driverId: driver1Id, status: 'ACTIVE' } })).toBe(0);
+    expect(await prisma.driverSession.count({ where: { driverId: driver1Id, status: 'ACTIVE' } })).toBe(1);
   });
 
   it('4. ingest happy path: current location upserted, history row inserted, movement MOVING when speed > 2', async () => {

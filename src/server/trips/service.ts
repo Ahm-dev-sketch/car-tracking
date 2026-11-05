@@ -280,26 +280,47 @@ async function closeTrip(
         data: { status: status === TripStatus.COMPLETED ? BookingStatus.COMPLETED : BookingStatus.DRIVER_ASSIGNED },
       });
     }
-    // Close active vehicle assignment for this trip; vehicle returns to pool
-    await tx.vehicleAssignment.updateMany({
-      where: { unassignedAt: null, OR: [{ driverId: trip.driverId }, { vehicleId: trip.vehicleId }] },
-      data: { unassignedAt: endedAt, reason: 'Trip closed; returned to pool' },
-    });
     const reservation = await tx.booking.findFirst({
       where: { vehicleId: trip.vehicleId, status: { in: committedBookingStatuses } }, select: { id: true },
     });
     const reserved = (status === TripStatus.ABORTED && trip.bookingId) || Boolean(reservation);
-    // Vehicle and driver are released back to the pool
-    await tx.vehicle.update({ where: { id: trip.vehicleId }, data: { status: reserved ? VehicleStatus.RESERVED : VehicleStatus.AVAILABLE, currentDriverId: null } });
-    await tx.driver.update({ where: { id: trip.driverId }, data: { status: DriverStatus.OFFLINE, currentVehicleId: null } });
-    await tx.driverSession.updateMany({
+
+    const activeSession = await tx.driverSession.findFirst({
       where: { driverId: trip.driverId, status: DriverSessionStatus.ACTIVE },
-      data: { status: DriverSessionStatus.ENDED, endedAt },
     });
-    await tx.vehicleLocation.updateMany({
-      where: { OR: [{ vehicleId: trip.vehicleId }, { driverId: trip.driverId }] },
-      data: { movement: MovementStatus.OFFLINE },
-    });
+
+    if (activeSession) {
+      // Driver stays AVAILABLE (online) on standby; shift session remains active until manually toggled from dashboard
+      await tx.vehicle.update({
+        where: { id: trip.vehicleId },
+        data: { status: reserved ? VehicleStatus.RESERVED : VehicleStatus.AVAILABLE, currentDriverId: trip.driverId },
+      });
+      await tx.driver.update({
+        where: { id: trip.driverId },
+        data: { status: DriverStatus.AVAILABLE, currentVehicleId: trip.vehicleId },
+      });
+      await tx.vehicleLocation.updateMany({
+        where: { OR: [{ vehicleId: trip.vehicleId }, { driverId: trip.driverId }] },
+        data: { movement: MovementStatus.STOPPED },
+      });
+    } else {
+      // No active session: release vehicle and driver back to pool
+      // No active session: release vehicle and driver back to pool
+      await tx.vehicleAssignment.updateMany({
+        where: { unassignedAt: null, OR: [{ driverId: trip.driverId }, { vehicleId: trip.vehicleId }] },
+        data: { unassignedAt: endedAt, reason: 'Trip closed; returned to pool' },
+      });
+      await tx.vehicle.update({ where: { id: trip.vehicleId }, data: { status: reserved ? VehicleStatus.RESERVED : VehicleStatus.AVAILABLE, currentDriverId: null } });
+      await tx.driver.update({ where: { id: trip.driverId }, data: { status: DriverStatus.OFFLINE, currentVehicleId: null } });
+      await tx.driverSession.updateMany({
+        where: { driverId: trip.driverId, status: DriverSessionStatus.ACTIVE },
+        data: { status: DriverSessionStatus.ENDED, endedAt },
+      });
+      await tx.vehicleLocation.updateMany({
+        where: { OR: [{ vehicleId: trip.vehicleId }, { driverId: trip.driverId }] },
+        data: { movement: MovementStatus.OFFLINE },
+      });
+    }
     return tx.trip.update({
       where: { id: trip.id },
       data: { status, endedAt, endLat: input.endLat ?? undefined, endLng: input.endLng ?? undefined, distanceMeters: input.distanceMeters ?? undefined },

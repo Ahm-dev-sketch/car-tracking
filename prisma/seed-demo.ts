@@ -38,7 +38,7 @@ async function main() {
   // ---------- Admin ----------
   const admin = await prisma.user.upsert({
     where: { email: 'admin@demo.test' },
-    update: {},
+    update: { passwordHash: hash, isActive: true },
     create: {
       email: 'admin@demo.test',
       passwordHash: hash,
@@ -51,7 +51,7 @@ async function main() {
   // ---------- Regular user ----------
   await prisma.user.upsert({
     where: { email: 'user@demo.test' },
-    update: {},
+    update: { passwordHash: hash, isActive: true },
     create: {
       email: 'user@demo.test',
       passwordHash: hash,
@@ -132,7 +132,7 @@ async function main() {
   for (const spec of driversSpec) {
     const user = await prisma.user.upsert({
       where: { email: spec.email },
-      update: {},
+      update: { passwordHash: hash, isActive: true },
       create: {
         email: spec.email,
         passwordHash: hash,

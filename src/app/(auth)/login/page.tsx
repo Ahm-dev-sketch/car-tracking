@@ -65,8 +65,8 @@ function LoginForm() {
   return (
     <div className="w-full rounded-2xl border-[3px] border-black bg-white p-6 sm:p-9 shadow-[8px_8px_0px_0px_#000]">
       <div className="mb-7">
-        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-emerald-300 text-black shadow-[3px_3px_0px_0px_#000]">
-          <LoginIcon name="route" className="h-6 w-6" />
+        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-rose-200 text-black shadow-[3px_3px_0px_0px_#000]">
+          <LoginIcon name="route" className="h-6 w-6 text-rose-900" />
         </div>
         <span className="eyebrow">Your workday, connected</span>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-black sm:text-4xl">Welcome back.</h1>
@@ -80,6 +80,56 @@ function LoginForm() {
           onDismiss={() => setError(null)}
         />
       )}
+
+      {/* Quick Demo Fill Buttons */}
+      <div className="mb-6 rounded-xl border-2 border-black bg-amber-50 p-3.5 shadow-[2px_2px_0px_0px_#000]">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">
+            Akun Demo Siap Pakai:
+          </span>
+          <span className="text-[10px] font-bold text-zinc-500">
+            Password: Demo1234
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('user@demo.test');
+              setPassword('Demo1234');
+              setError(null);
+            }}
+            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-amber-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+          >
+            <span className="text-xs font-black text-black">User</span>
+            <span className="text-[10px] font-bold text-zinc-500">Penumpang</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('driver1@demo.test');
+              setPassword('Demo1234');
+              setError(null);
+            }}
+            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-rose-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+          >
+            <span className="text-xs font-black text-black">Driver</span>
+            <span className="text-[10px] font-bold text-zinc-500">Budi (Halim)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('admin@demo.test');
+              setPassword('Demo1234');
+              setError(null);
+            }}
+            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-amber-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+          >
+            <span className="text-xs font-black text-black">Admin</span>
+            <span className="text-[10px] font-bold text-zinc-500">Operasional</span>
+          </button>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4" aria-busy={isLoading}>
         <div>
@@ -95,8 +145,8 @@ function LoginForm() {
               spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#059669] transition-all"
+              placeholder="user@demo.test"
+              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#be123c] transition-all"
             />
           </div>
         </div>
@@ -112,8 +162,8 @@ function LoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#059669] transition-all"
+              placeholder="Demo1234"
+              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#be123c] transition-all"
             />
           </div>
         </div>
@@ -121,11 +171,11 @@ function LoginForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="group mt-3 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-[2.5px] border-black bg-emerald-400 px-6 py-3.5 text-base font-black text-black shadow-[4px_4px_0px_0px_#000] hover:bg-emerald-300 hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          className="group mt-3 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-[2.5px] border-black bg-[#be123c] px-6 py-3.5 text-base font-black text-white shadow-[4px_4px_0px_0px_#000] hover:bg-[#e11d48] hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isLoading && <Spinner size="sm" className="text-black" />}
+          {isLoading && <Spinner size="sm" className="text-white" />}
           {isLoading ? 'Signing in...' : 'Sign in'}
-          {!isLoading && <LoginIcon name="arrow" className="h-4 w-4" />}
+          {!isLoading && <LoginIcon name="arrow" className="h-4 w-4 text-white" />}
         </button>
       </form>
 
@@ -142,10 +192,10 @@ export default function LoginPage() {
     <main className="flex min-h-dvh flex-col bg-[#faf9f5] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-black sm:px-10 lg:px-14">
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black bg-emerald-400 text-black shadow-[2px_2px_0px_0px_#000]">
-            <LoginIcon name="route" className="h-6 w-6" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black bg-rose-200 text-black shadow-[2px_2px_0px_0px_#000]">
+            <LoginIcon name="route" className="h-6 w-6 text-rose-900" />
           </div>
-          <span className="text-xl font-black tracking-tight text-black">KCIC Fleet<span className="text-emerald-700">.</span></span>
+          <span className="text-xl font-black tracking-tight text-black">KCIC Fleet<span className="text-rose-700">.</span></span>
         </div>
         <span className="hidden text-[11px] font-black uppercase tracking-wider text-black bg-amber-300 border-1.5 border-black px-2.5 py-0.5 rounded-md shadow-[1.5px_1.5px_0px_0px_#000] sm:block">Workplace mobility</span>
       </header>

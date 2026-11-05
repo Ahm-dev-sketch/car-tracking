@@ -7,6 +7,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Spinner } from '@/components/ui/Spinner';
 import { Icon as LoginIcon } from '@/components/ui/Icon';
 import { VehicleTracking3D } from '@/components/ui/VehicleTracking3D';
+import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
 
 function LoginForm() {
   const router = useRouter();
@@ -35,6 +36,9 @@ function LoginForm() {
         setIsLoading(false);
         return;
       }
+
+      // Reset install dismissal state so the prompt is ready to offer on new session
+      resetInstallDismissal();
 
       // Fetch user role to route appropriately
       const meRes = await fetch('/api/me');

@@ -21,11 +21,11 @@ async function main() {
 
   const locations = [
     { name: 'Halim', code: '102' },
-    { name: 'Karawang', code: '201' },
     { name: 'Karawang', code: '202' },
+    { name: 'Karawang', code: '204' },
     { name: 'Padalarang', code: '802' },
     { name: 'Tegalluar Station', code: '402' },
-    { name: 'Tegalluar Depot', code: '202' },
+    { name: 'Tegalluar Depo', code: '502' },
   ];
 
   for (const loc of locations) {

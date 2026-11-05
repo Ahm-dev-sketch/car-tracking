@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { LocationBadge } from '@/components/ui/LocationBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { InterventionQueue } from '@/components/admin/InterventionQueue';
+import { Icon } from '@/components/ui/Icon';
 
 interface AdminStats {
   vehicles: {
@@ -38,13 +37,21 @@ interface AdminStats {
   }>;
 }
 
+interface ActiveTripPreview {
+  id: string;
+  startedAt: string;
+  vehicle?: { plateNumber: string } | null;
+  booking?: { pickupLocation: string; destination: string } | null;
+  driver?: { user?: { name: string } | null } | null;
+}
+
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [activeTripsList, setActiveTripsList] = useState<any[]>([]);
+  const [activeTripsList, setActiveTripsList] = useState<ActiveTripPreview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadStats = async () => {
-    setIsLoading(true);
+  const loadStats = async (isInitial = false) => {
+    if (isInitial) setIsLoading(true);
     try {
       const [statsRes, tripsRes] = await Promise.all([
         fetch('/api/admin/stats'),
@@ -63,314 +70,173 @@ export default function AdminOverviewPage() {
     } catch {
       // ignore
     } finally {
-      setIsLoading(false);
+      if (isInitial) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadStats();
-    const interval = setInterval(loadStats, 20000);
+    loadStats(true);
+    const interval = setInterval(() => loadStats(false), 20000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+    <div className="min-w-0 space-y-6 text-zinc-900 sm:space-y-8">
+      <header className="page-intro">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900">Fleet Command Center</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Operational hubs overview, auto-dispatch telemetry, and intervention queue
-          </p>
+          <p className="eyebrow">FleetTrack / Operations overview</p>
+          <h1 className="page-heading mt-2">Fleet at a glance</h1>
+          <p className="mt-3 max-w-lg text-sm leading-relaxed text-zinc-500">A clear view of your vehicles, people, and journeys. Ready for the decisions ahead.</p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/fleet"
-            className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
-          >
-            <span>🛰️ Live Fleet Map</span>
+        <div className="flex flex-col gap-2 min-[380px]:flex-row sm:flex-wrap sm:justify-end">
+          <Link href="/admin/fleet" className="button-primary">
+            <Icon name="pin" />Live fleet map
           </Link>
-          <Link
-            href="/admin/bookings"
-            className="px-3.5 py-1.5 bg-white border border-zinc-300 hover:bg-zinc-50 text-zinc-700 rounded text-xs font-medium cursor-pointer"
-          >
-            Manage Bookings
+          <Link href="/admin/bookings" className="button-secondary">
+            <Icon name="calendar" />Manage bookings
           </Link>
         </div>
-      </div>
+      </header>
 
-      {/* ADMIN INTERVENTION QUEUE */}
+      <section aria-label="Fleet overview metrics" className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:gap-5">
+        {[
+          { label: 'Available fleet', value: stats?.vehicles.available, caption: 'Ready for dispatch', icon: 'car' as const, accent: true },
+          { label: 'Active trips', value: stats?.bookings.active, caption: 'Assigned / en route', icon: 'route' as const, accent: false },
+          { label: 'Online drivers', value: stats?.drivers.online, caption: 'GPS active', icon: 'users' as const, accent: false },
+        ].map((metric) => (
+          <div key={metric.label} className="surface flex flex-col justify-between p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xs font-black uppercase tracking-wider text-zinc-600">{metric.label}</h2>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-emerald-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]"><Icon name={metric.icon} /></span>
+            </div>
+            <div className={`metric-value mt-4 text-4xl font-black ${metric.accent ? 'text-emerald-700' : 'text-zinc-950'}`}>
+              {isLoading || !stats ? <Spinner size="md" /> : metric.value}
+            </div>
+            <p className="mt-2 text-xs font-semibold text-zinc-600">{metric.caption}</p>
+          </div>
+        ))}
+      </section>
+
       <InterventionQueue onAssigned={loadStats} />
 
-      {/* KPI METRIC CARDS */}
-      <div className="space-y-3">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-          Fleet Health & Dispatch Metrics
-        </h2>
-
-        {/* Vehicles KPI row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-              Total Fleet
-            </span>
-            <div className="mt-1 text-2xl font-bold text-zinc-900">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.vehicles.total}
-            </div>
-            <span className="text-[10px] text-zinc-500">Registered assets</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">
-              Available
-            </span>
-            <div className="mt-1 text-2xl font-bold text-emerald-700">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.vehicles.available}
-            </div>
-            <span className="text-[10px] text-zinc-500">Ready for dispatch</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 block">
-              Reserved
-            </span>
-            <div className="mt-1 text-2xl font-bold text-amber-700">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.vehicles.reserved}
-            </div>
-            <span className="text-[10px] text-zinc-500">Assigned to booking</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block">
-              In Use
-            </span>
-            <div className="mt-1 text-2xl font-bold text-blue-700">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.vehicles.inUse}
-            </div>
-            <span className="text-[10px] text-zinc-500">On active trip</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
-              Maintenance
-            </span>
-            <div className="mt-1 text-2xl font-bold text-zinc-700">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.vehicles.maintenance}
-            </div>
-            <span className="text-[10px] text-zinc-500">Service workshop</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">
-              Inactive
-            </span>
-            <div className="mt-1 text-2xl font-bold text-rose-700">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.vehicles.inactive}
-            </div>
-            <span className="text-[10px] text-zinc-500">Decommissioned</span>
-          </div>
-        </div>
-
-        {/* Drivers & Bookings summary row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {/* Drivers */}
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 block">
-              Drivers Online
-            </span>
-            <div className="mt-1 text-xl font-bold text-emerald-800">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.drivers.online}
-            </div>
-            <span className="text-[10px] text-zinc-500">GPS active</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block">
-              Drivers Busy
-            </span>
-            <div className="mt-1 text-xl font-bold text-blue-800">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.drivers.busy}
-            </div>
-            <span className="text-[10px] text-zinc-500">On trip</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
-              Drivers Offline
-            </span>
-            <div className="mt-1 text-xl font-bold text-zinc-600">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.drivers.offline}
-            </div>
-            <span className="text-[10px] text-zinc-500">Standby</span>
-          </div>
-
-          {/* Bookings */}
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 block">
-              Active Trips
-            </span>
-            <div className="mt-1 text-xl font-bold text-indigo-800">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.bookings.active}
-            </div>
-            <span className="text-[10px] text-zinc-500">Assigned / En Route</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 block">
-              Searching Driver
-            </span>
-            <div className="mt-1 text-xl font-bold text-amber-800">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.bookings.searching}
-            </div>
-            <span className="text-[10px] text-zinc-500">Auto-dispatch</span>
-          </div>
-
-          <div className="p-3 bg-white border border-zinc-200 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
-              Unassigned
-            </span>
-            <div className="mt-1 text-xl font-bold text-zinc-700">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.bookings.unassigned}
-            </div>
-            <span className="text-[10px] text-zinc-500">No driver available</span>
-          </div>
-
-          <div className="p-3 bg-white border border-orange-200 bg-orange-50/40 rounded-lg">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-orange-700 block">
-              Intervention
-            </span>
-            <div className="mt-1 text-xl font-bold text-orange-900">
-              {isLoading || !stats ? <Spinner size="sm" /> : stats.bookings.adminIntervention}
-            </div>
-            <span className="text-[10px] text-orange-800 font-medium">Needs assign</span>
-          </div>
-        </div>
-      </div>
-
-      {/* BY-LOCATION BREAKDOWN */}
-      <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between">
+      <section aria-labelledby="fleet-health-heading" className="surface px-5 py-6 sm:px-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-800">
-              Operational Locations Breakdown
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">
-              Asset distribution and active workload partitioned by operational base
-            </p>
+            <p className="eyebrow">The operational picture</p>
+            <h2 id="fleet-health-heading" className="section-title mt-2">Fleet health & dispatch</h2>
           </div>
-          <span className="text-xs text-zinc-400 font-mono">
-            {stats?.byLocation.length || 0} OPERATIONAL HUBS
-          </span>
+          <p className="flex items-center gap-2 text-xs font-semibold text-zinc-600"><Icon name="clock" className="h-4 w-4" />Refreshes every 20 seconds</p>
         </div>
+        <dl className="mt-5 grid grid-cols-2 gap-x-5 sm:grid-cols-3 xl:grid-cols-5 xl:gap-x-8">
+          {[
+            { label: 'Total fleet', value: stats?.vehicles.total, caption: 'Registered assets', attention: false },
+            { label: 'Reserved', value: stats?.vehicles.reserved, caption: 'Assigned to a booking', attention: false },
+            { label: 'In use', value: stats?.vehicles.inUse, caption: 'On an active trip', attention: false },
+            { label: 'Maintenance', value: stats?.vehicles.maintenance, caption: 'Service workshop', attention: false },
+            { label: 'Inactive', value: stats?.vehicles.inactive, caption: 'Decommissioned', attention: false },
+            { label: 'Busy drivers', value: stats?.drivers.busy, caption: 'On a trip', attention: false },
+            { label: 'Offline drivers', value: stats?.drivers.offline, caption: 'On standby', attention: false },
+            { label: 'Searching for a driver', value: stats?.bookings.searching, caption: 'Auto-dispatch', attention: false },
+            { label: 'Unassigned bookings', value: stats?.bookings.unassigned, caption: 'No driver available', attention: false },
+            { label: 'Intervention', value: stats?.bookings.adminIntervention, caption: 'Needs assignment', attention: true },
+          ].map((metric) => (
+            <div key={metric.label} className="min-w-0 border-t-2 border-black/10 py-4">
+              <dt className={`min-h-10 text-xs font-bold leading-relaxed ${metric.attention ? 'text-amber-800' : 'text-zinc-600'}`}>{metric.label}</dt>
+              <dd className={`mt-1 text-2xl font-black tracking-tight tabular-nums ${metric.attention ? 'text-amber-800' : 'text-zinc-950'}`}>
+                {isLoading || !stats ? <Spinner size="sm" /> : metric.value}
+              </dd>
+              <dd className={`mt-1 text-xs font-medium ${metric.attention ? 'text-amber-800' : 'text-zinc-500'}`}>{metric.caption}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
 
-        {isLoading || !stats ? (
-          <div className="py-12 text-center text-zinc-500 text-xs">
-            <Spinner size="sm" className="mr-2" /> Loading operational locations...
-          </div>
-        ) : stats.byLocation.length === 0 ? (
-          <div className="py-8 text-center text-zinc-400 text-xs italic">
-            No operational locations configured.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stats.byLocation.map((loc) => (
-              <div
-                key={loc.locationId}
-                className="p-4 border border-zinc-200 rounded-lg bg-zinc-50/50 hover:bg-zinc-50 transition-colors space-y-3"
-              >
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
-                  <div className="font-bold text-sm text-zinc-900">{loc.name}</div>
-                  <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-zinc-800 text-white rounded">
-                    {loc.code}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="p-2 bg-white rounded border border-zinc-200">
-                    <span className="text-[10px] uppercase font-bold text-zinc-400 block">Vehicles</span>
-                    <span className="text-base font-bold text-zinc-900">{loc.vehicles}</span>
-                  </div>
-                  <div className="p-2 bg-white rounded border border-zinc-200">
-                    <span className="text-[10px] uppercase font-bold text-emerald-600 block">Drivers</span>
-                    <span className="text-base font-bold text-emerald-700">{loc.drivers}</span>
-                  </div>
-                  <div className="p-2 bg-white rounded border border-zinc-200">
-                    <span className="text-[10px] uppercase font-bold text-indigo-600 block">Trips</span>
-                    <span className="text-base font-bold text-indigo-700">{loc.bookings}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-1 text-[11px]">
-                  <Link
-                    href={`/admin/vehicles?locationId=${loc.locationId}`}
-                    className="text-zinc-600 hover:text-zinc-900 font-medium"
-                  >
-                    Vehicles →
-                  </Link>
-                  <Link
-                    href={`/admin/bookings?locationId=${loc.locationId}`}
-                    className="text-zinc-600 hover:text-zinc-900 font-medium"
-                  >
-                    Bookings →
-                  </Link>
-                  <Link
-                    href={`/admin/fleet?locationId=${loc.locationId}`}
-                    className="text-zinc-600 hover:text-zinc-900 font-medium"
-                  >
-                    Map →
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ACTIVE TRIPS PREVIEW */}
-      <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+      <section aria-labelledby="active-trips-heading" className="surface px-5 py-6 sm:px-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-800">
-              Active Trips Broadcast ({activeTripsList.length})
-            </h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Vehicles currently underway on live routes</p>
+            <p className="eyebrow">On the road</p>
+            <h2 id="active-trips-heading" className="section-title mt-2">Active trips <span className="ml-2 rounded-md border-2 border-black bg-zinc-100 px-2 py-0.5 text-xs font-black text-zinc-900 shadow-[1px_1px_0px_0px_#000]">{activeTripsList.length} shown</span></h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">Vehicles currently underway on live routes.</p>
           </div>
-          <Link
-            href="/admin/fleet"
-            className="text-xs font-semibold text-zinc-600 hover:text-zinc-900 hover:underline"
-          >
-            Live Tracking Map →
+          <Link href="/admin/fleet" className="button-secondary">
+            Live tracking map<Icon name="arrow" className="h-4 w-4" />
           </Link>
         </div>
 
         {activeTripsList.length === 0 ? (
-          <div className="py-8 text-center text-zinc-400 text-xs italic">
-            No active trips currently in progress.
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            {isLoading ? (
+              <div role="status" className="flex items-center gap-3 text-sm font-bold text-zinc-600"><Spinner size="md" />Loading active trips...</div>
+            ) : (
+              <>
+                <span className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-emerald-200 text-zinc-950 shadow-[2px_2px_0px_0px_#000]"><Icon name="route" /></span>
+                <p className="text-base font-black text-zinc-900">No trips underway right now.</p>
+                <p className="max-w-sm text-xs font-medium leading-relaxed text-zinc-600">Active journeys will appear here as drivers start their trips.</p>
+              </>
+            )}
           </div>
         ) : (
-          <div className="divide-y divide-zinc-100">
+          <ul className="mt-5 divide-y-2 divide-black/10">
             {activeTripsList.map((t) => (
-              <div key={t.id} className="py-3 flex items-center justify-between gap-4 text-xs">
-                <div>
-                  <div className="font-mono font-bold text-zinc-900">{t.vehicle?.plateNumber}</div>
-                  <div className="text-zinc-600">
-                    {t.booking ? `${t.booking.pickupLocation} → ${t.booking.destination}` : 'Ad-hoc trip'}
+              <li key={t.id} className="flex min-w-0 flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-amber-200 text-zinc-950 shadow-[2px_2px_0px_0px_#000]"><Icon name="car" /></span>
+                  <div className="min-w-0">
+                    <p className="wrap-anywhere font-mono text-sm font-black text-zinc-950">{t.vehicle?.plateNumber}</p>
+                    <p className="mt-1 wrap-anywhere text-sm font-medium leading-relaxed text-zinc-700">{t.booking ? `${t.booking.pickupLocation} → ${t.booking.destination}` : 'Ad-hoc trip'}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-medium text-zinc-800">
-                    Driver: {t.driver?.user?.name || 'Assigned Driver'}
-                  </div>
-                  <div className="text-zinc-400 text-[11px]">
-                    Started <RelativeTime date={t.startedAt} />
-                  </div>
+                <div className="min-w-0 pl-14 sm:max-w-[45%] sm:pl-0 sm:text-right">
+                  <p className="wrap-anywhere text-sm font-bold text-zinc-800">Driver: {t.driver?.user?.name || 'Assigned driver'}</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-500">Started <RelativeTime date={t.startedAt} /></p>
                 </div>
-              </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="locations-heading" className="surface min-w-0 space-y-6 p-5 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow">Across your network</p>
+            <h2 id="locations-heading" className="section-title mt-2">Operational locations</h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">Fleet distribution and active workload at each base.</p>
+          </div>
+          <span className="rounded-md border-2 border-black bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-900 shadow-[1px_1px_0px_0px_#000]">{stats?.byLocation.length || 0} operational hubs</span>
+        </div>
+
+        {isLoading || !stats ? (
+          <div role="status" className="flex items-center justify-center gap-3 py-12 text-sm font-bold text-zinc-600"><Spinner size="md" />Loading operational locations...</div>
+        ) : stats.byLocation.length === 0 ? (
+          <div className="rounded-2xl border-2 border-black bg-zinc-50 px-5 py-10 text-center shadow-[3px_3px_0px_0px_#000]">
+            <Icon name="pin" className="mx-auto mb-4 h-6 w-6 text-emerald-800" />
+            <p className="text-base font-black text-zinc-900">No operational locations configured.</p>
+            <p className="mt-2 text-xs font-medium leading-relaxed text-zinc-600">Your base-by-base fleet overview will appear here when locations are available.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {stats.byLocation.map((loc) => (
+              <article key={loc.locationId} className="min-w-0 rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="wrap-anywhere text-base font-black tracking-tight text-zinc-950">{loc.name}</h3>
+                  <span className="shrink-0 rounded-md border-2 border-black bg-emerald-200 px-2.5 py-1 font-mono text-xs font-black text-zinc-950 shadow-[1px_1px_0px_0px_#000]">{loc.code}</span>
+                </div>
+                <dl className="my-5 grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-black bg-zinc-50 p-2 text-center"><dt className="text-[10px] font-black uppercase text-zinc-500">Vehicles</dt><dd className="mt-1 text-2xl font-black tabular-nums text-zinc-900">{loc.vehicles}</dd></div>
+                  <div className="rounded-lg border border-black bg-emerald-50 p-2 text-center"><dt className="text-[10px] font-black uppercase text-emerald-800">Drivers</dt><dd className="mt-1 text-2xl font-black tabular-nums text-emerald-800">{loc.drivers}</dd></div>
+                  <div className="rounded-lg border border-black bg-zinc-50 p-2 text-center"><dt className="text-[10px] font-black uppercase text-zinc-500">Trips</dt><dd className="mt-1 text-2xl font-black tabular-nums text-zinc-900">{loc.bookings}</dd></div>
+                </dl>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t-2 border-black/10 pt-3">
+                  <Link href={`/admin/vehicles?locationId=${loc.locationId}`} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-black bg-zinc-100 px-2.5 text-xs font-bold text-zinc-900 hover:bg-zinc-200 shadow-[1px_1px_0px_0px_#000]">Vehicles<Icon name="arrow" className="h-3.5 w-3.5" /></Link>
+                  <Link href={`/admin/bookings?locationId=${loc.locationId}`} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-black bg-zinc-100 px-2.5 text-xs font-bold text-zinc-900 hover:bg-zinc-200 shadow-[1px_1px_0px_0px_#000]">Bookings<Icon name="arrow" className="h-3.5 w-3.5" /></Link>
+                  <Link href={`/admin/fleet?locationId=${loc.locationId}`} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-black bg-zinc-100 px-2.5 text-xs font-bold text-zinc-900 hover:bg-zinc-200 shadow-[1px_1px_0px_0px_#000]">Map<Icon name="arrow" className="h-3.5 w-3.5" /></Link>
+                </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

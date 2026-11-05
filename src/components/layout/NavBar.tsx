@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { RelativeTime } from '@/components/ui/RelativeTime';
+import { Drawer } from '@/components/ui/Drawer';
+import { Icon } from '@/components/ui/Icon';
+import { getNavigation, isNavigationActive } from './navigation';
 
 interface NotificationItem {
   id: string;
@@ -19,256 +22,120 @@ export function NavBar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const role = session?.user?.role;
-
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const links = getNavigation(role);
+  const dockLinks = role === 'ADMIN' ? links.slice(0, 3) : links;
+  const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const notifRef = useRef<HTMLDivElement>(null);
+  const unreadCount = notifications.filter((item) => !item.readAt).length;
+  const name = session?.user?.name || session?.user?.email || 'Your account';
+  const initials = name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase();
+  const moreActive = role === 'ADMIN' && links.slice(3).some((link) => isNavigationActive(pathname, link.href));
 
-  // Close menus on route change
   useEffect(() => {
-    setMobileMenuOpen(false);
-    setNotificationsOpen(false);
-  }, [pathname]);
-
-  // Click outside to close notifications dropdown
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotificationsOpen(false);
+    if (!session?.user) return;
+    let cancelled = false;
+    const loadNotifications = async () => {
+      try {
+        const response = await fetch('/api/notifications?limit=8');
+        if (response.ok) {
+          const json = await response.json();
+          if (!cancelled) setNotifications(json.data || []);
+        }
+      } catch {
+        // Keep the last notifications visible during a connection interruption.
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Fetch notifications
-  const fetchNotifications = async () => {
-    if (!session?.user) return;
-    try {
-      const res = await fetch('/api/notifications?limit=8');
-      if (res.ok) {
-        const json = await res.json();
-        const items: NotificationItem[] = json.data || [];
-        setNotifications(items);
-        setUnreadCount(items.filter((n) => !n.readAt).length);
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(interval);
-  }, [session]);
+    void loadNotifications();
+    const interval = setInterval(loadNotifications, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [session?.user]);
 
   const markNotificationRead = async (id: string) => {
     try {
-      await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
-      );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      const response = await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+      if (!response.ok) return;
+      setNotifications((previous) => previous.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item));
     } catch {
-      // ignore
+      // Leave unread notifications available to retry.
     }
   };
 
-  let links: { label: string; href: string }[] = [];
-  if (role === 'ADMIN') {
-    links = [
-      { label: 'Overview', href: '/admin' },
-      { label: 'Vehicles', href: '/admin/vehicles' },
-      { label: 'Drivers', href: '/admin/drivers' },
-      { label: 'Bookings', href: '/admin/bookings' },
-      { label: 'Live Fleet', href: '/admin/fleet' },
-      { label: 'Trips', href: '/admin/trips' },
-      { label: 'Users', href: '/admin/users' },
-    ];
-  } else if (role === 'DRIVER') {
-    links = [
-      { label: 'Active Trip', href: '/driver' },
-      { label: 'My Vehicle', href: '/driver/vehicle' },
-      { label: 'Trip History', href: '/driver/history' },
-    ];
-  } else {
-    // Default USER
-    links = [
-      { label: 'Overview', href: '/user' },
-      { label: 'Vehicles', href: '/user/vehicles' },
-      { label: 'My Bookings', href: '/user/bookings' },
-      { label: 'Live Tracking', href: '/user/tracking' },
-    ];
-  }
-
-  const roleBadgeColor =
-    role === 'ADMIN'
-      ? 'bg-rose-100 text-rose-800 border-rose-200'
-      : role === 'DRIVER'
-      ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
-      : 'bg-zinc-100 text-zinc-800 border-zinc-200';
-
   return (
-    <nav className="bg-white border-b border-zinc-200 sticky top-0 z-40 pt-[env(safe-area-inset-top)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14">
-          {/* Brand & Left Nav */}
-          <div className="flex items-center gap-6">
-            <Link
-              href={role === 'ADMIN' ? '/admin' : role === 'DRIVER' ? '/driver' : '/user'}
-              className="flex items-center gap-2 font-bold text-zinc-900 tracking-tight text-sm uppercase min-h-[44px]"
-            >
-              <div className="w-6 h-6 rounded bg-zinc-900 text-white flex items-center justify-center font-mono text-xs font-bold">
-                F
-              </div>
-              <span>FleetOps</span>
+    <>
+      <header className="app-header">
+        <div className="header-island">
+          <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="FleetTrack home">
+            <span className="brand-mark"><Icon name="route" className="size-6 text-black" /></span>
+            <span className="text-xl font-black tracking-tight text-black">Fleet<span className="text-emerald-700 underline decoration-black decoration-2">Track</span></span>
+          </Link>
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
+            {links.map((link) => (
+              <Link key={link.href} href={link.href} className="desktop-link" aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}>{link.label}</Link>
+            ))}
+          </nav>
+          <div className="flex shrink-0 items-center gap-2">
+            <button type="button" onClick={() => setNotificationsOpen(true)} className="icon-button relative rounded-xl border-2 border-black bg-white shadow-[2px_2px_0px_0px_#000]" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-haspopup="dialog">
+              <Icon name="bell" />
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 size-3.5 rounded-full border-1.5 border-black bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">{unreadCount}</span>}
+            </button>
+            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-2.5 rounded-xl border-2 border-black bg-amber-300 p-1 text-black shadow-[2px_2px_0px_0px_#000] transition-all hover:bg-amber-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none" aria-label="Open account and navigation" aria-haspopup="dialog" aria-expanded={menuOpen}>
+              <span className="grid size-8 place-items-center rounded-lg border-1.5 border-black bg-white text-xs font-black">{initials}</span>
+              <span className="hidden pr-2 text-xs font-black uppercase tracking-wider xl:inline">{role === 'ADMIN' ? 'Admin' : role === 'DRIVER' ? 'Driver' : 'Workspace'}</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <nav className="mobile-dock" aria-label="Mobile navigation">
+        {dockLinks.map((link) => (
+          <Link key={link.href} href={link.href} className="dock-link" aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}>
+            <Icon name={link.icon} className="size-[21px]" /><span>{link.shortLabel}</span>
+          </Link>
+        ))}
+        {(role === 'ADMIN' || role === 'DRIVER') && (
+          <button type="button" onClick={() => setMenuOpen(true)} className="dock-link" aria-expanded={menuOpen} aria-current={moreActive ? 'page' : undefined} aria-haspopup="dialog">
+            <Icon name="more" /><span>More</span>
+          </button>
+        )}
+      </nav>
+
+      <Drawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} title="Your workspace" description="Everything you need for the road ahead.">
+        <div className="flex items-center gap-3 rounded-xl border-2 border-black bg-emerald-300 p-4 shadow-[3px_3px_0px_0px_#000]">
+          <span className="grid size-12 shrink-0 place-items-center rounded-lg border-2 border-black bg-white text-base font-black text-black">{initials}</span>
+          <div className="min-w-0"><p className="break-words text-sm font-extrabold text-black">{name}</p><p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-emerald-950">{role === 'ADMIN' ? 'Fleet administrator' : role === 'DRIVER' ? 'Driver workspace' : 'Employee workspace'}</p></div>
+        </div>
+        <nav aria-label="Workspace navigation" className="space-y-2">
+          {links.map((link) => (
+            <Link key={link.href} href={link.href} onClick={() => setMenuOpen(false)} aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined} className={`flex min-h-12 items-center gap-3 rounded-xl border-2 border-black px-4 text-sm font-bold shadow-[2.5px_2.5px_0px_0px_#000] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${isNavigationActive(pathname, link.href) ? 'bg-amber-300 text-black' : 'bg-white text-black hover:bg-amber-100'}`}>
+              <Icon name={link.icon} /><span className="flex-1">{link.label}</span><Icon name="arrow" className="size-4 opacity-75" />
             </Link>
+          ))}
+        </nav>
+        <div className="border-t-2 border-black pt-4">
+          <button type="button" onClick={() => signOut({ callbackUrl: '/login' })} className="button-secondary w-full rounded-xl border-2 border-black bg-rose-200 text-black font-extrabold shadow-[3px_3px_0px_0px_#000] hover:bg-rose-300">
+            <Icon name="logout" />Sign out
+          </button>
+        </div>
+      </Drawer>
 
-            <div className="hidden md:flex items-center gap-1">
-              {links.map((link) => {
-                const isActive =
-                  pathname === link.href || (link.href !== '/admin' && link.href !== '/user' && link.href !== '/driver' && pathname.startsWith(link.href));
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      isActive
-                        ? 'bg-zinc-100 text-zinc-900 font-semibold'
-                        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </div>
+      <Drawer isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Notifications" description={unreadCount ? `${unreadCount} unread updates from your workspace.` : 'You’re all caught up.'}>
+        {notifications.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-black bg-amber-50/50 px-5 py-12 text-center">
+            <span className="grid size-14 place-items-center rounded-xl border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000]"><Icon name="bell" className="size-6" /></span>
+            <p className="text-base font-extrabold text-black">A little quiet here.</p><p className="max-w-60 text-xs font-medium leading-relaxed text-zinc-600">Booking and trip updates will appear here.</p>
           </div>
-
-          {/* Right Actions: Notifications, User, Signout */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Notifications Bell */}
-            <div className="relative" ref={notifRef}>
-              <button
-                type="button"
-                onClick={() => setNotificationsOpen((v) => !v)}
-                className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-md cursor-pointer"
-                aria-label="View notifications"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-600" />
-                )}
+        ) : (
+          <ul className="space-y-3">{notifications.map((item) => (
+            <li key={item.id}>
+              <button type="button" onClick={() => !item.readAt && void markNotificationRead(item.id)} className={`w-full rounded-xl border-2 border-black p-4 text-left shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-amber-50 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${!item.readAt ? 'bg-amber-200/70' : 'bg-white'}`}>
+                <span className="flex items-start justify-between gap-3"><span className="text-sm font-extrabold text-black">{item.title}</span>{!item.readAt && <span className="mt-1 size-2.5 shrink-0 rounded-full border border-black bg-emerald-500"><span className="sr-only">Unread</span></span>}</span>
+                <span className="mt-1.5 block text-xs font-medium leading-relaxed text-zinc-800">{item.body}</span><RelativeTime date={item.createdAt} className="mt-2.5 block font-mono text-[11px] font-bold text-zinc-600" />
               </button>
-
-              {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white rounded-lg shadow-xl border border-zinc-200 overflow-hidden z-50">
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-200">
-                    <span className="text-xs font-semibold text-zinc-800">Notifications</span>
-                    {unreadCount > 0 && (
-                      <span className="text-[10px] bg-rose-100 text-rose-800 font-semibold px-1.5 py-0.5 rounded">
-                        {unreadCount} unread
-                      </span>
-                    )}
-                  </div>
-                  <div className="max-h-72 overflow-y-auto divide-y divide-zinc-100">
-                    {notifications.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-zinc-500">
-                        No notifications
-                      </div>
-                    ) : (
-                      notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={() => !n.readAt && markNotificationRead(n.id)}
-                          className={`p-3 text-left transition-colors cursor-pointer ${
-                            !n.readAt ? 'bg-zinc-50/80 hover:bg-zinc-100/60' : 'hover:bg-zinc-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-semibold text-zinc-900 truncate">
-                              {n.title}
-                            </span>
-                            <RelativeTime date={n.createdAt} className="text-[10px] shrink-0" />
-                          </div>
-                          <p className="text-xs text-zinc-600 mt-0.5 line-clamp-2">{n.body}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* User Profile & Role */}
-            {session?.user && (
-              <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-zinc-200">
-                <div className="text-right">
-                  <div className="text-xs font-semibold text-zinc-800 leading-tight">
-                    {session.user.name || session.user.email}
-                  </div>
-                  <span className={`inline-block text-[10px] uppercase font-bold px-1.5 py-0.2 rounded border ${roleBadgeColor}`}>
-                    {role}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Logout button */}
-            <button
-              type="button"
-              onClick={() => signOut({ callbackUrl: '/login' })}
-              className="min-h-[44px] px-3 py-2 text-xs font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded hover:bg-zinc-100 cursor-pointer flex items-center justify-center"
-            >
-              Sign out
-            </button>
-
-            {/* Mobile hamburger button */}
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen((o) => !o)}
-              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-md cursor-pointer"
-              aria-label="Toggle navigation menu"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile menu dropdown */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-zinc-200 bg-white px-4 pt-2 pb-3 space-y-1">
-          {links.map((link) => {
-            const isActive =
-              pathname === link.href || (link.href !== '/admin' && link.href !== '/user' && link.href !== '/driver' && pathname.startsWith(link.href));
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center min-h-[44px] px-3 py-2 rounded-md text-xs font-medium ${
-                  isActive
-                    ? 'bg-zinc-100 text-zinc-900 font-semibold'
-                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </nav>
+            </li>
+          ))}</ul>
+        )}
+      </Drawer>
+    </>
   );
 }

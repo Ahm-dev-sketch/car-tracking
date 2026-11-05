@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LocationBadge } from '@/components/ui/LocationBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { fetchJson } from '@/lib/fetch-json';
 
 interface VehicleLocation {
   id: string;
@@ -51,62 +52,43 @@ function DriverVehicleContent() {
     searchParams.get('locationId') || searchParams.get('location_id') || ''
   );
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-  const [seatsFilter, setSeatsFilter] = useState(searchParams.get('seats') || '');
+  const [seatsFilter] = useState(searchParams.get('seats') || '');
+  const searchVersion = useRef(0);
   const [searchResults, setSearchResults] = useState<VehicleDetails[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const syncUrlParams = (newParams: Record<string, string>) => {
+  const syncUrlParams = useCallback((newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(newParams).forEach(([k, v]) => {
       if (v) params.set(k, v);
       else params.delete(k);
     });
-    router.replace(`/driver/vehicle?${params.toString()}`);
-  };
+    if (params.toString() !== searchParams.toString()) router.replace(`/driver/vehicle?${params.toString()}`);
+  }, [router, searchParams]);
 
   useEffect(() => {
     async function loadDriverVehicle() {
       setIsLoading(true);
       setError(null);
       try {
-        const [configRes, locsRes, meRes] = await Promise.all([
-          fetch('/api/tracking/config'),
-          fetch('/api/locations'),
-          fetch('/api/me'),
+        const [config, locs, me] = await Promise.all([
+          fetchJson<{ sessionState: { activeTrip?: { vehicle: { id: string } }; activeSession?: { vehicle?: { id: string } } } }>('/api/tracking/config'),
+          fetchJson<{ data: LocationOption[] }>('/api/locations'),
+          fetchJson<{ driver: { status: string; licenseNumber: string; currentVehicle: VehicleDetails | null } | null }>('/api/me'),
         ]);
-
-        if (configRes.ok) {
-          const json = await configRes.json();
-          if (json.sessionState?.activeTrip?.vehicle) {
-            setCurrentVehicle(json.sessionState.activeTrip.vehicle);
-          }
+        setLocations(locs.data || []);
+        if (!me.driver) throw new Error('Driver profile not found. Please contact an administrator.');
+        setDriverStatus(me.driver.status);
+        setLicenseNumber(me.driver.licenseNumber);
+        const vehicleId = config.sessionState.activeTrip?.vehicle.id || config.sessionState.activeSession?.vehicle?.id || me.driver.currentVehicle?.id;
+        if (vehicleId) {
+          const result = await fetchJson<{ data: VehicleDetails }>(`/api/vehicles/${vehicleId}`);
+          setCurrentVehicle(result.data);
+        } else {
+          setCurrentVehicle(null);
         }
-
-        if (locsRes.ok) {
-          const lJson = await locsRes.json();
-          setLocations(lJson.data || []);
-        }
-
-        if (meRes.ok) {
-          const meData = await meRes.json();
-          const dRes = await fetch(
-            `/api/drivers?search=${encodeURIComponent(meData.user?.email || '')}`
-          );
-          if (dRes.ok) {
-            const dJson = await dRes.json();
-            const dList = dJson.data || [];
-            if (dList.length > 0) {
-              const d = dList[0];
-              setDriverStatus(d.status);
-              setLicenseNumber(d.licenseNumber);
-              if (d.currentVehicle) {
-                setCurrentVehicle(d.currentVehicle);
-              }
-            }
-          }
-        }
-      } catch {
-        setError('Failed to load vehicle assignment');
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Failed to load vehicle assignment');
       } finally {
         setIsLoading(false);
       }
@@ -115,7 +97,8 @@ function DriverVehicleContent() {
     loadDriverVehicle();
   }, []);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
+    const version = ++searchVersion.current;
     setIsSearching(true);
     try {
       const params = new URLSearchParams({ limit: '12' });
@@ -124,27 +107,22 @@ function DriverVehicleContent() {
       if (statusFilter) params.set('status', statusFilter);
       if (seatsFilter) params.set('seats', seatsFilter);
 
-      const res = await fetch(`/api/vehicles?${params.toString()}`);
-      if (res.ok) {
-        const json = await res.json();
-        setSearchResults(json.data || json.vehicles || []);
-      }
-    } catch {
-      // ignore
+      const json = await fetchJson<{ data: VehicleDetails[] }>(`/api/vehicles?${params.toString()}`);
+      if (version === searchVersion.current) setSearchResults(json.data || []);
+    } catch (cause) {
+      if (version === searchVersion.current) setError(cause instanceof Error ? cause.message : 'Unable to search vehicles.');
     } finally {
-      setIsSearching(false);
+      if (version === searchVersion.current) setIsSearching(false);
     }
-  };
+  }, [searchTerm, locationFilter, statusFilter, seatsFilter]);
 
   useEffect(() => {
-    handleSearch();
-    syncUrlParams({
-      search: searchTerm.trim(),
-      locationId: locationFilter,
-      status: statusFilter,
-      seats: seatsFilter,
-    });
-  }, [locationFilter, statusFilter, seatsFilter]);
+    const timer = setTimeout(() => {
+      void handleSearch();
+      syncUrlParams({ search: searchTerm.trim(), locationId: locationFilter, status: statusFilter, seats: seatsFilter });
+    }, 300);
+    return () => { clearTimeout(timer); searchVersion.current += 1; };
+  }, [handleSearch, syncUrlParams, searchTerm, locationFilter, statusFilter, seatsFilter]);
 
   const assignedCurrentLoc =
     currentVehicle?.currentLocation || currentVehicle?.currentOperationalLocation;

@@ -1,4 +1,6 @@
-import React from 'react';
+"use client";
+
+import React from "react";
 
 export interface Column<T> {
   header: string;
@@ -16,75 +18,163 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
 }
 
-export function DataTable<T extends Record<string, any>>({
+const interactiveSelector =
+  'a, button, input, select, textarea, label, summary, [role="button"], [role="link"], [contenteditable], [tabindex]';
+
+export function DataTable<T extends object>({
   columns,
   data,
-  keyField = 'id' as keyof T,
+  keyField = "id" as keyof T,
   isLoading = false,
-  emptyMessage = 'No records found',
+  emptyMessage = "No records found",
   onRowClick,
 }: DataTableProps<T>) {
-  return (
-    <div className="w-full border border-zinc-200 rounded-md bg-white overflow-hidden">
-      <div className="sm:hidden text-[10px] uppercase font-semibold text-zinc-400 px-3 py-1 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
-        <span>Table view</span>
-        <span>Swipe horizontally →</span>
+  const renderCell = (column: Column<T>, row: T) =>
+    column.cell
+      ? column.cell(row)
+      : column.accessorKey
+        ? String(row[column.accessorKey] ?? "—")
+        : null;
+  const handleRowClick = (event: React.MouseEvent<HTMLElement>, row: T) => {
+    if (
+      !onRowClick ||
+      event.defaultPrevented ||
+      (event.target instanceof Element &&
+        event.target.closest(interactiveSelector))
+    )
+      return;
+    if (window.getSelection()?.toString()) return;
+    event.currentTarget
+      .querySelector<HTMLButtonElement>("[data-row-action]")
+      ?.focus({ preventScroll: true });
+    onRowClick(row);
+  };
+  const viewButton = (row: T, index: number, mobile = false) => (
+    <button
+      type="button"
+      data-row-action
+      onClick={(event) => {
+        event.currentTarget.focus({ preventScroll: true });
+        onRowClick?.(row);
+      }}
+      aria-label={`View record ${index + 1}`}
+      className={`inline-flex min-h-9 min-w-9 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-black bg-amber-300 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000] transition-all hover:bg-amber-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-2 focus-visible:outline-black ${mobile ? "w-full py-2.5 px-4" : "p-1.5"}`}
+    >
+      {mobile && <span>View record</span>}
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M5 12h14m-5-5 5 5-5 5" />
+      </svg>
+    </button>
+  );
+
+  if (isLoading || data.length === 0) {
+    return (
+      <div
+        className="w-full rounded-xl border-[2.5px] border-black bg-white p-8 text-center sm:p-12 shadow-[5px_5px_0px_0px_#000]"
+        role="status"
+        aria-live="polite"
+        aria-busy={isLoading}
+      >
+        {isLoading && (
+          <span
+            className="mx-auto mb-4 block size-7 animate-spin rounded-full border-3 border-zinc-200 border-t-black motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+        )}
+        <p className="text-sm font-bold text-zinc-800">
+          {isLoading ? "Loading data..." : emptyMessage}
+        </p>
       </div>
-      <div className="w-full overflow-x-auto">
-        <table className="w-full text-left text-sm border-collapse min-w-[580px] sm:min-w-full">
-        <thead className="bg-zinc-50 border-b border-zinc-200 text-xs font-semibold text-zinc-600 uppercase tracking-wider">
-          <tr>
-            {columns.map((col, idx) => (
-              <th
-                key={idx}
-                scope="col"
-                className={`py-3 px-4 ${col.className || ''}`}
-              >
-                {col.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-200">
-          {isLoading ? (
-            <tr>
-              <td colSpan={columns.length} className="py-12 text-center text-zinc-500">
-                <div className="inline-block animate-spin rounded-full border-2 border-zinc-400 border-t-transparent w-5 h-5 mr-2 align-middle" />
-                Loading data...
-              </td>
-            </tr>
-          ) : data.length === 0 ? (
-            <tr>
-              <td colSpan={columns.length} className="py-10 text-center text-zinc-500 text-sm">
-                {emptyMessage}
-              </td>
-            </tr>
-          ) : (
-            data.map((row, rowIdx) => {
-              const rowKey = (row[keyField] as string) || String(rowIdx);
-              return (
+    );
+  }
+
+  return (
+    <div className="w-full min-w-0">
+      <div className="hidden rounded-xl border-[2.5px] border-black bg-white shadow-[5px_5px_0px_0px_#000] overflow-hidden md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead className="border-b-[2.5px] border-black bg-emerald-100 text-xs font-black uppercase tracking-wider text-black">
+              <tr>
+                {columns.map((column, index) => (
+                  <th
+                    key={index}
+                    scope="col"
+                    className={`px-5 py-3.5 ${column.className || ""}`}
+                  >
+                    {column.header}
+                  </th>
+                ))}
+                {onRowClick && (
+                  <th scope="col" className="w-16 px-3">
+                    <span className="sr-only">Record details</span>
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y-2 divide-black/10">
+              {data.map((row, rowIndex) => (
                 <tr
-                  key={rowKey}
-                  onClick={() => onRowClick?.(row)}
-                  className={`transition-colors ${
-                    onRowClick ? 'cursor-pointer hover:bg-zinc-50' : 'hover:bg-zinc-50/50'
-                  }`}
+                  key={String(row[keyField] ?? rowIndex)}
+                  onClick={(event) => handleRowClick(event, row)}
+                  className={`hover:bg-amber-100/50 transition-colors ${onRowClick ? "cursor-pointer" : ""}`}
                 >
-                  {columns.map((col, colIdx) => (
+                  {columns.map((column, index) => (
                     <td
-                      key={colIdx}
-                      className={`py-3 px-4 text-zinc-800 ${col.className || ''}`}
+                      key={index}
+                      className={`px-5 py-3.5 text-black font-medium ${column.className || ""}`}
                     >
-                      {col.cell ? col.cell(row) : col.accessorKey ? String(row[col.accessorKey] ?? '—') : null}
+                      {renderCell(column, row)}
                     </td>
                   ))}
+                  {onRowClick && (
+                    <td className="px-3 py-2.5">{viewButton(row, rowIndex)}</td>
+                  )}
                 </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <ul className="grid min-w-0 gap-4 md:hidden" aria-label="Records">
+        {data.map((row, rowIndex) => (
+          <li
+            key={String(row[keyField] ?? rowIndex)}
+            onClick={(event) => handleRowClick(event, row)}
+            className={`min-w-0 rounded-xl border-[2.5px] border-black bg-white p-4 shadow-[4px_4px_0px_0px_#000] ${onRowClick ? "cursor-pointer" : ""}`}
+          >
+            <div className="min-w-0">
+              <dl className="min-w-0 divide-y-2 divide-black/10">
+                {columns.map((column, index) => (
+                  <div key={index} className="grid min-w-0 gap-1.5 py-3 first:pt-0 last:pb-0">
+                    <dt className="text-[11px] font-black uppercase tracking-wider text-zinc-600">
+                      {column.header || "Value"}
+                    </dt>
+                    <dd className="min-w-0 text-sm font-semibold text-black wrap-anywhere">
+                      {renderCell(column, row)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            {onRowClick && (
+              <div className="pt-3">
+                {viewButton(row, rowIndex, true)}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

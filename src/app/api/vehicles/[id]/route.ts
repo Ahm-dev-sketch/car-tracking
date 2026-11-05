@@ -7,7 +7,7 @@ import { getVehicleById, updateVehicle, deleteVehicle } from '@/server/vehicles/
 
 export const GET = withErrorHandling(
   async (_req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
-    await getSessionUser();
+    const user = await getSessionUser();
 
     const params = await context?.params;
     const id = params?.id;
@@ -18,7 +18,7 @@ export const GET = withErrorHandling(
       );
     }
 
-    const vehicle = await getVehicleById(id);
+    const vehicle = await getVehicleById(id, user);
     return NextResponse.json({ data: vehicle });
   }
 );

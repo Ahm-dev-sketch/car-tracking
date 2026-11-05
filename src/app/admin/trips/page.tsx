@@ -161,7 +161,7 @@ export default function AdminTripsPage() {
         <button
           type="button"
           onClick={() => setSelectedTrip(t)}
-          className="px-2.5 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+          className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
         >
           Details
         </button>
@@ -171,21 +171,21 @@ export default function AdminTripsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="pb-4 border-b border-zinc-200">
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900">Trip Audit & Records</h1>
-        <p className="text-xs text-zinc-500 mt-0.5">Comprehensive history of all vehicle tracking sessions and routes</p>
+      <div className="pb-4 border-b-2 border-black/10">
+        <h1 className="text-2xl font-black tracking-tight text-zinc-950">Trip Audit & Records</h1>
+        <p className="text-xs font-medium text-zinc-600 mt-0.5">Comprehensive history of all vehicle tracking sessions and routes</p>
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {/* Filter */}
-      <div className="bg-white p-3 rounded-lg border border-zinc-200 flex items-center justify-between gap-3">
+      <div className="surface p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-zinc-500">Status:</span>
+          <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
           >
             <option value="">All Statuses</option>
             <option value="ACTIVE">ACTIVE</option>

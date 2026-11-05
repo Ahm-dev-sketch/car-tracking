@@ -55,13 +55,19 @@ export function classifyMovement(
 }
 
 export async function markStale(
-  staleThresholdSec: number = TRACKING_CONFIG.tripIntervalSec * TRACKING_CONFIG.maxStaleMultiplier
+  staleThresholdSec?: number
 ): Promise<number> {
-  const cutoff = new Date(Date.now() - staleThresholdSec * 1000);
+  const now = Date.now();
+  const tripCutoff = new Date(now - (staleThresholdSec ?? TRACKING_CONFIG.tripIntervalSec * TRACKING_CONFIG.maxStaleMultiplier) * 1000);
+  const idleCutoff = new Date(now - (staleThresholdSec ?? TRACKING_CONFIG.idleIntervalSec * TRACKING_CONFIG.maxStaleMultiplier) * 1000);
   const updated = await prisma.vehicleLocation.updateMany({
     where: {
       movement: { notIn: [MovementStatus.OFFLINE, MovementStatus.GPS_LOST] },
-      receivedAt: { lt: cutoff },
+      OR: [
+        { trip: { is: { status: TripStatus.ACTIVE } }, receivedAt: { lt: tripCutoff } },
+        { trip: { is: null }, receivedAt: { lt: idleCutoff } },
+        { trip: { is: { status: { not: TripStatus.ACTIVE } } }, receivedAt: { lt: idleCutoff } },
+      ],
     },
     data: {
       movement: MovementStatus.GPS_LOST,
@@ -130,12 +136,12 @@ export async function ingestLocations(
   for (let i = 0; i < rawPoints.length; i++) {
     const p = rawPoints[i];
 
-    if (p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) {
+    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng) || p.lat < -90 || p.lat > 90 || p.lng < -180 || p.lng > 180) {
       rejected.push({ index: i, reason: 'Invalid latitude or longitude coordinate' });
       continue;
     }
 
-    if (p.accuracyM < 0 || p.accuracyM > 5000) {
+    if (!Number.isFinite(p.accuracyM) || p.accuracyM < 0 || p.accuracyM > 5000) {
       rejected.push({ index: i, reason: 'Accuracy out of range (0-5000m)' });
       continue;
     }
@@ -151,7 +157,7 @@ export async function ingestLocations(
     if (
       p.speedMps !== null &&
       p.speedMps !== undefined &&
-      (p.speedMps < 0 || p.speedMps > TRACKING_CONFIG.maxSpeedMps)
+      (!Number.isFinite(p.speedMps) || p.speedMps < 0 || p.speedMps > TRACKING_CONFIG.maxSpeedMps)
     ) {
       rejected.push({ index: i, reason: `Speed out of bounds (0-${TRACKING_CONFIG.maxSpeedMps} m/s)` });
       continue;
@@ -160,13 +166,17 @@ export async function ingestLocations(
     if (
       p.headingDeg !== null &&
       p.headingDeg !== undefined &&
-      (p.headingDeg < 0 || p.headingDeg > 360)
+      (!Number.isFinite(p.headingDeg) || p.headingDeg < 0 || p.headingDeg > 360)
     ) {
       rejected.push({ index: i, reason: 'Heading out of bounds (0-360 degrees)' });
       continue;
     }
 
     const recordedMs = p.recordedAt.getTime();
+    if (!Number.isFinite(recordedMs)) {
+      rejected.push({ index: i, reason: 'Invalid recorded timestamp' });
+      continue;
+    }
     if (recordedMs > now + maxFutureSkewMs) {
       rejected.push({ index: i, reason: 'Recorded timestamp is in the future' });
       continue;
@@ -184,89 +194,105 @@ export async function ingestLocations(
     // Sort accepted points ascending by recordedAt
     accepted.sort((a, b) => a.recordedAt.getTime() - b.recordedAt.getTime());
 
-    // Insert history rows into driver_locations
-    for (const p of accepted) {
-      // Ensure partition for target month exists
-      await prisma.$executeRawUnsafe(
-        'SELECT create_driver_location_partition($1::date)',
-        p.recordedAt
+    // Validate the live session under locks before writing either history or snapshot.
+    const latestPoint = accepted[accepted.length - 1];
+    const movement = await prisma.$transaction(async (tx) => {
+      // Serialize snapshot updates so delayed batches cannot rewind live telemetry.
+      await tx.$queryRaw`SELECT id FROM vehicles WHERE id = ${targetVehicleId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM drivers WHERE id = ${driverId} FOR UPDATE`;
+      // Session/trip shutdown uses the same driver lock. An in-flight upload must
+      // never revive an OFFLINE snapshot or attach old points to a new journey.
+      const currentTrip = await tx.trip.findFirst({ where: { driverId, status: TripStatus.ACTIVE } });
+      const currentSession = currentTrip ? null : await tx.driverSession.findFirst({
+        where: { driverId, status: DriverSessionStatus.ACTIVE },
+        include: { driver: { select: { currentVehicleId: true } } },
+      });
+      const currentVehicleId = currentTrip?.vehicleId ?? currentSession?.vehicleId ?? currentSession?.driver.currentVehicleId;
+      if ((!currentTrip && !currentSession) || currentTrip?.id !== activeTrip?.id || currentVehicleId !== targetVehicleId || (!currentTrip && currentSession?.id !== activeSession?.id)) {
+        throw new ApiError(409, 'TRACKING_SESSION_CHANGED', 'Tracking session changed during upload. Refresh the driver dashboard.');
+      }
+      for (const p of accepted) {
+        await tx.$executeRawUnsafe('SELECT create_driver_location_partition($1::date)', p.recordedAt);
+        await tx.driverLocation.create({
+          data: {
+            driverId,
+            vehicleId: targetVehicleId,
+            tripId: activeTrip?.id ?? null,
+            lat: p.lat,
+            lng: p.lng,
+            accuracyM: p.accuracyM,
+            speedMps: p.speedMps ?? null,
+            headingDeg: p.headingDeg ?? null,
+            recordedAt: p.recordedAt,
+            receivedAt: new Date(),
+          },
+        });
+      }
+      const prevLocation = await tx.vehicleLocation.findUnique({
+        where: { vehicleId: targetVehicleId },
+      });
+
+      if (prevLocation && prevLocation.recordedAt >= latestPoint.recordedAt) {
+        return null;
+      }
+      const movement = classifyMovement(
+        prevLocation ? { lat: prevLocation.lat, lng: prevLocation.lng } : null,
+        latestPoint
       );
 
-      await prisma.driverLocation.create({
-        data: {
-          driverId,
+      await tx.vehicleLocation.upsert({
+        where: { vehicleId: targetVehicleId },
+        create: {
           vehicleId: targetVehicleId,
+          driverId,
           tripId: activeTrip?.id ?? null,
-          lat: p.lat,
-          lng: p.lng,
-          accuracyM: p.accuracyM,
-          speedMps: p.speedMps ?? null,
-          headingDeg: p.headingDeg ?? null,
-          recordedAt: p.recordedAt,
+          lat: latestPoint.lat,
+          lng: latestPoint.lng,
+          accuracyM: latestPoint.accuracyM,
+          speedMps: latestPoint.speedMps ?? null,
+          headingDeg: latestPoint.headingDeg ?? null,
+          recordedAt: latestPoint.recordedAt,
           receivedAt: new Date(),
+          movement,
+        },
+        update: {
+          driverId,
+          tripId: activeTrip?.id ?? null,
+          lat: latestPoint.lat,
+          lng: latestPoint.lng,
+          accuracyM: latestPoint.accuracyM,
+          speedMps: latestPoint.speedMps ?? null,
+          headingDeg: latestPoint.headingDeg ?? null,
+          recordedAt: latestPoint.recordedAt,
+          receivedAt: new Date(),
+          movement,
+        },
+      });
+
+      return movement;
+    });
+
+    if (movement !== null) {
+      await publishEvent({
+        type: 'location:update',
+        data: {
+          vehicleId: targetVehicleId,
+          lat: latestPoint.lat,
+          lng: latestPoint.lng,
+          accuracyM: latestPoint.accuracyM,
+          speedMps: latestPoint.speedMps ?? null,
+          headingDeg: latestPoint.headingDeg ?? null,
+          recordedAt: latestPoint.recordedAt.toISOString(),
+          receivedAt: new Date().toISOString(),
+          movement,
+          driverName: activeTrip?.driver?.user?.name ?? activeSession?.driver?.user?.name ?? null,
+          driverPhone: activeTrip?.driver?.user?.phone ?? activeSession?.driver?.user?.phone ?? null,
+          plateNumber: activeTrip?.vehicle?.plateNumber ?? activeSession?.vehicle?.plateNumber ?? null,
+          tripOrigin: activeTrip?.booking?.pickupLocation ?? null,
+          tripDestination: activeTrip?.booking?.destination ?? null,
         },
       });
     }
-
-    // Upsert current vehicle location
-    const latestPoint = accepted[accepted.length - 1];
-    const prevLocation = await prisma.vehicleLocation.findUnique({
-      where: { vehicleId: targetVehicleId },
-    });
-
-    const movement = classifyMovement(
-      prevLocation ? { lat: prevLocation.lat, lng: prevLocation.lng } : null,
-      latestPoint
-    );
-
-    await prisma.vehicleLocation.upsert({
-      where: { vehicleId: targetVehicleId },
-      create: {
-        vehicleId: targetVehicleId,
-        driverId,
-        tripId: activeTrip?.id ?? null,
-        lat: latestPoint.lat,
-        lng: latestPoint.lng,
-        accuracyM: latestPoint.accuracyM,
-        speedMps: latestPoint.speedMps ?? null,
-        headingDeg: latestPoint.headingDeg ?? null,
-        recordedAt: latestPoint.recordedAt,
-        receivedAt: new Date(),
-        movement,
-      },
-      update: {
-        driverId,
-        tripId: activeTrip?.id ?? null,
-        lat: latestPoint.lat,
-        lng: latestPoint.lng,
-        accuracyM: latestPoint.accuracyM,
-        speedMps: latestPoint.speedMps ?? null,
-        headingDeg: latestPoint.headingDeg ?? null,
-        recordedAt: latestPoint.recordedAt,
-        receivedAt: new Date(),
-        movement,
-      },
-    });
-
-    await publishEvent({
-      type: 'location:update',
-      data: {
-        vehicleId: targetVehicleId,
-        lat: latestPoint.lat,
-        lng: latestPoint.lng,
-        accuracyM: latestPoint.accuracyM,
-        speedMps: latestPoint.speedMps ?? null,
-        headingDeg: latestPoint.headingDeg ?? null,
-        recordedAt: latestPoint.recordedAt.toISOString(),
-        receivedAt: new Date().toISOString(),
-        movement,
-        driverName: activeTrip?.driver?.user?.name ?? activeSession?.driver?.user?.name ?? null,
-        driverPhone: activeTrip?.driver?.user?.phone ?? activeSession?.driver?.user?.phone ?? null,
-        plateNumber: activeTrip?.vehicle?.plateNumber ?? activeSession?.vehicle?.plateNumber ?? null,
-        tripOrigin: activeTrip?.booking?.pickupLocation ?? null,
-        tripDestination: activeTrip?.booking?.destination ?? null,
-      },
-    });
   }
 
   return {
@@ -328,6 +354,7 @@ export async function getVehicleTracking(
   const activeTrip = await prisma.trip.findFirst({
     where: { vehicleId, status: TripStatus.ACTIVE },
     include: {
+      driver: { include: { user: { select: { id: true, name: true, phone: true } } } },
       booking: {
         select: {
           pickupLocation: true,
@@ -339,6 +366,7 @@ export async function getVehicleTracking(
   });
 
   const canSeePhone = isAdmin || isOwnerActive;
+  const driver = activeTrip?.driver ?? vehicle.currentDriver;
 
   return {
     vehicle: {
@@ -349,11 +377,11 @@ export async function getVehicleTracking(
       status: vehicle.status,
     },
     location: vehicle.currentLocation,
-    driver: vehicle.currentDriver?.user
+    driver: driver?.user
       ? {
-          id: vehicle.currentDriver.id,
-          name: vehicle.currentDriver.user.name,
-          phone: canSeePhone ? vehicle.currentDriver.user.phone : 'REDACTED',
+          id: driver.id,
+          name: driver.user.name,
+          phone: canSeePhone ? driver.user.phone : 'REDACTED',
         }
       : null,
     activeTrip: activeTrip
@@ -419,6 +447,11 @@ export async function getLiveTracking(
       currentLocation: true,
       homeLocation: { select: { id: true, name: true, code: true } },
       currentOperationalLocation: { select: { id: true, name: true, code: true } },
+      trips: {
+        where: { status: TripStatus.ACTIVE },
+        take: 1,
+        include: { driver: { include: { user: { select: { id: true, name: true, phone: true } } } } },
+      },
       currentDriver: {
         include: { user: { select: { id: true, name: true, phone: true } } },
       },
@@ -428,6 +461,7 @@ export async function getLiveTracking(
   return vehicles.map((v) => {
     const isOwner = Boolean(vehicleIds && vehicleIds.includes(v.id));
     const canSeePhone = isAdmin || isOwner;
+    const driver = v.trips[0]?.driver ?? v.currentDriver;
 
     return {
       vehicleId: v.id,
@@ -438,11 +472,11 @@ export async function getLiveTracking(
       homeLocation: v.homeLocation,
       currentLocationInfo: v.currentOperationalLocation,
       location: v.currentLocation,
-      driver: v.currentDriver?.user
+      driver: driver?.user
         ? {
-            id: v.currentDriver.id,
-            name: v.currentDriver.user.name,
-            phone: canSeePhone ? v.currentDriver.user.phone : 'REDACTED',
+            id: driver.id,
+            name: driver.user.name,
+            phone: canSeePhone ? driver.user.phone : 'REDACTED',
           }
         : null,
     };

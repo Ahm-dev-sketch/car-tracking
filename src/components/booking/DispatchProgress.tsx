@@ -26,7 +26,7 @@ export function formatEta(
 const STEPS = [
   { key: 'SEARCHING_DRIVER', label: 'Searching for driver…' },
   { key: 'DRIVER_NOTIFIED', label: 'Driver notified' },
-  { key: 'DRIVER_ASSIGNED', label: 'Driver assigned — vehicle reserved' },
+  { key: 'DRIVER_ASSIGNED', label: 'Driver assigned' },
   { key: 'DRIVER_EN_ROUTE', label: 'Driver en route' },
   { key: 'ARRIVED', label: 'Driver arrived' },
 ];
@@ -44,15 +44,15 @@ export function DispatchProgress({
   // If status is one of the failure or cancellation states
   if (normStatus === 'NO_DRIVER_AVAILABLE') {
     return (
-      <div className={`p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs ${className}`}>
+      <div className={`p-4 bg-zinc-100 border-[2.5px] border-black rounded-xl text-xs shadow-[3px_3px_0px_0px_#000] ${className}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-zinc-400" />
-            <span className="font-semibold text-zinc-800">No Driver Available</span>
+            <span className="w-2.5 h-2.5 rounded-full border border-black bg-zinc-500" />
+            <span className="font-extrabold text-black">No Driver Available</span>
           </div>
           <StatusBadge status="NO_DRIVER_AVAILABLE" />
         </div>
-        <p className="text-zinc-600 mt-1">
+        <p className="text-zinc-700 font-medium mt-1.5 leading-relaxed">
           Auto-dispatch could not find an available online driver at this location.
         </p>
       </div>
@@ -61,15 +61,15 @@ export function DispatchProgress({
 
   if (normStatus === 'ADMIN_INTERVENTION') {
     return (
-      <div className={`p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs ${className}`}>
+      <div className={`p-4 bg-orange-100 border-[2.5px] border-black rounded-xl text-xs shadow-[3px_3px_0px_0px_#000] ${className}`}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-            <span className="font-semibold text-orange-900">Dispatch Escalated to Admin</span>
+            <span className="w-2.5 h-2.5 rounded-full border border-black bg-orange-500 animate-pulse" />
+            <span className="font-extrabold text-black">Dispatch Escalated to Admin</span>
           </div>
           <StatusBadge status="ADMIN_INTERVENTION" />
         </div>
-        <p className="text-orange-800 mt-1">
+        <p className="text-orange-950 font-medium mt-1.5 leading-relaxed">
           Auto-dispatch retries exhausted. A fleet manager will assign a driver manually.
         </p>
       </div>
@@ -92,22 +92,22 @@ export function DispatchProgress({
   if (compact) {
     const isSearching = normStatus === 'SEARCHING_DRIVER';
     return (
-      <div className={`flex items-center gap-2 text-xs ${className}`}>
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
+      <div className={`flex flex-wrap items-center gap-2 text-xs ${className}`}>
+        <span className="relative flex h-3 w-3 shrink-0">
           {isSearching && (
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
           )}
           <span
-            className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+            className={`relative inline-flex rounded-full h-3 w-3 border border-black ${
               isSearching
-                ? 'bg-amber-500'
+                ? 'bg-amber-400'
                 : currentIdx >= 3
                 ? 'bg-emerald-500'
-                : 'bg-indigo-500'
+                : 'bg-sky-400'
             }`}
           />
         </span>
-        <span className="font-medium text-zinc-900">
+        <span className="font-bold text-black">
           {normStatus === 'SEARCHING_DRIVER'
             ? 'Searching for driver…'
             : normStatus === 'DRIVER_NOTIFIED'
@@ -121,7 +121,7 @@ export function DispatchProgress({
             : normStatus.replace(/_/g, ' ')}
         </span>
         {etaText && (
-          <span className="font-mono text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+          <span className="font-mono text-[11px] font-black text-black bg-amber-300 px-2 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
             ETA: {etaText}
           </span>
         )}
@@ -130,32 +130,32 @@ export function DispatchProgress({
   }
 
   return (
-    <div className={`p-4 bg-white border border-zinc-200 rounded-lg space-y-3 ${className}`}>
+    <div className={`p-4 bg-white border-[2.5px] border-black rounded-xl space-y-3.5 shadow-[4px_4px_0px_0px_#000] ${className}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {normStatus === 'SEARCHING_DRIVER' ? (
-            <span className="relative flex h-3 w-3">
+            <span className="relative flex h-3.5 w-3.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 border border-black bg-amber-400" />
             </span>
           ) : (
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
+              className={`w-3 h-3 rounded-full border border-black ${
                 currentIdx >= 4
-                  ? 'bg-emerald-600'
+                  ? 'bg-emerald-500'
                   : currentIdx >= 2
-                  ? 'bg-indigo-600'
-                  : 'bg-zinc-400'
+                  ? 'bg-sky-400'
+                  : 'bg-zinc-300'
               }`}
             />
           )}
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+          <span className="text-xs font-black uppercase tracking-wider text-black">
             Dispatch Status
           </span>
         </div>
         <div className="flex items-center gap-2">
           {etaText && (
-            <span className="text-xs font-mono font-medium text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+            <span className="text-xs font-mono font-black text-black bg-amber-300 px-2 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
               ETA: {etaText}
             </span>
           )}
@@ -164,7 +164,7 @@ export function DispatchProgress({
       </div>
 
       {/* Visual step timeline */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-2 border-t border-zinc-100">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-2 border-t-2 border-black/15">
         {STEPS.map((step, idx) => {
           const stepTargetIdx = stepOrder.indexOf(step.key);
           const isDone = currentIdx > stepTargetIdx;
@@ -173,26 +173,26 @@ export function DispatchProgress({
           return (
             <div
               key={step.key}
-              className={`p-2 rounded border transition-colors ${
+              className={`p-2 rounded-lg border-2 border-black transition-all ${
                 isCurrent
                   ? isCurrent && step.key === 'SEARCHING_DRIVER'
-                    ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold'
-                    : 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold'
+                    ? 'bg-amber-300 text-black font-extrabold shadow-[2px_2px_0px_0px_#000]'
+                    : 'bg-sky-300 text-black font-extrabold shadow-[2px_2px_0px_0px_#000]'
                   : isDone
-                  ? 'bg-zinc-50 border-zinc-200 text-zinc-700'
-                  : 'bg-zinc-50/50 border-zinc-100 text-zinc-400'
+                  ? 'bg-emerald-300 text-black font-bold shadow-[2px_2px_0px_0px_#000]'
+                  : 'bg-zinc-100 text-zinc-500 font-medium'
               }`}
             >
               <div className="flex items-center gap-1.5 text-[11px]">
                 <span
-                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 font-bold ${
+                  className={`w-4 h-4 rounded-md border border-black flex items-center justify-center text-[10px] shrink-0 font-black ${
                     isCurrent
                       ? step.key === 'SEARCHING_DRIVER'
-                        ? 'bg-amber-500 text-white animate-pulse'
-                        : 'bg-indigo-600 text-white'
+                        ? 'bg-black text-white animate-pulse'
+                        : 'bg-black text-white'
                       : isDone
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-zinc-200 text-zinc-500'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black'
                   }`}
                 >
                   {isDone ? '✓' : idx + 1}

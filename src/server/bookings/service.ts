@@ -1,10 +1,11 @@
-import { Prisma, BookingStatus, VehicleStatus, DriverStatus } from '@prisma/client';
+import { Prisma, BookingStatus, VehicleStatus, DriverStatus, OfferStatus, DriverSessionStatus, TripStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
 import { logAuditEvent } from '@/server/audit';
 import { notify, notifyAdmins } from '@/server/notifications/service';
 import { AuthenticatedUser } from '@/lib/auth-guard';
 import { publishEvent } from '@/server/realtime/hub';
+import { endTrip } from '@/server/trips/service';
 
 export interface BookingMutationContext {
   actorUserId?: string | null;
@@ -31,6 +32,7 @@ export interface CreateBookingInput {
 }
 
 export interface BookingQueryFilters {
+  driverWorkflow?: boolean;
   page?: number;
   limit?: number;
   userId?: string;
@@ -111,6 +113,33 @@ export async function assertVehicleAvailableForWindow(
       `Vehicle is already reserved for an overlapping time window by booking ${conflict.bookingNumber}`
     );
   }
+}
+
+export async function lockAssignmentDriver(
+  tx: Prisma.TransactionClient,
+  driverId: string,
+  requestedVehicleId?: string | null
+) {
+  const include = { user: true, sessions: { where: { status: DriverSessionStatus.ACTIVE }, take: 1 } } as const;
+  const snapshot = await tx.driver.findUnique({ where: { id: driverId }, include });
+  if (!snapshot) throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver not found');
+  const vehicleId = requestedVehicleId ?? snapshot.sessions[0]?.vehicleId ?? snapshot.currentVehicleId;
+  // Match the vehicle-first lock order used by assignments and trips.
+  if (vehicleId) {
+    await tx.$queryRawUnsafe('SELECT id FROM vehicles WHERE id = $1 FOR UPDATE', vehicleId);
+  }
+  await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', driverId);
+  const driver = await tx.driver.findUniqueOrThrow({ where: { id: driverId }, include });
+  if (requestedVehicleId && driver.currentVehicleId && driver.currentVehicleId !== requestedVehicleId) {
+    if (driver.status === DriverStatus.ON_TRIP) {
+      throw new ApiError(409, 'DRIVER_BUSY', 'Driver is currently on an active trip with another vehicle');
+    }
+  }
+  const currentVehicleId = requestedVehicleId ?? driver.sessions[0]?.vehicleId ?? driver.currentVehicleId;
+  if (currentVehicleId !== vehicleId) {
+    throw new ApiError(409, 'ASSIGNMENT_CHANGED', 'Driver vehicle changed during assignment; please retry');
+  }
+  return { driver, vehicleId };
 }
 
 // Generates human-readable booking numbers: BK-{YYYY}-{0001}
@@ -254,6 +283,13 @@ export async function createBooking(
   return created;
 }
 
+const bookingMutationInclude = {
+  user: { select: { id: true, name: true, email: true, phone: true } },
+  vehicle: true,
+  driver: { include: { user: { select: { id: true, name: true, email: true, phone: true } } } },
+  operationalLocation: true,
+} satisfies Prisma.BookingInclude;
+
 export async function transitionBooking(
   bookingId: string,
   to: BookingStatus,
@@ -298,11 +334,9 @@ export async function transitionBooking(
         to === BookingStatus.CANCELLED)) ||
     (from === BookingStatus.DRIVER_ASSIGNED &&
       (to === BookingStatus.DRIVER_EN_ROUTE ||
-        to === BookingStatus.IN_PROGRESS ||
         to === BookingStatus.CANCELLED)) ||
     (from === BookingStatus.DRIVER_EN_ROUTE &&
       (to === BookingStatus.ARRIVED ||
-        to === BookingStatus.IN_PROGRESS ||
         to === BookingStatus.CANCELLED)) ||
     (from === BookingStatus.ARRIVED &&
       (to === BookingStatus.IN_PROGRESS || to === BookingStatus.CANCELLED)) ||
@@ -316,7 +350,9 @@ export async function transitionBooking(
     throw new ApiError(
       409,
       'INVALID_TRANSITION',
-      `Cannot transition booking from ${from} to ${to}`
+      to === BookingStatus.CANCELLED && from === BookingStatus.IN_PROGRESS
+        ? 'Cannot cancel an in-progress booking; abort or end its trip first'
+        : `Cannot transition booking from ${from} to ${to}`
     );
   }
 
@@ -336,19 +372,49 @@ export async function transitionBooking(
       throw new ApiError(403, 'FORBIDDEN', 'Only the booking owner or an administrator can cancel this booking');
     }
   } else if (
+    to === BookingStatus.SEARCHING_DRIVER ||
+    to === BookingStatus.DRIVER_NOTIFIED ||
+    to === BookingStatus.NO_DRIVER_AVAILABLE ||
+    to === BookingStatus.ADMIN_INTERVENTION
+  ) {
+    if (actor.role !== 'ADMIN') {
+      throw new ApiError(403, 'FORBIDDEN', 'Only administrators can update dispatch status');
+    }
+  } else if (
     to === BookingStatus.DRIVER_EN_ROUTE ||
     to === BookingStatus.ARRIVED ||
     to === BookingStatus.IN_PROGRESS ||
     to === BookingStatus.COMPLETED
   ) {
     if (!booking.driverId) {
-      throw new ApiError(400, 'NO_DRIVER_ASSIGNED', 'Cannot start trip without an assigned driver');
+      throw new ApiError(409, 'ACTIVE_TRIP_REQUIRED', 'Start the matching trip before updating booking progress');
     }
-    const isAssignedDriver =
-      booking.driver?.userId === actor.id || booking.driver?.id === actor.id;
+    const isAssignedDriver = actor.role === 'DRIVER' && booking.driver?.userId === actor.id;
     if (!isAssignedDriver && actor.role !== 'ADMIN') {
       throw new ApiError(403, 'FORBIDDEN', 'Only the assigned driver can update trip progress');
     }
+  }
+
+  if (to === BookingStatus.COMPLETED) {
+    const trip = booking.driverId && booking.vehicleId
+      ? await prisma.trip.findFirst({
+          where: { bookingId, driverId: booking.driverId, vehicleId: booking.vehicleId, status: TripStatus.ACTIVE },
+        })
+      : null;
+    if (!trip) {
+      throw new ApiError(409, 'ACTIVE_TRIP_REQUIRED', 'Booking has no matching active trip to complete');
+    }
+    // endTrip owns the booking/vehicle/driver/trip locks and lifecycle side effects.
+    await endTrip(trip.driverId, trip.id, {}, { ...ctx, actorUserId: ctx?.actorUserId ?? actor.id });
+    await logAuditEvent({
+      actorUserId: ctx?.actorUserId ?? actor.id, action: 'booking.completed',
+      entityType: 'Booking', entityId: bookingId, oldValue: { status: from },
+      newValue: { status: BookingStatus.COMPLETED, driverId: trip.driverId },
+      ip: ctx?.ip, userAgent: ctx?.userAgent,
+    });
+    const completed = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId }, include: bookingMutationInclude });
+    await publishEvent({ type: 'booking:update', data: { bookingId, status: completed.status, userId: completed.userId } });
+    return completed;
   }
 
   // 3. Execute transition in transaction
@@ -371,6 +437,25 @@ export async function transitionBooking(
       );
     }
 
+    if (
+      to === BookingStatus.DRIVER_EN_ROUTE ||
+      to === BookingStatus.ARRIVED ||
+      to === BookingStatus.IN_PROGRESS
+    ) {
+      if (!booking.vehicleId || !booking.driverId) {
+        throw new ApiError(409, 'ACTIVE_TRIP_REQUIRED', 'Start the matching trip before updating booking progress');
+      }
+      await tx.$queryRawUnsafe('SELECT id FROM vehicles WHERE id = $1 FOR UPDATE', booking.vehicleId);
+      await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', booking.driverId);
+      const trips = await tx.$queryRawUnsafe<Array<{ id: string }>>(
+        "SELECT id FROM trips WHERE booking_id = $1 AND vehicle_id = $2 AND driver_id = $3 AND status = 'ACTIVE' FOR UPDATE",
+        bookingId, booking.vehicleId, booking.driverId
+      );
+      if (!trips.length) {
+        throw new ApiError(409, 'ACTIVE_TRIP_REQUIRED', 'Start the matching trip before updating booking progress');
+      }
+    }
+
     if (to === BookingStatus.APPROVED) {
       if (booking.vehicleId) {
         await assertVehicleAvailableForWindow(
@@ -390,7 +475,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.APPROVED },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -401,7 +486,7 @@ export async function transitionBooking(
           status: BookingStatus.REJECTED,
           rejectedReason: payload?.reason ?? null,
         },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -409,7 +494,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.SEARCHING_DRIVER },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -417,7 +502,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.DRIVER_NOTIFIED },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -425,7 +510,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.DRIVER_EN_ROUTE },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -433,7 +518,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.ARRIVED },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -441,7 +526,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -449,7 +534,7 @@ export async function transitionBooking(
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.ADMIN_INTERVENTION },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -458,16 +543,15 @@ export async function transitionBooking(
         throw new ApiError(400, 'DRIVER_REQUIRED', 'driverId is required for driver assignment');
       }
 
-      const driver = await tx.driver.findUnique({
-        where: { id: payload.driverId },
-        include: { user: true },
-      });
+      const { driver, vehicleId: targetVehicleId } = await lockAssignmentDriver(
+        tx, payload.driverId, payload.vehicleId ?? booking.vehicleId ?? booking.vehiclePreferenceId
+      );
 
       if (!driver) {
         throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver not found');
       }
 
-      if (driver.status !== DriverStatus.AVAILABLE) {
+      if (!driver.user.isActive || driver.status !== DriverStatus.AVAILABLE) {
         throw new ApiError(
           409,
           'DRIVER_UNAVAILABLE',
@@ -503,7 +587,9 @@ export async function transitionBooking(
         );
       }
 
-      const targetVehicleId = payload.vehicleId ?? booking.vehicleId;
+      if (!targetVehicleId) {
+        throw new ApiError(409, 'NO_VEHICLE_ASSIGNED', 'No vehicle assigned to driver or booking');
+      }
 
       // Check vehicle availability and active assignment conflict
       if (targetVehicleId) {
@@ -516,6 +602,13 @@ export async function transitionBooking(
           false
         );
 
+        const vehicle = await tx.vehicle.findUniqueOrThrow({ where: { id: targetVehicleId } });
+        if (vehicle.seatingCapacity < booking.passengerCount) {
+          throw new ApiError(409, 'INSUFFICIENT_CAPACITY', 'Vehicle has insufficient passenger capacity');
+        }
+        if (vehicle.currentDriverId && vehicle.currentDriverId !== driver.id) {
+          throw new ApiError(409, 'VEHICLE_ALREADY_ASSIGNED', 'Vehicle is assigned to another driver');
+        }
         const openVehicleAssignment = await tx.vehicleAssignment.findFirst({
           where: { vehicleId: targetVehicleId, unassignedAt: null },
         });
@@ -537,6 +630,10 @@ export async function transitionBooking(
         });
       }
 
+      await tx.bookingOffer.updateMany({
+        where: { bookingId, status: OfferStatus.SENT },
+        data: { status: OfferStatus.CANCELLED, respondedAt: new Date() },
+      });
       return tx.booking.update({
         where: { id: bookingId },
         data: {
@@ -544,36 +641,62 @@ export async function transitionBooking(
           driverId: payload.driverId,
           ...(targetVehicleId ? { vehicleId: targetVehicleId } : {}),
         },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
     if (to === BookingStatus.IN_PROGRESS) {
-      // Phase 4 note: Vehicle status -> IN_USE transition belongs to live trip session
+
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.IN_PROGRESS },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
-    if (to === BookingStatus.COMPLETED) {
-      // Phase 4 note: COMPLETED clears nothing yet (trip record Phase 4 owns vehicle status)
-      return tx.booking.update({
-        where: { id: bookingId },
-        data: { status: BookingStatus.COMPLETED },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
-      });
-    }
 
     if (to === BookingStatus.CANCELLED) {
+      if (booking.vehicleId) {
+        await tx.$queryRawUnsafe('SELECT id FROM vehicles WHERE id = $1 FOR UPDATE', booking.vehicleId);
+      }
+      const activeTrip = await tx.trip.findFirst({ where: { bookingId, status: TripStatus.ACTIVE } });
+      if (activeTrip) {
+        throw new ApiError(409, 'ACTIVE_TRIP_EXISTS', 'Abort or end the active trip before cancelling this booking');
+      }
+      if (booking.vehicleId) {
+        const vehicle = await tx.vehicle.findUniqueOrThrow({ where: { id: booking.vehicleId } });
+        const standingAssignment = await tx.vehicleAssignment.findFirst({
+          where: { vehicleId: booking.vehicleId, unassignedAt: null },
+        });
+        const committedBooking = await tx.booking.findFirst({
+          where: {
+            vehicleId: booking.vehicleId, id: { not: bookingId },
+            status: { in: [BookingStatus.APPROVED, BookingStatus.DRIVER_ASSIGNED, BookingStatus.DRIVER_EN_ROUTE, BookingStatus.ARRIVED, BookingStatus.IN_PROGRESS] },
+          },
+        });
+        const vehicleTrip = await tx.trip.findFirst({ where: { vehicleId: booking.vehicleId, status: TripStatus.ACTIVE } });
+        if (
+          vehicle.status === VehicleStatus.RESERVED &&
+          (!vehicle.currentDriverId || vehicle.currentDriverId === booking.driverId) &&
+          !standingAssignment && !committedBooking && !vehicleTrip
+        ) {
+          await tx.vehicle.updateMany({
+            where: { id: booking.vehicleId, status: VehicleStatus.RESERVED },
+            data: { status: VehicleStatus.AVAILABLE },
+          });
+        }
+      }
+      await tx.bookingOffer.updateMany({
+        where: { bookingId, status: OfferStatus.SENT },
+        data: { status: OfferStatus.CANCELLED, respondedAt: new Date() },
+      });
       return tx.booking.update({
         where: { id: bookingId },
         data: {
           status: BookingStatus.CANCELLED,
           cancelledReason: payload?.reason ?? null,
         },
-        include: { user: true, vehicle: true, driver: { include: { user: true } }, operationalLocation: true },
+        include: bookingMutationInclude,
       });
     }
 
@@ -683,19 +806,7 @@ export async function transitionBooking(
       body: `Booking ${updated.bookingNumber} is now in progress`,
       data: { bookingId: updated.id },
     });
-  } else if (to === BookingStatus.COMPLETED) {
-    await notify(updated.userId, {
-      type: 'BOOKING_COMPLETED',
-      title: 'Trip Completed',
-      body: `Your trip for booking ${updated.bookingNumber} has been completed`,
-      data: { bookingId: updated.id },
-    });
-    await notifyAdmins({
-      type: 'BOOKING_COMPLETED',
-      title: 'Trip Completed',
-      body: `Booking ${updated.bookingNumber} has been completed`,
-      data: { bookingId: updated.id },
-    });
+
   }
 
   await publishEvent({
@@ -723,6 +834,9 @@ export async function listBookings(
   // Role gating: regular users only see their own bookings
   if (actor.role === 'USER') {
     where.userId = actor.id;
+  } else if (actor.role === 'DRIVER') {
+    where.OR = [{ userId: actor.id }, { driver: { userId: actor.id } }];
+    if (filters.userId) where.userId = filters.userId;
   } else if (filters.userId) {
     where.userId = filters.userId;
   }
@@ -731,7 +845,10 @@ export async function listBookings(
     where.vehicleId = filters.vehicleId;
   }
 
-  if (filters.status) {
+  if (filters.driverWorkflow && actor.role === 'DRIVER') {
+    where.driver = { userId: actor.id };
+    where.status = { in: [BookingStatus.APPROVED, BookingStatus.DRIVER_ASSIGNED, BookingStatus.DRIVER_EN_ROUTE, BookingStatus.ARRIVED, BookingStatus.IN_PROGRESS] };
+  } else if (filters.status) {
     where.status = filters.status;
   }
 

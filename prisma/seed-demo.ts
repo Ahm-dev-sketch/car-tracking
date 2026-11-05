@@ -29,11 +29,11 @@ async function main() {
   const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   const halim = await location('Halim', '102');
-  const karawang201 = await location('Karawang', '201');
   const karawang202 = await location('Karawang', '202');
+  const karawang204 = await location('Karawang', '204');
   const padalarang = await location('Padalarang', '802');
   const tegalluarStation = await location('Tegalluar Station', '402');
-  const tegalluarDepot = await location('Tegalluar Depot', '202');
+  const tegalluarDepo = await location('Tegalluar Depo', '502');
 
   // ---------- Admin ----------
   const admin = await prisma.user.upsert({
@@ -91,7 +91,7 @@ async function main() {
         vehicleType: VehicleType.MPV,
         seatingCapacity: 7,
         transmission: Transmission.AUTOMATIC,
-        home: karawang201,
+        home: karawang202,
         status: VehicleStatus.AVAILABLE,
       },
     },
@@ -148,6 +148,7 @@ async function main() {
         homeLocationId: spec.vehicle.home.id,
         currentLocationId: spec.vehicle.home.id,
         status: spec.vehicle.status,
+        currentDriverId: null,
       },
       create: {
         plateNumber: spec.vehicle.plateNumber,
@@ -159,30 +160,35 @@ async function main() {
         homeLocationId: spec.vehicle.home.id,
         currentLocationId: spec.vehicle.home.id,
         status: spec.vehicle.status,
+        currentDriverId: null,
       },
     });
 
-    const driver = await prisma.driver.upsert({
+    await prisma.driver.upsert({
       where: { userId: user.id },
       update: {
         licenseNumber: spec.license,
-        status: DriverStatus.AVAILABLE,
-        currentVehicleId: vehicle.id,
+        status: DriverStatus.OFFLINE,
+        currentVehicleId: null,
       },
       create: {
         userId: user.id,
         licenseNumber: spec.license,
-        status: DriverStatus.AVAILABLE,
-        currentVehicleId: vehicle.id,
+        status: DriverStatus.OFFLINE,
+        currentVehicleId: null,
       },
     });
-
-    // Keep vehicle.currentDriverId mirror consistent
-    await prisma.vehicle.update({
-      where: { id: vehicle.id },
-      data: { currentDriverId: driver.id },
-    });
   }
+
+  // Close any open standing vehicle assignments or stale active sessions
+  await prisma.vehicleAssignment.updateMany({
+    where: { unassignedAt: null },
+    data: { unassignedAt: new Date(), reason: 'Demo seed: reset to vehicle pool' },
+  });
+  await prisma.driverSession.updateMany({
+    where: { status: 'ACTIVE' },
+    data: { status: 'ENDED', endedAt: new Date() },
+  });
 
   // ---------- Extra vehicles (assigned home locations, no driver yet) ----------
   const extraVehicles = [
@@ -193,7 +199,7 @@ async function main() {
       vehicleType: VehicleType.MPV,
       seatingCapacity: 7,
       transmission: Transmission.AUTOMATIC,
-      home: karawang202,
+      home: karawang204,
       status: VehicleStatus.AVAILABLE,
     },
     {
@@ -203,7 +209,7 @@ async function main() {
       vehicleType: VehicleType.VAN,
       seatingCapacity: 6,
       transmission: Transmission.MANUAL,
-      home: tegalluarDepot,
+      home: tegalluarDepo,
       status: VehicleStatus.MAINTENANCE,
     },
     {
@@ -225,6 +231,7 @@ async function main() {
         homeLocationId: v.home.id,
         currentLocationId: v.home.id,
         status: v.status,
+        currentDriverId: null,
       },
       create: {
         plateNumber: v.plateNumber,
@@ -236,6 +243,7 @@ async function main() {
         homeLocationId: v.home.id,
         currentLocationId: v.home.id,
         status: v.status,
+        currentDriverId: null,
       },
     });
   }

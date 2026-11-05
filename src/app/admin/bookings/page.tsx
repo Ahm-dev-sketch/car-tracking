@@ -374,7 +374,7 @@ function AdminBookingsContent() {
               <button
                 type="button"
                 onClick={() => handleOpenIntervention(b)}
-                className="px-2 py-1 text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white rounded cursor-pointer"
+                className="px-2.5 py-1 text-xs font-black bg-amber-400 hover:bg-amber-500 text-zinc-950 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
               >
                 Assign
               </button>
@@ -382,7 +382,7 @@ function AdminBookingsContent() {
             <button
               type="button"
               onClick={() => setSelectedBooking(b)}
-              className="px-2 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+              className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
             >
               Details
             </button>
@@ -390,7 +390,7 @@ function AdminBookingsContent() {
               <button
                 type="button"
                 onClick={() => setCancellingBooking(b)}
-                className="px-2 py-1 text-xs font-medium text-rose-700 border border-rose-200 rounded hover:bg-rose-50 cursor-pointer"
+                className="px-2.5 py-1 text-xs font-black text-rose-700 bg-rose-50 border-2 border-black rounded-lg hover:bg-rose-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
               >
                 Cancel
               </button>
@@ -404,10 +404,10 @@ function AdminBookingsContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900">Reservations & Dispatch</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Reservations & Dispatch</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">
             Monitor auto-dispatch states, operational locations, and admin intervention escalations
           </p>
         </div>
@@ -416,16 +416,16 @@ function AdminBookingsContent() {
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
       {/* Filter and quick selection bar */}
-      <div className="bg-white p-3.5 rounded-lg border border-zinc-200 flex flex-wrap items-center justify-between gap-3">
+      <div className="surface p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {/* Quick filter pills */}
           <button
             type="button"
             onClick={() => setStatusFilter('')}
-            className={`px-2.5 py-1 text-xs rounded font-medium border cursor-pointer ${
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
               statusFilter === ''
-                ? 'bg-zinc-900 text-white border-zinc-900'
-                : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                ? 'bg-zinc-950 text-white shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-900 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
             }`}
           >
             All
@@ -433,10 +433,10 @@ function AdminBookingsContent() {
           <button
             type="button"
             onClick={() => setStatusFilter('ADMIN_INTERVENTION')}
-            className={`px-2.5 py-1 text-xs rounded font-bold border cursor-pointer ${
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
               statusFilter === 'ADMIN_INTERVENTION'
-                ? 'bg-orange-600 text-white border-orange-600'
-                : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
+                ? 'bg-amber-400 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-amber-100 text-zinc-950 shadow-[1px_1px_0px_0px_#000] hover:bg-amber-200'
             }`}
           >
             ⚠️ Intervention Required
@@ -444,10 +444,10 @@ function AdminBookingsContent() {
           <button
             type="button"
             onClick={() => setStatusFilter('SEARCHING_DRIVER')}
-            className={`px-2.5 py-1 text-xs rounded font-medium border cursor-pointer ${
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
               statusFilter === 'SEARCHING_DRIVER'
-                ? 'bg-amber-600 text-white border-amber-600'
-                : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                ? 'bg-amber-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
             }`}
           >
             Searching
@@ -455,10 +455,10 @@ function AdminBookingsContent() {
           <button
             type="button"
             onClick={() => setStatusFilter('IN_PROGRESS')}
-            className={`px-2.5 py-1 text-xs rounded font-medium border cursor-pointer ${
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
               statusFilter === 'IN_PROGRESS'
-                ? 'bg-emerald-600 text-white border-emerald-600'
-                : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                ? 'bg-emerald-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
             }`}
           >
             In Progress
@@ -468,11 +468,11 @@ function AdminBookingsContent() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Operational Hub filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-zinc-500">Hub:</span>
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              className="px-2.5 py-1 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
               <option value="">All Hubs</option>
               {locations.map((loc) => (
@@ -485,11 +485,11 @@ function AdminBookingsContent() {
 
           {/* Status dropdown */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-zinc-500">Status:</span>
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              className="px-2.5 py-1 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
               <option value="">All Statuses</option>
               <option value="SEARCHING_DRIVER">Searching Driver</option>

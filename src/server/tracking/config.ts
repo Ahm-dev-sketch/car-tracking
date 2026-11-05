@@ -1,7 +1,7 @@
 export const TRACKING_CONFIG = {
   tripIntervalSec: 5,
   idleIntervalSec: 20,
-  accuracyCapTripM: 100,
+  accuracyCapTripM: 250,
   accuracyCapIdleM: 250,
   maxFutureSkewSec: 60,
   maxStaleMultiplier: 2,

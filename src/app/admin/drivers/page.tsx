@@ -382,7 +382,7 @@ function AdminDriversContent() {
             <button
               type="button"
               onClick={() => handleOpenAssign(d)}
-              className="px-2 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+              className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
             >
               Assign
             </button>
@@ -396,7 +396,7 @@ function AdminDriversContent() {
               setEditStatus(d.status);
               setEditError(null);
             }}
-            className="px-2 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
           >
             Edit
           </button>
@@ -405,7 +405,7 @@ function AdminDriversContent() {
             <button
               type="button"
               onClick={() => setDeactivatingDriver(d)}
-              className="px-2 py-1 text-xs font-medium text-rose-700 border border-rose-200 rounded hover:bg-rose-50 cursor-pointer"
+              className="px-2.5 py-1 text-xs font-black text-rose-700 bg-rose-50 border-2 border-black rounded-lg hover:bg-rose-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
             >
               Deactivate
             </button>
@@ -417,10 +417,10 @@ function AdminDriversContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900">Drivers Directory</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">Manage drivers, licenses, and duty assignments</p>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Drivers Directory</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">Manage drivers, licenses, and duty assignments</p>
         </div>
         <button
           type="button"
@@ -428,7 +428,7 @@ function AdminDriversContent() {
             setIsAddOpen(true);
             setAddError(null);
           }}
-          className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+          className="button-primary cursor-pointer inline-flex items-center gap-1.5"
         >
           <span>+ Add Driver</span>
         </button>
@@ -437,27 +437,27 @@ function AdminDriversContent() {
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
       {/* Filter and Search */}
-      <div className="bg-white p-3 rounded-lg border border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="surface p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
         <form onSubmit={(e) => { e.preventDefault(); fetchDrivers(1); }} className="w-full sm:w-80 flex gap-2">
           <input
             type="text"
             placeholder="Search driver name, license, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
           />
-          <button type="submit" className="px-3 py-1.5 bg-zinc-900 text-white rounded text-xs font-semibold">
+          <button type="submit" className="button-primary px-3 py-1.5 text-xs font-black">
             Search
           </button>
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-zinc-500">Hub:</span>
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
               <option value="">All Hubs</option>
               {locations.map((loc) => (
@@ -469,11 +469,11 @@ function AdminDriversContent() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-zinc-500">Status:</span>
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
               <option value="">All Statuses</option>
               <option value="AVAILABLE">Available</option>

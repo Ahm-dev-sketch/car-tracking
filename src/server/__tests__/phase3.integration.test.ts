@@ -30,6 +30,7 @@ import {
   BookingStatus,
 } from '@prisma/client';
 import { AuthenticatedUser } from '@/lib/auth-guard';
+import { startTrip, arriveTrip } from '@/server/trips/service';
 
 describe('Phase 3 PostgreSQL Integration Tests', () => {
   let adminActor: AuthenticatedUser;
@@ -442,6 +443,8 @@ describe('Phase 3 PostgreSQL Integration Tests', () => {
       undefined,
       { driverId: driver1Id }
     );
+    const trip = await startTrip(driver1Id, { bookingId: b2.id, startLat: 21, startLng: 105 });
+    await arriveTrip(driver1UserActor, trip.id);
     await transitionBooking(
       b2.id,
       BookingStatus.IN_PROGRESS,

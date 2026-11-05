@@ -8,6 +8,7 @@ import {
   startTrip,
   endTrip,
   abortTrip,
+  arriveTrip,
 } from '@/server/trips/service';
 import {
   ingestLocations,
@@ -274,7 +275,7 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
     );
   });
 
-  it('3. endTrip resets: booking COMPLETED, vehicle AVAILABLE, driver AVAILABLE, mirrors kept', async () => {
+  it('3. endTrip completes booking, ends session, preserves reserved assignment mirrors', async () => {
     const booking = await createBooking(userActor.id, {
       vehicleId: vehicle1Id,
       pickupLocation: 'Hanoi',
@@ -299,6 +300,8 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
       startLng: 105.8542,
     });
 
+    await arriveTrip(driver1UserActor, trip.id);
+    await transitionBooking(booking.id, BookingStatus.IN_PROGRESS, driver1UserActor);
     const ended = await endTrip(driver1Id, trip.id, {
       endLat: 20.8449,
       endLng: 106.6881,
@@ -317,15 +320,16 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
     const updatedVehicle = await prisma.vehicle.findUniqueOrThrow({
       where: { id: vehicle1Id },
     });
-    expect(updatedVehicle.status).toBe(VehicleStatus.AVAILABLE);
+    expect(updatedVehicle.status).toBe(VehicleStatus.RESERVED);
     // Denormalized mirror kept until explicit unassign
     expect(updatedVehicle.currentDriverId).toBe(driver1Id);
 
     const updatedDriver = await prisma.driver.findUniqueOrThrow({
       where: { id: driver1Id },
     });
-    expect(updatedDriver.status).toBe(DriverStatus.AVAILABLE);
+    expect(updatedDriver.status).toBe(DriverStatus.OFFLINE);
     expect(updatedDriver.currentVehicleId).toBe(vehicle1Id);
+    expect(await prisma.driverSession.count({ where: { driverId: driver1Id, status: 'ACTIVE' } })).toBe(0);
   });
 
   it('4. ingest happy path: current location upserted, history row inserted, movement MOVING when speed > 2', async () => {
@@ -381,7 +385,7 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
       {
         lat: 21.0,
         lng: 105.8,
-        accuracyM: 150, // exceeds trip cap 100m
+        accuracyM: 300, // exceeds trip cap 250m
         recordedAt: new Date(now),
       },
       {

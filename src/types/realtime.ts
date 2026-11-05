@@ -38,6 +38,8 @@ export interface OfferEventData {
   pickupLocation: string;
   destination: string;
   expiresAt: string;
+  driverId?: string;
+  driverUserId?: string;
 }
 
 export type ServerRealtimeEvent =

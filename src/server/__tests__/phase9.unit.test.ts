@@ -111,7 +111,7 @@ describe('Phase 9 Unit Tests: Dispatch Engine Logic', () => {
   });
 
   it('9. dispatch config values match specifications', () => {
-    expect(DISPATCH_CONFIG.offerTimeoutSec).toBe(30);
+    expect(DISPATCH_CONFIG.offerTimeoutSec).toBe(60);
     expect(DISPATCH_CONFIG.overallTimeoutSec).toBe(480);
     expect(DISPATCH_CONFIG.maxAttempts).toBe(8);
     expect(DISPATCH_CONFIG.crossLocationDispatch).toBe(false);

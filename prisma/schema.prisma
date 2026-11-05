@@ -346,22 +346,26 @@ model DriverLocation {
 }
 
 model BookingOffer {
-  id           String      @id @default(cuid())
-  bookingId    String      @map("booking_id")
-  booking      Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  driverId     String      @map("driver_id")
-  driver       Driver      @relation(fields: [driverId], references: [id], onDelete: Restrict)
-  attemptNo    Int         @map("attempt_no")
-  status       OfferStatus @default(SENT)
-  sentAt       DateTime    @default(now()) @map("sent_at")
-  expiresAt    DateTime    @map("expires_at")
-  respondedAt  DateTime?   @map("responded_at")
-  rank         Int
-  etaSeconds   Int?        @map("eta_seconds")
-  etaEstimated Boolean     @default(false) @map("eta_estimated")
+  id              String       @id @default(cuid())
+  bookingId       String       @map("booking_id")
+  booking         Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  driverId        String       @map("driver_id")
+  driver          Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  attemptNo       Int          @map("attempt_no")
+  roundNo         Int          @default(1) @map("round_no")
+  status          OfferStatus  @default(SENT)
+  sentAt          DateTime     @default(now()) @map("sent_at")
+  expiresAt       DateTime     @map("expires_at")
+  respondedAt     DateTime?    @map("responded_at")
+  cooldownUntil   DateTime?    @map("cooldown_until")
+  rejectionReason String?      @map("rejection_reason")
+  rank            Int
+  etaSeconds      Int?         @map("eta_seconds")
+  etaEstimated    Boolean      @default(false) @map("eta_estimated")
 
   @@index([bookingId, attemptNo])
-  @@index([driverId, status])
+  @@index([bookingId, status])
+  @@index([driverId, status, cooldownUntil])
   @@index([status, expiresAt])
   @@map("booking_offers")
 }

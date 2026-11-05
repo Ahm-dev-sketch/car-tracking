@@ -255,7 +255,7 @@ export default function AdminUsersPage() {
               setNewPassword('');
               setResetError(null);
             }}
-            className="px-2 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
           >
             Reset Password
           </button>
@@ -263,10 +263,10 @@ export default function AdminUsersPage() {
           <button
             type="button"
             onClick={() => setTogglingUser(u)}
-            className={`px-2 py-1 text-xs font-medium rounded border cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-black rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer ${
               u.isActive
-                ? 'text-rose-700 border-rose-200 hover:bg-rose-50'
-                : 'text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                ? 'text-rose-700 bg-rose-50 hover:bg-rose-100'
+                : 'text-emerald-950 bg-emerald-200 hover:bg-emerald-300'
             }`}
           >
             {u.isActive ? 'Deactivate' : 'Activate'}
@@ -278,15 +278,15 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900">User Management</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">Control employee and system user accounts, roles, and credentials</p>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">User Management</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">Control employee and system user accounts, roles, and credentials</p>
         </div>
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+          className="button-primary cursor-pointer inline-flex items-center gap-1.5"
         >
           <span>+ Create User</span>
         </button>
@@ -295,16 +295,16 @@ export default function AdminUsersPage() {
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
       {/* Search */}
-      <div className="bg-white p-3 rounded-lg border border-zinc-200 flex items-center justify-between gap-3">
+      <div className="surface p-4 flex items-center justify-between gap-3">
         <form onSubmit={(e) => { e.preventDefault(); fetchUsers(1); }} className="w-full sm:w-80 flex gap-2">
           <input
             type="text"
             placeholder="Search user name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
           />
-          <button type="submit" className="px-3 py-1.5 bg-zinc-900 text-white rounded text-xs font-semibold">
+          <button type="submit" className="button-primary px-3 py-1.5 text-xs font-black">
             Search
           </button>
         </form>

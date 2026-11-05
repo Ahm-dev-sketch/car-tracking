@@ -1,3 +1,9 @@
+try {
+  process.loadEnvFile();
+} catch {
+  // Ignore if .env not present or already loaded
+}
+
 import { createRealtimeServer } from './realtime-dev-core.mjs';
 
 const port = parseInt(process.env.PORT || '3001', 10);

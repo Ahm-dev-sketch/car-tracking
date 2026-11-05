@@ -1,19 +1,25 @@
 import { prisma } from '@/lib/prisma';
+import { ensureVehicleAssignment } from '@/server/assignments/service';
 import { ApiError } from '@/lib/errors';
 import { logAuditEvent } from '@/server/audit';
 import { notify, notifyAdmins } from '@/server/notifications/service';
 import { publishEvent } from '@/server/realtime/hub';
 import { haversineDistanceMeters } from '@/server/tracking/service';
 import { TRACKING_CONFIG } from '@/server/tracking/config';
-import { assertVehicleAvailableForWindow } from '@/server/bookings/service';
-import { DISPATCH_CONFIG } from './config';
+import { assertVehicleAvailableForWindow, lockAssignmentDriver } from '@/server/bookings/service';
+import { DISPATCH_CONFIG, computeDriverCooldown } from './config';
 import {
+  Prisma,
   BookingStatus,
   OfferStatus,
   DriverSessionStatus,
   DriverStatus,
   VehicleStatus,
+  TripStatus,
+  MovementStatus,
 } from '@prisma/client';
+
+const publicUserSelect = { id: true, name: true, email: true, phone: true } satisfies Prisma.UserSelect;
 
 export interface DispatchMutationContext {
   actorUserId?: string | null;
@@ -123,7 +129,7 @@ export async function findEligibleCandidates(
     });
 
     let isAvailable = false;
-    if (prefVehicle && prefVehicle.status === VehicleStatus.AVAILABLE) {
+    if (prefVehicle && (prefVehicle.status === VehicleStatus.AVAILABLE || prefVehicle.status === VehicleStatus.RESERVED)) {
       const conflict = await prisma.booking.findFirst({
         where: {
           vehicleId: prefVehicle.id,
@@ -180,13 +186,45 @@ export async function findEligibleCandidates(
     TRACKING_CONFIG.idleIntervalSec * DISPATCH_CONFIG.gpsFreshnessIdleMultiplier * 1000;
   const freshnessThreshold = new Date(Date.now() - maxIdleStaleMs);
 
+  const now = new Date();
+
+  // Drivers in active cooldown or holding a SENT offer for this booking
+  const blockedOffers = await prisma.bookingOffer.findMany({
+    where: {
+      bookingId,
+      OR: [
+        { status: OfferStatus.SENT },
+        { cooldownUntil: { gt: now } },
+      ],
+    },
+    select: { driverId: true },
+  });
+
+  // Drivers holding a SENT offer on any booking (prevent simultaneous cross-booking dispatch)
+  const busyOffers = await prisma.bookingOffer.findMany({
+    where: {
+      status: OfferStatus.SENT,
+      expiresAt: { gt: now },
+    },
+    select: { driverId: true },
+  });
+
+  const allExcludedIds = Array.from(
+    new Set([
+      ...excludeDriverIds,
+      ...blockedOffers.map((o) => o.driverId),
+      ...busyOffers.map((o) => o.driverId),
+    ])
+  );
+
   // Active driver sessions
   const activeSessions = await prisma.driverSession.findMany({
     where: {
       status: DriverSessionStatus.ACTIVE,
       driver: {
-        status: { not: DriverStatus.ON_TRIP },
-        id: { notIn: excludeDriverIds },
+        status: DriverStatus.AVAILABLE,
+        id: { notIn: allExcludedIds },
+        user: { isActive: true },
       },
     },
     include: {
@@ -233,7 +271,7 @@ export async function findEligibleCandidates(
 
     // Vehicle determination: session vehicle, or driver's current vehicle
     const vehicle = session.vehicle ?? driver.currentVehicle;
-    if (!vehicle) {
+    if (!vehicle || (vehicle.currentDriverId && vehicle.currentDriverId !== driver.id)) {
       continue;
     }
 
@@ -243,7 +281,7 @@ export async function findEligibleCandidates(
     }
 
     // Vehicle status & capacity
-    if (vehicle.status !== VehicleStatus.AVAILABLE) {
+    if (vehicle.status !== VehicleStatus.AVAILABLE && vehicle.status !== VehicleStatus.RESERVED) {
       continue;
     }
     if (!isCapacitySufficient(vehicle.seatingCapacity, booking.passengerCount)) {
@@ -289,8 +327,14 @@ export async function findEligibleCandidates(
       where: { vehicleId: vehicle.id },
     });
 
+    // In active standby sessions, stationary drivers waiting at hubs remain eligible
+    // within a 15-minute window even if browser GPS is throttled or stationary.
+    const standbyCutoff = new Date(Date.now() - 15 * 60 * 1000);
+    const candidateFreshnessThreshold =
+      session.status === DriverSessionStatus.ACTIVE ? standbyCutoff : freshnessThreshold;
+
     // Check freshness: if no location or receivedAt is older than threshold
-    if (!vehicleLocation || !isLocationFresh(vehicleLocation.receivedAt, freshnessThreshold)) {
+    if (!vehicleLocation || !isLocationFresh(vehicleLocation.receivedAt, candidateFreshnessThreshold)) {
       continue;
     }
 
@@ -324,11 +368,50 @@ export async function findEligibleCandidates(
     });
   }
 
-  // Ranking:
-  // 1. etaSeconds asc (nulls last)
-  // 2. receivedAt freshness desc (newer first)
-  // 3. driverId asc (tiebreak)
+  // Fetch offer history for this booking to calculate priority tiers
+  const previousBookingOffers = await prisma.bookingOffer.findMany({
+    where: { bookingId },
+    select: { driverId: true, sentAt: true },
+    orderBy: { sentAt: 'desc' },
+  });
+
+  const driverOfferHistory = new Map<string, { count: number; lastSentAt: Date }>();
+  for (const prev of previousBookingOffers) {
+    const existing = driverOfferHistory.get(prev.driverId);
+    if (!existing) {
+      driverOfferHistory.set(prev.driverId, { count: 1, lastSentAt: prev.sentAt });
+    } else {
+      existing.count += 1;
+    }
+  }
+
+  // Priority Queue Ranking:
+  // 1. Fresh candidates (count === 0) first, over repeat candidates (count > 0)
+  // 2. Repeat candidates: least attempts count first; tiebreak oldest lastSentAt (round-robin)
+  // 3. etaSeconds asc (nulls last)
+  // 4. receivedAt freshness desc (newer first)
+  // 5. driverId asc (tiebreak)
   validCandidates.sort((a, b) => {
+    const historyA = driverOfferHistory.get(a.candidate.driverId);
+    const historyB = driverOfferHistory.get(b.candidate.driverId);
+    const countA = historyA?.count ?? 0;
+    const countB = historyB?.count ?? 0;
+
+    if (countA === 0 && countB > 0) return -1;
+    if (countB === 0 && countA > 0) return 1;
+
+    if (countA !== countB) {
+      return countA - countB;
+    }
+
+    if (countA > 0 && historyA && historyB) {
+      const timeA = historyA.lastSentAt.getTime();
+      const timeB = historyB.lastSentAt.getTime();
+      if (timeA !== timeB) {
+        return timeA - timeB; // Oldest offer first (fair round-robin)
+      }
+    }
+
     if (a.candidate.etaSeconds !== null && b.candidate.etaSeconds !== null) {
       if (a.candidate.etaSeconds !== b.candidate.etaSeconds) {
         return a.candidate.etaSeconds - b.candidate.etaSeconds;
@@ -356,33 +439,90 @@ export async function findEligibleCandidates(
   return { candidates };
 }
 
+async function lockSearchingBooking(tx: Prisma.TransactionClient, bookingId: string) {
+  const locked = await tx.$queryRawUnsafe<Array<{ id: string; status: BookingStatus }>>(
+    'SELECT id, status FROM bookings WHERE id = $1 FOR UPDATE', bookingId
+  );
+  if (!locked.length) {
+    throw new ApiError(404, 'BOOKING_NOT_FOUND', 'Booking not found');
+  }
+  if (locked[0].status !== BookingStatus.SEARCHING_DRIVER) {
+    throw new ApiError(409, 'INVALID_BOOKING_STATUS', 'Booking is no longer searching for a driver');
+  }
+}
+
+async function assertAssignmentVehicle(
+  tx: Prisma.TransactionClient,
+  vehicleId: string,
+  driverId: string,
+  passengerCount: number
+) {
+  // Call after assertVehicleAvailableForWindow has locked the vehicle.
+  const vehicle = await tx.vehicle.findUniqueOrThrow({ where: { id: vehicleId } });
+  const otherSession = await tx.driverSession.findFirst({
+    where: { vehicleId, status: DriverSessionStatus.ACTIVE, driverId: { not: driverId } },
+  });
+  const otherTrip = await tx.trip.findFirst({
+    where: { vehicleId, status: TripStatus.ACTIVE, driverId: { not: driverId } },
+  });
+  if ((vehicle.currentDriverId && vehicle.currentDriverId !== driverId) || otherSession || otherTrip) {
+    throw new ApiError(409, 'VEHICLE_ALREADY_ASSIGNED', 'Vehicle is currently in use by another driver');
+  }
+  if (!isCapacitySufficient(vehicle.seatingCapacity, passengerCount)) {
+    throw new ApiError(409, 'INSUFFICIENT_CAPACITY', 'Vehicle has insufficient passenger capacity');
+  }
+}
+
 export async function createOffer(
   bookingId: string,
   candidate: CandidateDriver,
   ctx?: DispatchMutationContext
 ) {
-  const expiresAt = new Date(Date.now() + DISPATCH_CONFIG.offerTimeoutSec * 1000);
-
   const offer = await prisma.$transaction(async (tx) => {
-    const locked = await tx.$queryRawUnsafe<Array<{ id: string; status: BookingStatus }>>(
-      'SELECT id, status FROM bookings WHERE id = $1 FOR UPDATE',
-      bookingId
-    );
-
-    if (!locked || locked.length === 0) {
-      throw new ApiError(404, 'BOOKING_NOT_FOUND', 'Booking not found');
+    await lockSearchingBooking(tx, bookingId);
+    await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', candidate.driverId);
+    const activeBookingOffer = await tx.bookingOffer.findFirst({
+      where: { bookingId, status: OfferStatus.SENT },
+    });
+    if (activeBookingOffer) {
+      throw new ApiError(409, 'ACTIVE_OFFER_EXISTS', 'An active offer is already pending for this booking');
     }
+
+    const driverActiveOffer = await tx.bookingOffer.findFirst({
+      where: { driverId: candidate.driverId, status: OfferStatus.SENT },
+    });
+    if (driverActiveOffer) {
+      throw new ApiError(409, 'DRIVER_BUSY_WITH_OFFER', 'Driver already has an active pending offer');
+    }
+
+    const driver = await tx.driver.findUnique({
+      where: { id: candidate.driverId },
+      include: { user: true, sessions: { where: { status: DriverSessionStatus.ACTIVE }, take: 1 } },
+    });
+    if (!driver || !driver.user.isActive || driver.status !== DriverStatus.AVAILABLE || !driver.sessions.length) {
+      throw new ApiError(409, 'DRIVER_UNAVAILABLE', 'Driver is no longer online and available');
+    }
+    const expiresAt = new Date(Date.now() + DISPATCH_CONFIG.offerTimeoutSec * 1000);
 
     const previousAttempts = await tx.bookingOffer.count({
       where: { bookingId },
     });
+    if (previousAttempts >= DISPATCH_CONFIG.maxAttempts) {
+      throw new ApiError(409, 'MAX_ATTEMPTS_EXCEEDED', 'Dispatch attempt limit reached');
+    }
     const attemptNo = previousAttempts + 1;
+
+    const driverPreviousOffers = await tx.bookingOffer.count({
+      where: { bookingId, driverId: candidate.driverId },
+    });
+    const roundNo = driverPreviousOffers + 1;
 
     const createdOffer = await tx.bookingOffer.create({
       data: {
         bookingId,
         driverId: candidate.driverId,
         attemptNo,
+        roundNo,
         status: OfferStatus.SENT,
         expiresAt,
         rank: candidate.rank,
@@ -391,16 +531,16 @@ export async function createOffer(
       },
       include: {
         booking: true,
-        driver: { include: { user: true } },
+        driver: { include: { user: { select: publicUserSelect } } },
       },
     });
 
-    await tx.booking.update({
+    const updatedBooking = await tx.booking.update({
       where: { id: bookingId },
       data: { status: BookingStatus.DRIVER_NOTIFIED },
     });
 
-    return createdOffer;
+    return { ...createdOffer, booking: updatedBooking };
   });
 
   await logAuditEvent({
@@ -413,6 +553,7 @@ export async function createOffer(
       bookingId,
       driverId: candidate.driverId,
       attemptNo: offer.attemptNo,
+      roundNo: offer.roundNo,
       rank: offer.rank,
       expiresAt: offer.expiresAt.toISOString(),
       etaSeconds: offer.etaSeconds,
@@ -431,6 +572,8 @@ export async function createOffer(
       pickupLocation: offer.booking.pickupLocation,
       destination: offer.booking.destination,
       expiresAt: offer.expiresAt.toISOString(),
+      driverId: candidate.driverId,
+      driverUserId: candidate.userId,
     },
   });
 
@@ -459,13 +602,17 @@ export async function dispatchBooking(
     throw new ApiError(404, 'BOOKING_NOT_FOUND', 'Booking not found');
   }
 
+  if (booking.status !== BookingStatus.SEARCHING_DRIVER) {
+    throw new ApiError(409, 'INVALID_BOOKING_STATUS', 'Booking is not searching for a driver');
+  }
+
   const { candidates, preferenceUnavailableReason, alternatives } =
     await findEligibleCandidates(bookingId);
 
   // If vehicle preference was specified but unavailable
   if (preferenceUnavailableReason) {
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', bookingId);
+      await lockSearchingBooking(tx, bookingId);
       return tx.booking.update({
         where: { id: bookingId },
         data: {
@@ -499,7 +646,7 @@ export async function dispatchBooking(
 
   if (candidates.length === 0) {
     const updated = await prisma.$transaction(async (tx) => {
-      await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', bookingId);
+      await lockSearchingBooking(tx, bookingId);
       return tx.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
@@ -542,7 +689,7 @@ export async function acceptOffer(
 ) {
   const result = await prisma.$transaction(async (tx) => {
     // 1. Fetch and validate offer
-    const offer = await tx.bookingOffer.findUnique({
+    let offer = await tx.bookingOffer.findUnique({
       where: { id: offerId },
       include: {
         booking: true,
@@ -587,17 +734,25 @@ export async function acceptOffer(
       );
     }
 
-    // 3. Check driver status and conflicts
-    const driver = await tx.driver.findUnique({
-      where: { id: driverId },
-      include: {
-        user: true,
-        sessions: { where: { status: DriverSessionStatus.ACTIVE }, take: 1 },
-      },
+    // The offer may have changed while waiting for the booking lock.
+    offer = await tx.bookingOffer.findUniqueOrThrow({
+      where: { id: offerId },
+      include: { booking: true, driver: { include: { user: true } } },
     });
+    if (offer.status !== OfferStatus.SENT) {
+      throw new ApiError(409, 'OFFER_NOT_ACTIVE', `Offer is in status ${offer.status}`);
+    }
+    if (offer.expiresAt.getTime() <= Date.now()) {
+      throw new ApiError(409, 'OFFER_EXPIRED', 'Offer has already expired');
+    }
 
-    if (!driver || driver.status === DriverStatus.ON_TRIP) {
-      throw new ApiError(409, 'DRIVER_UNAVAILABLE', 'Driver is on a trip or unavailable');
+    // 3. Serialize assignments across bookings, using vehicle-first lock order.
+    const { driver, vehicleId: targetVehicleId } = await lockAssignmentDriver(
+      tx, driverId, offer.booking.vehicleId ?? offer.booking.vehiclePreferenceId
+    );
+
+    if (!driver.user.isActive || driver.status !== DriverStatus.AVAILABLE || !driver.sessions.length) {
+      throw new ApiError(409, 'DRIVER_UNAVAILABLE', 'Driver is no longer online and available');
     }
 
     const driverConflict = await tx.booking.findFirst({
@@ -623,12 +778,6 @@ export async function acceptOffer(
     }
 
     // 4. Determine vehicle and assert availability
-    const session = driver.sessions[0];
-    const targetVehicleId =
-      offer.booking.vehicleId ??
-      offer.booking.vehiclePreferenceId ??
-      session?.vehicleId ??
-      driver.currentVehicleId;
 
     if (!targetVehicleId) {
       throw new ApiError(409, 'NO_VEHICLE_ASSIGNED', 'No vehicle found for assignment');
@@ -643,12 +792,21 @@ export async function acceptOffer(
       false
     );
 
+    await assertAssignmentVehicle(tx, targetVehicleId, driverId, offer.booking.passengerCount);
+    if (!isPreferenceMatching(targetVehicleId, offer.booking.vehiclePreferenceId)) {
+      throw new ApiError(409, 'VEHICLE_PREFERENCE_MISMATCH', 'Vehicle does not match the booking preference');
+    }
+    if (offer.expiresAt.getTime() <= Date.now()) {
+      throw new ApiError(409, 'OFFER_EXPIRED', 'Offer has already expired');
+    }
+
     // 5. Update offer status to ACCEPTED
     const acceptedOffer = await tx.bookingOffer.update({
       where: { id: offerId },
       data: {
         status: OfferStatus.ACCEPTED,
         respondedAt: new Date(),
+        cooldownUntil: null,
       },
     });
 
@@ -664,6 +822,8 @@ export async function acceptOffer(
         respondedAt: new Date(),
       },
     });
+
+    await ensureVehicleAssignment(tx, driver.id, targetVehicleId);
 
     // 7. Update vehicle status to RESERVED and driver's current vehicle
     await tx.vehicle.update({
@@ -688,9 +848,9 @@ export async function acceptOffer(
         vehicleId: targetVehicleId,
       },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: publicUserSelect },
         vehicle: true,
-        driver: { include: { user: true } },
+        driver: { include: { user: { select: publicUserSelect } } },
         operationalLocation: true,
       },
     });
@@ -762,11 +922,31 @@ export async function rejectOffer(
       throw new ApiError(409, 'OFFER_NOT_ACTIVE', `Offer is in status ${offer.status}`);
     }
 
+    const locked = await tx.$queryRawUnsafe<Array<{ status: BookingStatus }>>(
+      'SELECT id, status FROM bookings WHERE id = $1 FOR UPDATE', offer.bookingId
+    );
+    if (!locked.length || locked[0].status !== BookingStatus.DRIVER_NOTIFIED) {
+      throw new ApiError(409, 'INVALID_BOOKING_STATUS', 'Booking is no longer waiting for this offer');
+    }
+    const currentOffer = await tx.bookingOffer.findUniqueOrThrow({ where: { id: offerId } });
+    if (currentOffer.status !== OfferStatus.SENT) {
+      throw new ApiError(409, 'OFFER_NOT_ACTIVE', `Offer is in status ${currentOffer.status}`);
+    }
+    if (currentOffer.expiresAt.getTime() <= Date.now()) {
+      throw new ApiError(409, 'OFFER_EXPIRED', 'Offer has already expired');
+    }
+
+    const driverOffersCount = await tx.bookingOffer.count({
+      where: { bookingId: offer.bookingId, driverId },
+    });
+    const cooldownUntil = computeDriverCooldown(driverOffersCount);
+
     const updatedOffer = await tx.bookingOffer.update({
       where: { id: offerId },
       data: {
         status: OfferStatus.REJECTED,
         respondedAt: new Date(),
+        cooldownUntil,
       },
     });
 
@@ -793,15 +973,20 @@ export async function rejectOffer(
   });
 
   // Advance to next candidate immediately if available
-  const existingOffers = await prisma.bookingOffer.findMany({
+  const totalOffersCount = await prisma.bookingOffer.count({
     where: { bookingId: result.updatedBooking.id },
-    select: { driverId: true },
   });
-  const excluded = existingOffers.map((o) => o.driverId);
 
-  const { candidates } = await findEligibleCandidates(result.updatedBooking.id, excluded);
-  if (candidates.length > 0) {
-    await createOffer(result.updatedBooking.id, candidates[0], ctx);
+  if (totalOffersCount < DISPATCH_CONFIG.maxAttempts) {
+    const { candidates } = await findEligibleCandidates(result.updatedBooking.id);
+    if (candidates.length > 0) {
+      try {
+        await createOffer(result.updatedBooking.id, candidates[0], ctx);
+      } catch (error) {
+        // The rejection is already committed; cancellation or another sweep may win dispatch.
+        if (!(error instanceof ApiError) || error.code !== 'INVALID_BOOKING_STATUS') throw error;
+      }
+    }
   }
 
   return { success: true, nextOfferEtaSec: DISPATCH_CONFIG.offerTimeoutSec };
@@ -821,20 +1006,26 @@ export async function dispatchSweep() {
 
   for (const offer of expiredOffers) {
     try {
-      await prisma.$transaction(async (tx) => {
-        await tx.bookingOffer.update({
-          where: { id: offer.id },
-          data: {
-            status: OfferStatus.EXPIRED,
-            respondedAt: now,
-          },
+      const expired = await prisma.$transaction(async (tx) => {
+        await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', offer.bookingId);
+        const driverOffersCount = await tx.bookingOffer.count({
+          where: { bookingId: offer.bookingId, driverId: offer.driverId },
         });
+        const cooldownUntil = computeDriverCooldown(driverOffersCount, now);
 
-        await tx.booking.update({
-          where: { id: offer.bookingId },
+        const changed = await tx.bookingOffer.updateMany({
+          where: { id: offer.id, status: OfferStatus.SENT, expiresAt: { lte: now } },
+          data: { status: OfferStatus.EXPIRED, respondedAt: now, cooldownUntil },
+        });
+        if (!changed.count) return false;
+
+        await tx.booking.updateMany({
+          where: { id: offer.bookingId, status: BookingStatus.DRIVER_NOTIFIED },
           data: { status: BookingStatus.SEARCHING_DRIVER },
         });
+        return true;
       });
+      if (!expired) continue;
 
       await logAuditEvent({
         actorUserId: null,
@@ -856,7 +1047,7 @@ export async function dispatchSweep() {
   const searchingBookings = await prisma.booking.findMany({
     where: { status: BookingStatus.SEARCHING_DRIVER },
     include: {
-      offers: { select: { driverId: true } },
+      offers: { select: { driverId: true, sentAt: true }, orderBy: { sentAt: 'asc' } },
     },
   });
 
@@ -864,13 +1055,14 @@ export async function dispatchSweep() {
 
   for (const booking of searchingBookings) {
     try {
-      const isTimedOut = booking.createdAt.getTime() < Date.now() - overallTimeoutMs;
+      const searchStartedAt = booking.offers[0]?.sentAt ?? booking.updatedAt;
+      const isTimedOut = searchStartedAt.getTime() < Date.now() - overallTimeoutMs;
       const isMaxAttempts = booking.offers.length >= DISPATCH_CONFIG.maxAttempts;
 
       if (isTimedOut || isMaxAttempts) {
         // Escalate to ADMIN_INTERVENTION
         await prisma.$transaction(async (tx) => {
-          await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', booking.id);
+          await lockSearchingBooking(tx, booking.id);
           await tx.booking.update({
             where: { id: booking.id },
             data: { status: BookingStatus.ADMIN_INTERVENTION },
@@ -897,9 +1089,8 @@ export async function dispatchSweep() {
         continue;
       }
 
-      // Check next candidates excluding already-offered
-      const excluded = booking.offers.map((o) => o.driverId);
-      const { candidates } = await findEligibleCandidates(booking.id, excluded);
+      // Check next candidates with Priority Queue and Backoff
+      const { candidates } = await findEligibleCandidates(booking.id);
 
       if (candidates.length > 0) {
         await createOffer(booking.id, candidates[0]);
@@ -907,7 +1098,7 @@ export async function dispatchSweep() {
         // If 0 total attempts, mark NO_DRIVER_AVAILABLE
         if (booking.offers.length === 0) {
           await prisma.$transaction(async (tx) => {
-            await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', booking.id);
+            await lockSearchingBooking(tx, booking.id);
             await tx.booking.update({
               where: { id: booking.id },
               data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
@@ -976,15 +1167,11 @@ export async function manualAssignBooking(
       );
     }
 
-    const driver = await tx.driver.findUnique({
-      where: { id: driverId },
-      include: {
-        user: true,
-        sessions: { where: { status: DriverSessionStatus.ACTIVE }, take: 1 },
-      },
-    });
+    const { driver, vehicleId: targetVehicleId } = await lockAssignmentDriver(
+      tx, driverId, booking.vehicleId ?? booking.vehiclePreferenceId
+    );
 
-    if (!driver || driver.status === DriverStatus.ON_TRIP) {
+    if (!driver || !driver.user.isActive || driver.status === DriverStatus.ON_TRIP) {
       throw new ApiError(409, 'DRIVER_UNAVAILABLE', 'Driver is on a trip or unavailable');
     }
 
@@ -1010,12 +1197,6 @@ export async function manualAssignBooking(
       throw new ApiError(409, 'DRIVER_CONFLICT', 'Driver has a conflicting booking');
     }
 
-    const session = driver.sessions[0];
-    const targetVehicleId =
-      booking.vehicleId ??
-      booking.vehiclePreferenceId ??
-      session?.vehicleId ??
-      driver.currentVehicleId;
 
     if (!targetVehicleId) {
       throw new ApiError(409, 'NO_VEHICLE_ASSIGNED', 'No vehicle assigned to driver or booking');
@@ -1029,6 +1210,10 @@ export async function manualAssignBooking(
       booking.id,
       false
     );
+
+    await assertAssignmentVehicle(tx, targetVehicleId, driverId, booking.passengerCount);
+
+    await ensureVehicleAssignment(tx, driver.id, targetVehicleId);
 
     // Cancel any pending offers for this booking
     await tx.bookingOffer.updateMany({
@@ -1057,9 +1242,9 @@ export async function manualAssignBooking(
         vehicleId: targetVehicleId,
       },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: publicUserSelect },
         vehicle: true,
-        driver: { include: { user: true } },
+        driver: { include: { user: { select: publicUserSelect } } },
         operationalLocation: true,
       },
     });
@@ -1132,48 +1317,103 @@ export async function startDriverSession(
   input: { vehicleId?: string | null; startLat?: number | null; startLng?: number | null },
   ctx?: DispatchMutationContext
 ) {
-  const driver = await prisma.driver.findUnique({
-    where: { id: driverId },
-    include: { user: true },
-  });
+  const session = await prisma.$transaction(async (tx) => {
+    const { driver, vehicleId } = await lockAssignmentDriver(tx, driverId, input.vehicleId);
+    if (!driver) {
+      throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver not found');
+    }
+    if (!driver.user.isActive) {
+      throw new ApiError(403, 'FORBIDDEN', 'Driver account is inactive');
+    }
+    const activeTrip = await tx.trip.findFirst({ where: { status: TripStatus.ACTIVE, OR: [{ driverId }, ...(vehicleId ? [{ vehicleId }] : [])] } });
+    if (driver.status === DriverStatus.ON_TRIP || activeTrip) {
+      throw new ApiError(409, 'DRIVER_BUSY', 'Cannot start an idle session while a trip is active');
+    }
+    const existing = await tx.driverSession.findFirst({
+      where: { driverId, status: DriverSessionStatus.ACTIVE },
+    });
+    if (existing) {
+      throw new ApiError(409, 'SESSION_ALREADY_ACTIVE', 'Driver already has an active session');
+    }
 
-  if (!driver) {
-    throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver not found');
-  }
+    if (!vehicleId) {
+      throw new ApiError(400, 'VEHICLE_REQUIRED_FOR_TRACKING', 'Select a vehicle by license plate before going online.');
+    }
+    const otherSession = await tx.driverSession.findFirst({
+      where: { vehicleId, status: DriverSessionStatus.ACTIVE, driverId: { not: driverId } },
+    });
+    if (otherSession) {
+      throw new ApiError(409, 'VEHICLE_ALREADY_ASSIGNED', 'Another driver is already online with this vehicle.');
+    }
+    if (vehicleId) {
+      const locked = await tx.$queryRawUnsafe<Array<{ id: string; status: VehicleStatus }>>(
+        'SELECT id, status FROM vehicles WHERE id = $1 FOR UPDATE', vehicleId
+      );
+      if (!locked.length) {
+        throw new ApiError(404, 'VEHICLE_NOT_FOUND', 'Vehicle not found');
+      }
+      if (locked[0].status !== VehicleStatus.AVAILABLE && locked[0].status !== VehicleStatus.RESERVED) {
+        throw new ApiError(409, 'VEHICLE_UNAVAILABLE', 'Vehicle is unavailable');
+      }
+      await assertAssignmentVehicle(tx, vehicleId, driverId, 0);
+    }
 
-  const existing = await prisma.driverSession.findFirst({
-    where: { driverId, status: DriverSessionStatus.ACTIVE },
-  });
+    await ensureVehicleAssignment(tx, driverId, vehicleId);
+    await tx.vehicle.updateMany({ where: { currentDriverId: driverId, id: { not: vehicleId } }, data: { currentDriverId: null } });
+    await tx.driver.updateMany({ where: { currentVehicleId: vehicleId, id: { not: driverId } }, data: { currentVehicleId: null } });
+    await tx.driver.update({ where: { id: driverId }, data: { status: DriverStatus.AVAILABLE, currentVehicleId: vehicleId } });
+    await tx.vehicle.update({ where: { id: vehicleId }, data: { currentDriverId: driverId } });
 
-  if (existing) {
-    throw new ApiError(409, 'SESSION_ALREADY_ACTIVE', 'Driver already has an active session');
-  }
+    if (vehicleId && input.startLat !== null && input.startLat !== undefined && input.startLng !== null && input.startLng !== undefined) {
+      const now = new Date();
+      await tx.vehicleLocation.upsert({
+        where: { vehicleId },
+        create: {
+          vehicleId,
+          driverId,
+          lat: input.startLat,
+          lng: input.startLng,
+          accuracyM: 20,
+          movement: MovementStatus.STOPPED,
+          recordedAt: now,
+          receivedAt: now,
+        },
+        update: {
+          driverId,
+          lat: input.startLat,
+          lng: input.startLng,
+          accuracyM: 20,
+          movement: MovementStatus.STOPPED,
+          recordedAt: now,
+          receivedAt: now,
+        },
+      });
+    }
 
-  const vehicleId = input.vehicleId ?? driver.currentVehicleId;
-
-  const session = await prisma.driverSession.create({
-    data: {
-      driverId,
-      vehicleId: vehicleId ?? null,
-      status: DriverSessionStatus.ACTIVE,
-      startLat: input.startLat ?? null,
-      startLng: input.startLng ?? null,
-    },
-    include: {
-      vehicle: true,
-      driver: { include: { user: true } },
-    },
+    return tx.driverSession.create({
+      data: {
+        driverId,
+        vehicleId: vehicleId ?? null,
+        status: DriverSessionStatus.ACTIVE,
+        startLat: input.startLat ?? null,
+        startLng: input.startLng ?? null,
+      },
+      include: {
+        vehicle: true,
+        driver: { include: { user: { select: publicUserSelect } } },
+      },
+    });
   });
 
   await logAuditEvent({
-    actorUserId: ctx?.actorUserId ?? driver.userId,
+    actorUserId: ctx?.actorUserId ?? session.driver.userId,
     action: 'driver.session_start',
     entityType: 'DriverSession',
     entityId: session.id,
     newValue: {
       sessionId: session.id,
       driverId,
-      vehicleId,
+      vehicleId: session.vehicleId,
     },
     ip: ctx?.ip,
     userAgent: ctx?.userAgent,
@@ -1186,22 +1426,59 @@ export async function endDriverSession(
   driverId: string,
   ctx?: DispatchMutationContext
 ) {
-  const session = await prisma.driverSession.findFirst({
-    where: { driverId, status: DriverSessionStatus.ACTIVE },
-    include: { driver: true },
+  const { session, ended, offers } = await prisma.$transaction(async (tx) => {
+    // Driver-only lock: never acquire booking or vehicle locks in this transaction.
+    await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', driverId);
+    const activeTrip = await tx.trip.findFirst({ where: { driverId, status: TripStatus.ACTIVE } });
+    if (activeTrip) {
+      throw new ApiError(409, 'DRIVER_BUSY', 'Abort or end the active trip before going offline');
+    }
+    const session = await tx.driverSession.findFirst({
+      where: { driverId, status: DriverSessionStatus.ACTIVE },
+      include: { driver: true },
+    });
+    if (!session) {
+      throw new ApiError(404, 'NO_ACTIVE_SESSION', 'No active session found for driver');
+    }
+    const ended = await tx.driverSession.update({
+      where: { id: session.id },
+      data: { status: DriverSessionStatus.ENDED, endedAt: new Date() },
+    });
+    await tx.vehicleAssignment.updateMany({
+      where: { unassignedAt: null, OR: [{ driverId }, ...(session.vehicleId ? [{ vehicleId: session.vehicleId }] : [])] },
+      data: { unassignedAt: new Date(), reason: 'Driver session ended; released to pool' },
+    });
+    await tx.driver.update({ where: { id: driverId }, data: { status: DriverStatus.OFFLINE, currentVehicleId: null } });
+    if (session.vehicleId) {
+      await tx.vehicle.updateMany({
+        where: { id: session.vehicleId, currentDriverId: driverId },
+        data: { currentDriverId: null },
+      });
+    }
+    await tx.vehicleLocation.updateMany({ where: { driverId }, data: { movement: MovementStatus.OFFLINE } });
+    const offers = await tx.bookingOffer.findMany({
+      where: { driverId, status: OfferStatus.SENT },
+      select: { id: true, bookingId: true },
+    });
+    return { session, ended, offers };
   });
 
-  if (!session) {
-    throw new ApiError(404, 'NO_ACTIVE_SESSION', 'No active session found for driver');
+  // Release the driver lock before touching bookings; include expired SENT offers too.
+  for (const offer of offers) {
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', offer.bookingId);
+      const cancelled = await tx.bookingOffer.updateMany({
+        where: { id: offer.id, driverId, status: OfferStatus.SENT },
+        data: { status: OfferStatus.CANCELLED, respondedAt: new Date() },
+      });
+      if (cancelled.count) {
+        await tx.booking.updateMany({
+          where: { id: offer.bookingId, status: BookingStatus.DRIVER_NOTIFIED },
+          data: { status: BookingStatus.SEARCHING_DRIVER },
+        });
+      }
+    });
   }
-
-  const ended = await prisma.driverSession.update({
-    where: { id: session.id },
-    data: {
-      status: DriverSessionStatus.ENDED,
-      endedAt: new Date(),
-    },
-  });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? session.driver.userId,
@@ -1235,6 +1512,7 @@ export async function getDriverOffers(driverId: string) {
       driverId,
       status: OfferStatus.SENT,
       expiresAt: { gt: new Date() },
+      booking: { status: BookingStatus.DRIVER_NOTIFIED },
     },
     orderBy: { sentAt: 'desc' },
     include: {

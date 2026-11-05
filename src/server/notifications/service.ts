@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { Prisma, RoleCode } from '@prisma/client';
 import { publishEvent } from '@/server/realtime/hub';
 
@@ -48,44 +49,51 @@ function serializeNotification(row: {
 export async function notify(
   userId: string,
   payload: NotificationPayload
-): Promise<SerializedNotification> {
-  const row = await prisma.notification.create({
-    data: {
-      userId,
-      type: payload.type,
-      title: payload.title,
-      body: payload.body,
-      data: (payload.data ?? undefined) as Prisma.InputJsonValue | undefined,
-    },
-  });
+): Promise<SerializedNotification | null> {
+  try {
+    const row = await prisma.notification.create({
+      data: {
+        userId,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        data: (payload.data ?? undefined) as Prisma.InputJsonValue | undefined,
+      },
+    });
 
-  const serialized = serializeNotification(row);
-
-  await publishEvent({
-    type: 'notification',
-    data: {
-      id: serialized.id,
-      userId: serialized.userId,
-      type: serialized.type,
-      title: serialized.title,
-      body: serialized.body,
-      createdAt: serialized.createdAt.toISOString(),
-    },
-  });
-
-  return serialized;
+    const serialized = serializeNotification(row);
+    await publishEvent({
+      type: 'notification',
+      data: {
+        id: serialized.id,
+        userId: serialized.userId,
+        type: serialized.type,
+        title: serialized.title,
+        body: serialized.body,
+        createdAt: serialized.createdAt.toISOString(),
+      },
+    });
+    return serialized;
+  } catch (error) {
+    // Notification delivery must not turn a committed business action into an HTTP failure.
+    logger.warn({ msg: 'Notification delivery failed', userId, type: payload.type, error: error instanceof Error ? error.message : String(error) });
+    return null;
+  }
 }
 
 export async function notifyAdmins(payload: NotificationPayload): Promise<void> {
-  const admins = await prisma.user.findMany({
-    where: {
-      isActive: true,
-      role: { code: RoleCode.ADMIN },
-    },
-    select: { id: true },
-  });
-
-  await Promise.all(admins.map((admin) => notify(admin.id, payload)));
+  try {
+    const admins = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: { code: RoleCode.ADMIN },
+      },
+      select: { id: true },
+    });
+    await Promise.all(admins.map((admin) => notify(admin.id, payload)));
+  } catch (error) {
+    logger.warn({ msg: 'Admin notification delivery failed', type: payload.type, error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 export async function listNotifications(

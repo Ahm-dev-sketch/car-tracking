@@ -34,44 +34,44 @@ type StatusType =
 
 const statusStyles: Record<string, string> = {
   // Booking
-  PENDING: 'bg-amber-50 text-amber-800 border-amber-200',
-  SEARCHING_DRIVER: 'bg-amber-50 text-amber-800 border-amber-300 animate-pulse',
-  DRIVER_NOTIFIED: 'bg-blue-50 text-blue-800 border-blue-200',
-  DRIVER_ASSIGNED: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-  DRIVER_EN_ROUTE: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-  ARRIVED: 'bg-teal-50 text-teal-800 border-teal-200',
-  IN_PROGRESS: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  COMPLETED: 'border border-emerald-600 text-emerald-700 bg-white font-semibold',
-  NO_DRIVER_AVAILABLE: 'bg-zinc-100 text-zinc-700 border-zinc-300',
-  ADMIN_INTERVENTION: 'bg-orange-50 text-orange-800 border-orange-300',
-  APPROVED: 'bg-blue-50 text-blue-800 border-blue-200',
-  REJECTED: 'bg-rose-50 text-rose-800 border-rose-200',
-  CANCELLED: 'bg-rose-50 text-rose-800 border-rose-200',
+  PENDING: 'bg-amber-300 text-black',
+  SEARCHING_DRIVER: 'bg-amber-400 text-black animate-pulse',
+  DRIVER_NOTIFIED: 'bg-sky-300 text-black',
+  DRIVER_ASSIGNED: 'bg-violet-300 text-black',
+  DRIVER_EN_ROUTE: 'bg-indigo-300 text-black',
+  ARRIVED: 'bg-teal-300 text-black',
+  IN_PROGRESS: 'bg-emerald-300 text-black',
+  COMPLETED: 'bg-emerald-400 text-black',
+  NO_DRIVER_AVAILABLE: 'bg-zinc-200 text-black',
+  ADMIN_INTERVENTION: 'bg-orange-300 text-black',
+  APPROVED: 'bg-sky-300 text-black',
+  REJECTED: 'bg-rose-300 text-black',
+  CANCELLED: 'bg-rose-300 text-black',
 
   // Vehicle
-  AVAILABLE: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  RESERVED: 'bg-amber-50 text-amber-800 border-amber-200',
-  IN_USE: 'bg-blue-50 text-blue-800 border-blue-200',
-  MAINTENANCE: 'bg-zinc-100 text-zinc-700 border-zinc-300',
-  INACTIVE: 'bg-rose-50 text-rose-800 border-rose-200',
+  AVAILABLE: 'bg-emerald-300 text-black',
+  RESERVED: 'bg-amber-300 text-black',
+  IN_USE: 'bg-sky-300 text-black',
+  MAINTENANCE: 'bg-zinc-200 text-black',
+  INACTIVE: 'bg-rose-300 text-black',
 
   // Driver / Trip
-  OFFLINE: 'bg-zinc-100 text-zinc-600 border-zinc-200',
-  ONLINE: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  BUSY: 'bg-blue-50 text-blue-800 border-blue-200',
-  ON_TRIP: 'bg-blue-50 text-blue-800 border-blue-200',
-  ACTIVE: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-  ABORTED: 'bg-rose-50 text-rose-800 border-rose-200',
+  OFFLINE: 'bg-zinc-200 text-black',
+  ONLINE: 'bg-emerald-300 text-black',
+  BUSY: 'bg-sky-300 text-black',
+  ON_TRIP: 'bg-sky-300 text-black',
+  ACTIVE: 'bg-emerald-300 text-black',
+  ABORTED: 'bg-rose-300 text-black',
 };
 
 export function StatusBadge({ status, className = '' }: { status: StatusType; className?: string }) {
   const normalized = status ? status.toUpperCase() : 'UNKNOWN';
-  const style = statusStyles[normalized] || 'bg-zinc-100 text-zinc-700 border-zinc-200';
+  const style = statusStyles[normalized] || 'bg-zinc-200 text-black';
   const label = normalized.replace(/_/g, ' ');
 
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${style} ${className}`}
+      className={`inline-flex max-w-full items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] ${style} ${className}`}
     >
       {label}
     </span>

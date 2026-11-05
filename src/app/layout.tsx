@@ -21,7 +21,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: 'cover',
-  themeColor: '#0f172a',
+  themeColor: '#f4f7f5',
 };
 
 export const metadata: Metadata = {
@@ -53,9 +53,9 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="theme-color" content="#0f172a" />
+
       </head>
-      <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 font-sans">
+      <body className="min-h-dvh flex flex-col text-zinc-900 font-sans">
         <ServiceWorkerRegister />
         <AuthProvider>
           <NetworkStatus />

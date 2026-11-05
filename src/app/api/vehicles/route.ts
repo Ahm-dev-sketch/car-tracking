@@ -24,7 +24,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     sortOrder: searchParams.get('sortOrder') ?? undefined,
   });
 
-  const result = await listVehicles({ ...query, isAdmin });
+  const result = await listVehicles({ ...query, isAdmin, actor: user });
   return NextResponse.json(result);
 });
 

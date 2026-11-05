@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { FormField } from '@/components/ui/FormField';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
 import { DispatchProgress, formatEta } from './DispatchProgress';
+import { findNearestHub } from '@/lib/operational-locations';
+import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
 
 export interface LocationOption {
   id: string;
@@ -69,6 +72,60 @@ export function BookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // User GPS Location (Wajib)
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'locating' | 'granted' | 'denied' | 'unsupported'>('idle');
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; accuracyM: number } | null>(null);
+  const [nearestHubName, setNearestHubName] = useState<string | null>(null);
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationsLoadedRef = useRef(false);
+  const userManuallySelectedRef = useRef(false);
+
+  const requestUserLocation = useCallback((locationList?: LocationOption[]) => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGeoStatus('unsupported');
+      return;
+    }
+    setGeoStatus('locating');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const acc = Math.round(pos.coords.accuracy);
+        setUserCoords({ lat, lng, accuracyM: acc });
+        setGeoStatus('granted');
+
+        // Reverse geocode with IndexedDB/LocalStorage client cache
+        setIsResolvingAddress(true);
+        reverseGeocodeWithCache(lat, lng, nearestHubName || null)
+          .then((addr) => {
+            setResolvedAddress(addr);
+          })
+          .catch(() => {
+            setResolvedAddress(nearestHubName || null);
+          })
+          .finally(() => {
+            setIsResolvingAddress(false);
+          });
+
+        // Auto-match nearest Operational Location if not manually overridden by user or props
+        if (locationList && locationList.length > 0 && !initialVehiclePreference && !initialLocationId && !userManuallySelectedRef.current) {
+          const nearest = findNearestHub(lat, lng, locationList);
+          if (nearest) {
+            setOperationalLocationId(nearest.location.id);
+            setNearestHubName(`${nearest.location.name} (${nearest.location.code})`);
+          }
+        }
+      },
+      () => {
+        setGeoStatus('denied');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, [initialVehiclePreference, initialLocationId]);
+
   // Dispatch progress / Result states
   const [submittedBooking, setSubmittedBooking] = useState<any | null>(null);
   const [noDriverState, setNoDriverState] = useState<{
@@ -76,12 +133,12 @@ export function BookingModal({
     alternatives: Array<{ id: string; plateNumber: string; brand: string; model: string; seatingCapacity?: number }>;
   } | null>(null);
 
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // Reset or initialize on open
   useEffect(() => {
     if (!isOpen) {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      locationsLoadedRef.current = false;
+      userManuallySelectedRef.current = false;
       setSubmittedBooking(null);
       setNoDriverState(null);
       setFormError(null);
@@ -105,6 +162,8 @@ export function BookingModal({
     setFormError(null);
     setSubmittedBooking(null);
     setNoDriverState(null);
+    setNearestHubName(null);
+    setResolvedAddress(null);
 
     // Initial vehicle preference
     if (initialVehiclePreference) {
@@ -122,18 +181,23 @@ export function BookingModal({
       setOperationalLocationId(initialLocationId);
     }
 
+    // Proactively acquire user GPS location
+    requestUserLocation();
+
     // Fetch operational locations
     async function loadLocations() {
-      setLoadingLocations(true);
+      if (locations.length === 0) setLoadingLocations(true);
       try {
         const res = await fetch('/api/locations');
         if (res.ok) {
           const json = await res.json();
           const list: LocationOption[] = json.data || [];
           setLocations(list);
-          if (list.length > 0 && !operationalLocationId && !initialLocationId && !initialVehiclePreference) {
+          if (list.length > 0 && !operationalLocationId && !initialLocationId && !initialVehiclePreference && !userManuallySelectedRef.current) {
             setOperationalLocationId(list[0].id);
           }
+          // Re-evaluate nearest hub once location list is loaded
+          requestUserLocation(list);
         }
       } catch {
         // ignore
@@ -142,7 +206,12 @@ export function BookingModal({
       }
     }
 
-    loadLocations();
+    // Fetch operational locations (only once per open)
+    if (!locationsLoadedRef.current) {
+      locationsLoadedRef.current = true;
+      loadLocations();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- requestUserLocation is stable enough; including it causes an infinite fetch loop
   }, [isOpen, initialVehiclePreference, initialLocationId]);
 
   // Search vehicles when typing in vehicle preference search
@@ -222,6 +291,12 @@ export function BookingModal({
       return;
     }
 
+    if (!userCoords && geoStatus === 'denied') {
+      setFormError('Akses lokasi (GPS) wajib diaktifkan agar sistem dapat mencocokkan titik jemput dan armada terdekat.');
+      setIsSubmitting(false);
+      return;
+    }
+
     if (!pickupLocation.trim()) {
       setFormError('Pickup location is required');
       setIsSubmitting(false);
@@ -265,6 +340,8 @@ export function BookingModal({
         purpose: purpose.trim(),
         notes: notes.trim() || undefined,
         vehiclePreferenceId: vehiclePrefId || undefined,
+        pickupLat: userCoords?.lat ?? null,
+        pickupLng: userCoords?.lng ?? null,
       };
 
       const res = await fetch('/api/bookings', {
@@ -320,82 +397,231 @@ export function BookingModal({
       'IN_PROGRESS',
     ].includes(submittedBooking.status);
 
+    const isSearching = [
+      'PENDING',
+      'SEARCHING_DRIVER',
+      'DRIVER_NOTIFIED',
+    ].includes(submittedBooking.status);
+
+    const driverName = submittedBooking.driver?.user?.name || submittedBooking.driver?.name || 'Driver KCIC';
+    const driverPhone = submittedBooking.driver?.user?.phone;
+    const rawDriverPhone = driverPhone && driverPhone !== 'REDACTED' ? driverPhone.replace(/\D/g, '') : null;
+    const etaText = formatEta(submittedBooking.etaSeconds, submittedBooking.etaEstimated);
+
     return (
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="Reservation Submitted"
+        title={isAssigned ? 'Pengemudi Dikonfirmasi' : 'Mencari Armada'}
         description={`Booking Reference #${submittedBooking.bookingNumber || ''}`}
         maxWidth="lg"
       >
-        <div className="space-y-4">
-          <DispatchProgress
-            status={submittedBooking.status}
-            etaSeconds={submittedBooking.etaSeconds}
-            etaEstimated={submittedBooking.etaEstimated}
-          />
+        <div className="space-y-5">
+          {/* GOJEK-STYLE RADAR SEARCHING VIEW */}
+          {isSearching && (
+            <div className="py-4 text-center space-y-5">
+              <div className="relative mx-auto flex h-36 w-36 items-center justify-center">
+                <span className="absolute h-full w-full rounded-full border-2 border-dashed border-black bg-emerald-400/20 animate-ping duration-1000" />
+                <span className="absolute h-28 w-28 rounded-full border-2 border-black bg-emerald-300/30 animate-pulse" />
+                <span className="absolute h-20 w-20 rounded-full border-2 border-black bg-emerald-200/50" />
+                <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-2xl border-[3px] border-black bg-emerald-400 text-black shadow-[4px_4px_0px_0px_#000]">
+                  <Icon name="car" className="size-8 animate-bounce text-black" />
+                </div>
+              </div>
 
-          {/* Details */}
-          <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 text-xs space-y-2">
-            <div className="flex justify-between text-zinc-600">
-              <span className="font-semibold text-zinc-800">Route:</span>
-              <span className="text-right">
-                {submittedBooking.pickupLocation} → {submittedBooking.destination}
-              </span>
-            </div>
-            <div className="flex justify-between text-zinc-600">
-              <span className="font-semibold text-zinc-800">Passengers:</span>
-              <span>{submittedBooking.passengerCount} passenger(s)</span>
-            </div>
-            {submittedBooking.vehicle && (
-              <div className="flex justify-between text-zinc-600 pt-1 border-t border-zinc-200">
-                <span className="font-semibold text-zinc-800">Reserved Vehicle:</span>
-                <span className="font-mono font-medium text-zinc-900">
-                  {submittedBooking.vehicle.plateNumber} ({submittedBooking.vehicle.brand}{' '}
-                  {submittedBooking.vehicle.model})
+              <div>
+                <h3 className="text-xl font-extrabold tracking-tight text-black">
+                  Mencari Pengemudi Terdekat...
+                </h3>
+                <p className="mt-1.5 text-xs font-semibold text-zinc-700 max-w-sm mx-auto">
+                  Sistem auto-dispatch sedang memindai armada standby di hub operasional Anda.
+                </p>
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-lg border-2 border-black bg-amber-300 px-3.5 py-1.5 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000]">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-black" />
+                </span>
+                <span>
+                  {submittedBooking.status === 'DRIVER_NOTIFIED'
+                    ? 'Penawaran terkirim ke pengemudi terdekat, menunggu konfirmasi...'
+                    : 'Menghubungkan ke armada terbaik...'}
                 </span>
               </div>
-            )}
-            {submittedBooking.driver && (
-              <div className="flex justify-between text-zinc-600">
-                <span className="font-semibold text-zinc-800">Assigned Driver:</span>
-                <span className="font-medium text-zinc-900">
-                  {submittedBooking.driver.user?.name || submittedBooking.driver.name}
-                  {submittedBooking.driver.user?.phone && ` (${submittedBooking.driver.user.phone})`}
-                </span>
-              </div>
-            )}
-          </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2">
-            {isAssigned && submittedBooking.vehicle?.id && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  router.push(`/user/tracking?vehicleId=${submittedBooking.vehicle.id}`);
-                }}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold cursor-pointer"
-              >
-                Track Vehicle on Live Map →
-              </button>
-            )}
+              {/* Route Summary Preview */}
+              <div className="rounded-xl border-[2.5px] border-black bg-white p-4 text-left text-xs space-y-2.5 shadow-[4px_4px_0px_0px_#000]">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-emerald-400 text-[10px] font-black text-black">
+                    ●
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Titik Jemput</span>
+                    <p className="font-bold text-black truncate">{submittedBooking.pickupLocation}</p>
+                  </div>
+                </div>
+                <div className="border-t-2 border-dashed border-black/20" />
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-rose-400 text-[10px] font-black text-black">
+                    ■
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Tujuan</span>
+                    <p className="font-bold text-black truncate">{submittedBooking.destination}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* GOJEK-STYLE DRIVER ACCEPTED / ASSIGNED VIEW */}
+          {isAssigned && (
+            <div className="space-y-4">
+              {/* Banner */}
+              <div className="rounded-xl border-[2.5px] border-black bg-emerald-300 p-4 text-black shadow-[4px_4px_0px_0px_#000]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000]">
+                      <Icon name="check" className="size-5" />
+                    </span>
+                    <div>
+                      <h4 className="text-base font-extrabold text-black">Driver Ditemukan!</h4>
+                      <p className="text-xs font-semibold text-emerald-950">
+                        {submittedBooking.status === 'ARRIVED'
+                          ? 'Driver sudah tiba di titik penjemputan Anda!'
+                          : submittedBooking.status === 'IN_PROGRESS'
+                          ? 'Perjalanan sedang berlangsung.'
+                          : 'Driver sedang menuju titik penjemputan Anda.'}
+                      </p>
+                    </div>
+                  </div>
+                  {etaText && (
+                    <span className="rounded-lg border-2 border-black bg-amber-300 px-3 py-1 font-mono text-xs font-black text-black shadow-[2px_2px_0px_0px_#000]">
+                      ETA {etaText}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Driver & Vehicle Profile Card */}
+              <div className="rounded-xl border-[2.5px] border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000] space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-amber-300 text-black font-black text-xl shadow-[2px_2px_0px_0px_#000]">
+                      {driverName.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-base text-black">{driverName}</h4>
+                        <span className="rounded-md border-1.5 border-black bg-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase text-black">
+                          Driver KCIC
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-600 font-mono font-bold mt-0.5">
+                        {submittedBooking.driver?.licenseNumber ? `SIM: ${submittedBooking.driver.licenseNumber}` : 'Pengemudi Resmi'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Indonesian Vehicle License Plate Badge */}
+                  {submittedBooking.vehicle && (
+                    <div className="text-right">
+                      <div className="inline-block px-3 py-1 bg-black text-white font-mono font-black tracking-wider rounded-lg border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000]">
+                        {submittedBooking.vehicle.plateNumber}
+                      </div>
+                      <p className="text-[11px] font-bold text-zinc-700 mt-1">
+                        {submittedBooking.vehicle.brand} {submittedBooking.vehicle.model}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Direct Contact Buttons (WhatsApp & Call) */}
+                {rawDriverPhone && (
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/15">
+                    <a
+                      href={`https://wa.me/${rawDriverPhone}?text=${encodeURIComponent(
+                        `Halo Pak/Bu ${driverName}, saya penumpang untuk pemesanan #${submittedBooking.bookingNumber}. Saya menunggu di ${submittedBooking.pickupLocation}.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-3.5 py-2.5 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000] hover:bg-emerald-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition"
+                    >
+                      <svg className="size-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.698.074-2.001-.466-1.503-.623-2.529-2.115-2.607-2.219-.074-.103-.615-.818-.615-1.56 0-.743.391-1.107.531-1.258.14-.15.307-.188.409-.188.103 0 .205.004.296.009.096.005.225-.036.352.27.13.313.444 1.082.483 1.161.039.08.065.173.013.277-.052.103-.079.168-.156.259-.078.09-.163.201-.233.27-.08.077-.163.161-.07.32.093.16.413.682.886 1.103.609.543 1.123.711 1.282.79.16.08.254.07.348-.039.095-.109.406-.473.514-.635.109-.162.217-.135.367-.08.151.054.958.452 1.123.535.165.083.276.124.316.193.04.07.04.405-.104.81z"/>
+                      </svg>
+                      <span>Chat WhatsApp</span>
+                    </a>
+
+                    <a
+                      href={`tel:${driverPhone}`}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-3.5 py-2.5 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition"
+                    >
+                      <Icon name="phone" className="size-4" />
+                      <span>Telepon Driver</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Route Summary */}
+              <div className="rounded-xl border-[2.5px] border-black bg-amber-50/70 p-4 text-xs space-y-2 shadow-[3px_3px_0px_0px_#000]">
+                <div className="flex justify-between items-center text-black">
+                  <span className="font-extrabold text-black">Status Penjemputan:</span>
+                  <StatusBadge status={submittedBooking.status} />
+                </div>
+                <div className="flex justify-between text-black">
+                  <span className="font-extrabold text-black">Titik Jemput:</span>
+                  <span className="text-right text-black font-bold truncate max-w-[220px]">
+                    {submittedBooking.pickupLocation}
+                  </span>
+                </div>
+                <div className="flex justify-between text-black">
+                  <span className="font-extrabold text-black">Tujuan:</span>
+                  <span className="text-right text-black font-bold truncate max-w-[220px]">
+                    {submittedBooking.destination}
+                  </span>
+                </div>
+              </div>
+
+              {/* Big Tracking CTA Button */}
+              {submittedBooking.vehicle?.id && (
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      router.push(`/user/tracking?vehicleId=${submittedBooking.vehicle.id}`);
+                    }}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-[2.5px] border-black bg-emerald-400 px-4 py-3.5 text-sm font-black text-black shadow-[4px_4px_0px_0px_#000] hover:bg-emerald-300 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition cursor-pointer"
+                  >
+                    <Icon name="tracking" className="size-5" />
+                    <span>Lacak Posisi Driver di Peta Langsung ➔</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Modal Footer Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2 border-t-2 border-black/15">
             <button
               type="button"
               onClick={() => {
                 onClose();
                 router.push('/user/bookings');
               }}
-              className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer"
+              className="px-4 py-2.5 bg-black hover:bg-zinc-800 text-white rounded-xl border-2 border-black text-xs font-bold shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
             >
-              View My Bookings
+              Lihat Daftar Pemesanan Saya
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 border border-zinc-300 hover:bg-zinc-50 text-zinc-700 rounded text-xs font-medium cursor-pointer"
+              className="px-4 py-2.5 border-2 border-black bg-white hover:bg-zinc-100 text-black rounded-xl text-xs font-bold shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
             >
-              Close
+              Tutup
             </button>
           </div>
         </div>
@@ -495,6 +721,69 @@ export function BookingModal({
       <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
         {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
 
+        {/* GPS Location Banner (Wajib Bagi User) */}
+        <div className={`rounded-xl border-[2.5px] border-black p-3.5 text-xs shadow-[3px_3px_0px_0px_#000] transition-colors duration-200 ${
+          geoStatus === 'granted' && userCoords
+            ? 'bg-emerald-200 text-black'
+            : geoStatus === 'denied'
+              ? 'bg-rose-200 text-black'
+              : 'bg-amber-100 text-black'
+        }`}>
+          {geoStatus === 'locating' ? (
+            <div className="flex items-center gap-2.5 text-black font-bold">
+              <Spinner size="sm" />
+              <span>Memeriksa dan mendeteksi titik GPS perangkat Anda...</span>
+            </div>
+          ) : geoStatus === 'granted' && userCoords ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-black flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full border border-black bg-emerald-600 animate-pulse" />
+                  Lokasi GPS Terdeteksi (Wajib Aktif)
+                </span>
+                <span className="text-[11px] font-mono font-black text-black bg-white px-2 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
+                  ±{userCoords.accuracyM}m akurasi
+                </span>
+              </div>
+              <p className="text-[11px] font-semibold text-zinc-800">
+                Koordinat: {userCoords.lat.toFixed(5)}, {userCoords.lng.toFixed(5)}
+                {nearestHubName ? ` · Hub terdekat: ${nearestHubName}` : ''}
+              </p>
+            </div>
+          ) : geoStatus === 'denied' ? (
+            <div className="space-y-2 text-black">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold flex items-center gap-1.5 text-black">
+                  ⚠️ Izin Lokasi (GPS) Wajib Diaktifkan
+                </span>
+                <button
+                  type="button"
+                  onClick={() => requestUserLocation()}
+                  className="px-3 py-1 text-[11px] font-extrabold bg-black hover:bg-zinc-800 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                >
+                  Izinkan Lokasi
+                </button>
+              </div>
+              <p className="text-[11px] font-bold leading-relaxed text-rose-950">
+                Lokasi GPS Anda wajib diaktifkan agar sistem auto-dispatch dapat menentukan titik penjemputan dan armada driver terdekat. Silakan izinkan akses lokasi di browser Anda.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-black font-extrabold flex items-center gap-1.5">
+                📍 Lokasi (GPS) Wajib untuk Penjemputan
+              </span>
+              <button
+                type="button"
+                onClick={() => requestUserLocation()}
+                className="px-3 py-1 text-[11px] font-extrabold bg-black hover:bg-zinc-800 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+              >
+                Deteksi GPS
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Operational Location (Required) */}
         <FormField label="Operational Location" name="operationalLocation" required>
           {loadingLocations ? (
@@ -506,6 +795,7 @@ export function BookingModal({
               id="operationalLocation"
               value={operationalLocationId}
               onChange={(e) => {
+                userManuallySelectedRef.current = true;
                 setOperationalLocationId(e.target.value);
                 // Clear preferred vehicle if it doesn't belong to newly selected location
                 if (
@@ -535,15 +825,45 @@ export function BookingModal({
         {/* Pickup & Destination */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="Pickup Location" name="pickupLocation" required>
-            <input
-              id="pickupLocation"
-              type="text"
-              required
-              value={pickupLocation}
-              onChange={(e) => setPickupLocation(e.target.value)}
-              placeholder="e.g. Halim Station Gate 2"
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            />
+            <div className="space-y-1">
+              <input
+                id="pickupLocation"
+                type="text"
+                required
+                value={pickupLocation}
+                onChange={(e) => setPickupLocation(e.target.value)}
+                placeholder="e.g. Halim Gate 2"
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              />
+              {userCoords && (
+                <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const locationText =
+                        resolvedAddress ||
+                        nearestHubName ||
+                        `Titik GPS (${userCoords.lat.toFixed(5)}, ${userCoords.lng.toFixed(5)})`;
+                      setPickupLocation(locationText);
+                    }}
+                    className="text-emerald-700 hover:text-emerald-900 font-medium underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    📍 Gunakan alamat lokasi saya
+                  </button>
+                  {isResolvingAddress ? (
+                    <span className="text-zinc-400 italic text-[10px]">Mencari alamat...</span>
+                  ) : resolvedAddress ? (
+                    <span className="text-zinc-600 font-medium text-[10px] max-w-[280px] truncate" title={resolvedAddress}>
+                      {resolvedAddress}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-400 font-mono text-[10px]">
+                      {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </FormField>
 
           <FormField label="Destination" name="destination" required>
@@ -553,7 +873,7 @@ export function BookingModal({
               required
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
-              placeholder="e.g. Tegalluar Depot Office"
+              placeholder="e.g. Tegalluar Depo Office"
               className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
             />
           </FormField>
@@ -615,16 +935,16 @@ export function BookingModal({
         </div>
 
         {/* Specific Vehicle Preference (Option B - Optional) */}
-        <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2">
+        <div className="p-3.5 bg-amber-50/70 border-[2.5px] border-black rounded-xl space-y-2 shadow-[3px_3px_0px_0px_#000]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+            <span className="text-xs font-black uppercase tracking-wider text-black">
               Specific Vehicle Preference (Optional)
             </span>
             {preferredVehicle && (
               <button
                 type="button"
                 onClick={() => setPreferredVehicle(null)}
-                className="text-xs text-rose-600 hover:text-rose-800 font-medium cursor-pointer"
+                className="text-xs text-rose-700 hover:text-rose-900 font-extrabold cursor-pointer underline"
               >
                 Clear Preference
               </button>
@@ -632,20 +952,20 @@ export function BookingModal({
           </div>
 
           {preferredVehicle ? (
-            <div className="p-2.5 bg-white border border-zinc-300 rounded flex items-center justify-between text-xs">
+            <div className="p-3 bg-white border-2 border-black rounded-lg flex items-center justify-between text-xs shadow-[2px_2px_0px_0px_#000]">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-zinc-900">
+                  <span className="font-mono font-black text-black">
                     {preferredVehicle.plateNumber}
                   </span>
                   {preferredVehicle.status && <StatusBadge status={preferredVehicle.status} />}
                 </div>
-                <div className="text-zinc-600 mt-0.5">
+                <div className="text-zinc-700 font-semibold mt-0.5">
                   {preferredVehicle.brand} {preferredVehicle.model} • {preferredVehicle.seatingCapacity} seats
                   {preferredVehicle.vehicleType && ` • ${preferredVehicle.vehicleType}`}
                 </div>
               </div>
-              <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-semibold rounded uppercase">
+              <span className="px-2 py-0.5 bg-amber-300 border-1.5 border-black text-black text-[10px] font-black rounded-md uppercase shadow-[1.5px_1.5px_0px_0px_#000]">
                 Selected
               </span>
             </div>
@@ -656,15 +976,15 @@ export function BookingModal({
                 placeholder="Search by license plate to request specific vehicle..."
                 value={vehicleSearchQuery}
                 onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="w-full px-3 py-2 text-xs border-2 border-black rounded-lg bg-white text-black font-semibold shadow-[2px_2px_0px_0px_#000] focus:shadow-[3px_3px_0px_0px_#059669] focus:outline-none"
               />
               {isSearchingVehicles && (
-                <div className="text-xs text-zinc-400 flex items-center gap-1.5 py-1">
+                <div className="text-xs text-black font-bold flex items-center gap-1.5 py-1">
                   <Spinner size="sm" /> Searching vehicles...
                 </div>
               )}
               {vehicleSearchResults.length > 0 && (
-                <div className="bg-white border border-zinc-200 rounded divide-y divide-zinc-100 max-h-40 overflow-y-auto">
+                <div className="bg-white border-2 border-black rounded-lg divide-y-2 divide-black/10 max-h-40 overflow-y-auto shadow-[3px_3px_0px_0px_#000]">
                   {vehicleSearchResults.map((v) => (
                     <button
                       key={v.id}
@@ -674,11 +994,11 @@ export function BookingModal({
                         setVehicleSearchQuery('');
                         setVehicleSearchResults([]);
                       }}
-                      className="w-full p-2 text-left hover:bg-zinc-50 flex items-center justify-between text-xs cursor-pointer"
+                      className="w-full p-2.5 text-left hover:bg-amber-100/60 flex items-center justify-between text-xs cursor-pointer font-bold transition-colors"
                     >
                       <div>
-                        <span className="font-mono font-semibold text-zinc-900">{v.plateNumber}</span>
-                        <span className="text-zinc-500 ml-2">
+                        <span className="font-mono font-black text-black">{v.plateNumber}</span>
+                        <span className="text-zinc-700 ml-2">
                           {v.brand} {v.model} ({v.seatingCapacity} seats)
                         </span>
                       </div>
@@ -687,7 +1007,7 @@ export function BookingModal({
                   ))}
                 </div>
               )}
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] font-medium text-zinc-600">
                 Leaving this empty allows auto-dispatch to assign the fastest eligible driver & vehicle.
               </p>
             </div>
@@ -702,25 +1022,25 @@ export function BookingModal({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Special equipment, contact details, or operational instructions"
-            className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="w-full px-3 py-2 text-xs border-2 border-black rounded-lg bg-white text-black font-medium shadow-[2px_2px_0px_0px_#000] focus:shadow-[3px_3px_0px_0px_#059669] focus:outline-none"
           />
         </FormField>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t-2 border-black/15">
           <button
             type="button"
             onClick={onClose}
-            className="px-3.5 py-1.5 border border-zinc-300 hover:bg-zinc-50 text-zinc-700 rounded text-xs font-medium cursor-pointer"
+            className="px-4 py-2 border-2 border-black bg-white hover:bg-zinc-100 text-black rounded-xl text-xs font-bold shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+            className="px-5 py-2.5 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 text-black border-2 border-black rounded-xl text-xs font-black shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer inline-flex items-center gap-1.5"
           >
-            {isSubmitting && <Spinner size="sm" />}
+            {isSubmitting && <Spinner size="sm" className="text-black" />}
             <span>Submit Reservation</span>
           </button>
         </div>

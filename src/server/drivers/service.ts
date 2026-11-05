@@ -39,6 +39,9 @@ export async function createDriver(
   input: CreateDriverInput,
   ctx?: DriverMutationContext
 ) {
+  if (input.status === DriverStatus.ON_TRIP) {
+    throw new ApiError(400, 'INVALID_STATUS', 'ON_TRIP status is reserved for the trip lifecycle');
+  }
   const email = input.email.toLowerCase().trim();
   const licenseNumber = input.licenseNumber.trim();
 
@@ -184,70 +187,101 @@ export async function updateDriver(
   input: UpdateDriverInput,
   ctx?: DriverMutationContext
 ) {
-  const existing = await prisma.driver.findUnique({
-    where: { id },
-    include: { user: true },
-  });
+  const { existing, updated } = await prisma.$transaction(async (tx) => {
+    await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', id);
+    const existing = await tx.driver.findUnique({
+      where: { id },
+      include: { user: true, currentVehicle: true },
+    });
 
-  if (!existing) {
-    throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
-  }
+    if (!existing) {
+      throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
+    }
 
-  const data: Prisma.DriverUpdateInput = {};
+    const data: Prisma.DriverUpdateInput = {};
 
-  if (input.licenseNumber) {
-    const licenseNumber = input.licenseNumber.trim();
-    if (licenseNumber !== existing.licenseNumber) {
-      const duplicate = await prisma.driver.findUnique({ where: { licenseNumber } });
-      if (duplicate) {
-        throw new ApiError(409, 'LICENSE_EXISTS', 'A driver with this license number already exists');
+    if (input.licenseNumber) {
+      const licenseNumber = input.licenseNumber.trim();
+      if (licenseNumber !== existing.licenseNumber) {
+        const duplicate = await tx.driver.findUnique({ where: { licenseNumber } });
+        if (duplicate) {
+          throw new ApiError(409, 'LICENSE_EXISTS', 'A driver with this license number already exists');
+        }
+        data.licenseNumber = licenseNumber;
       }
-      data.licenseNumber = licenseNumber;
-    }
-  }
-
-  if (input.status && input.status !== existing.status) {
-    if (input.status === DriverStatus.ON_TRIP) {
-      throw new ApiError(
-        400,
-        'INVALID_STATUS',
-        'Cannot set ON_TRIP status manually; reserved for trip lifecycle'
-      );
     }
 
-    if (input.status === DriverStatus.AVAILABLE && !existing.currentVehicleId) {
-      throw new ApiError(
-        400,
-        'NO_VEHICLE_ASSIGNED',
-        'Cannot set AVAILABLE status without an assigned vehicle'
-      );
+    if (input.status && (input.status !== existing.status || input.status === DriverStatus.OFFLINE)) {
+      const activeTrip = await tx.trip.findFirst({ where: { driverId: id, status: 'ACTIVE' } });
+      if (existing.status === DriverStatus.ON_TRIP || activeTrip) {
+        throw new ApiError(409, 'DRIVER_BUSY', 'Cannot change driver status during an active trip');
+      }
+      if (input.status === DriverStatus.ON_TRIP) {
+        throw new ApiError(
+          400,
+          'INVALID_STATUS',
+          'Cannot set ON_TRIP status manually; reserved for trip lifecycle'
+        );
+      }
+
+      if (input.status === DriverStatus.AVAILABLE && !existing.user.isActive) {
+        throw new ApiError(409, 'DRIVER_INACTIVE', 'Cannot make an inactive driver available');
+      }
+      if (input.status === DriverStatus.AVAILABLE &&
+        existing.currentVehicle && ['INACTIVE', 'MAINTENANCE', 'IN_USE'].includes(existing.currentVehicle.status)) {
+        throw new ApiError(409, 'VEHICLE_UNAVAILABLE', 'Driver requires an available assigned vehicle');
+      }
+      if (input.status === DriverStatus.AVAILABLE && !existing.currentVehicleId) {
+        throw new ApiError(
+          400,
+          'NO_VEHICLE_ASSIGNED',
+          'Cannot set AVAILABLE status without an assigned vehicle'
+        );
+      }
+
+      if (input.status === DriverStatus.OFFLINE) {
+        const booking = await tx.booking.findFirst({
+          where: {
+            driverId: id,
+            status: { in: ['APPROVED', 'SEARCHING_DRIVER', 'DRIVER_NOTIFIED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'ADMIN_INTERVENTION'] },
+          },
+        });
+        if (booking) {
+          throw new ApiError(409, 'ACTIVE_BOOKING', 'Resolve assigned bookings before taking the driver offline');
+        }
+        await tx.driverSession.updateMany({
+          where: { driverId: id, status: 'ACTIVE' },
+          data: { status: 'ENDED', endedAt: new Date() },
+        });
+        await tx.vehicleLocation.updateMany({ where: { driverId: id }, data: { movement: 'OFFLINE' } });
+      }
+      data.status = input.status;
     }
 
-    data.status = input.status;
-  }
-
-  const updated = await prisma.driver.update({
-    where: { id },
-    data,
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          phone: true,
-          isActive: true,
+    const updated = await tx.driver.update({
+      where: { id },
+      data,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            isActive: true,
+          },
+        },
+        currentVehicle: {
+          select: {
+            id: true,
+            plateNumber: true,
+            brand: true,
+            model: true,
+          },
         },
       },
-      currentVehicle: {
-        select: {
-          id: true,
-          plateNumber: true,
-          brand: true,
-          model: true,
-        },
-      },
-    },
+    });
+    return { existing, updated };
   });
 
   await logAuditEvent({
@@ -270,38 +304,50 @@ export async function updateDriver(
   return updated;
 }
 
+export async function assertDriverCanDeactivate(tx: Prisma.TransactionClient, id: string) {
+  await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', id);
+  const driver = await tx.driver.findUnique({ where: { id }, include: { user: true, drivenVehicle: true } });
+  if (!driver) {
+    throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
+  }
+  const activeTrip = await tx.trip.findFirst({ where: { driverId: id, status: 'ACTIVE' } });
+  if (driver.status === DriverStatus.ON_TRIP || activeTrip) {
+    throw new ApiError(409, 'DRIVER_BUSY', 'Cannot deactivate a driver during an active trip');
+  }
+  const activeAssignment = await tx.vehicleAssignment.findFirst({
+    where: { driverId: id, unassignedAt: null },
+  });
+  if (activeAssignment || driver.currentVehicleId || driver.drivenVehicle) {
+    throw new ApiError(409, 'DRIVER_ASSIGNED', 'Unassign the vehicle before deactivating the driver');
+  }
+  const booking = await tx.booking.findFirst({
+    where: {
+      driverId: id,
+      status: { in: ['APPROVED', 'SEARCHING_DRIVER', 'DRIVER_NOTIFIED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'ADMIN_INTERVENTION'] },
+    },
+  });
+  if (booking) {
+    throw new ApiError(409, 'ACTIVE_BOOKING', 'Resolve assigned bookings before deactivating the driver');
+  }
+  const session = await tx.driverSession.findFirst({ where: { driverId: id, status: 'ACTIVE' } });
+  if (session) {
+    throw new ApiError(409, 'ACTIVE_SESSION', 'End the online session before deactivating the driver');
+  }
+  return driver;
+}
+
 export async function deactivateDriver(
   id: string,
   ctx?: DriverMutationContext
 ) {
-  const driver = await prisma.driver.findUnique({
-    where: { id },
-    include: { user: true },
-  });
-
-  if (!driver) {
-    throw new ApiError(404, 'NOT_FOUND', 'Driver not found');
-  }
-
-  const activeAssignment = await prisma.vehicleAssignment.findFirst({
-    where: { driverId: id, unassignedAt: null },
-  });
-
-  if (activeAssignment) {
-    throw new ApiError(
-      409,
-      'DRIVER_ASSIGNED',
-      'Cannot deactivate driver while an active vehicle assignment exists; unassign first'
-    );
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
+  const { result, driver } = await prisma.$transaction(async (tx) => {
+    const driver = await assertDriverCanDeactivate(tx, id);
     await tx.user.update({
       where: { id: driver.userId },
       data: { isActive: false },
     });
 
-    return tx.driver.update({
+    const result = await tx.driver.update({
       where: { id },
       data: {
         status: DriverStatus.OFFLINE,
@@ -319,6 +365,7 @@ export async function deactivateDriver(
         },
       },
     });
+    return { result, driver };
   });
 
   await logAuditEvent({

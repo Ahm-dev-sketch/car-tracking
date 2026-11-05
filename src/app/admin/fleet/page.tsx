@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FleetMap, VehicleMarkerData } from '@/components/map';
 import { useRealtime } from '@/hooks/useRealtime';
@@ -10,6 +10,18 @@ import { MovementBadge } from '@/components/ui/MovementBadge';
 import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Spinner } from '@/components/ui/Spinner';
+import {
+  getHubMapCenter,
+  getHubCoordinates,
+  DEFAULT_OPS_CENTER,
+  DEFAULT_OPS_ZOOM,
+} from '@/lib/operational-locations';
+
+type TrackingRow = Pick<VehicleMarkerData, 'vehicleId' | 'plateNumber' | 'brand' | 'model' | 'status' | 'homeLocation'> & {
+  driver?: { name: string; phone: string } | null;
+  location: Pick<VehicleMarkerData, 'lat' | 'lng' | 'accuracyM' | 'speedMps' | 'headingDeg' | 'recordedAt' | 'movement'>;
+  currentLocationInfo?: VehicleMarkerData['currentOperationalLocation'];
+};
 
 interface OperationalLocation {
   id: string;
@@ -23,6 +35,8 @@ function AdminFleetMapContent() {
 
   const [vehicles, setVehicles] = useState<VehicleMarkerData[]>([]);
   const [locations, setLocations] = useState<OperationalLocation[]>([]);
+  const locationsRef = useRef<OperationalLocation[]>([]);
+  locationsRef.current = locations;
   const [locationFilter, setLocationFilter] = useState(
     searchParams.get('locationId') || searchParams.get('location_id') || ''
   );
@@ -54,15 +68,16 @@ function AdminFleetMapContent() {
     router.replace(`/admin/fleet?${params.toString()}`);
   };
 
-  const fetchLiveFleet = async () => {
+  const fetchLiveFleet = useCallback(async (signal: AbortSignal) => {
     try {
       const url = locationFilter
         ? `/api/tracking/live?locationId=${encodeURIComponent(locationFilter)}`
         : '/api/tracking/live';
-      const res = await fetch(url);
+      const res = await fetch(url, { signal, cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
-        const rows: any[] = json.data || [];
+        if (signal.aborted) return;
+        const rows: TrackingRow[] = json.data || [];
         const mapped: VehicleMarkerData[] = rows
           .filter((r) => r.location && r.location.lat !== undefined && r.location.lng !== undefined)
           .map((r) => ({
@@ -75,7 +90,7 @@ function AdminFleetMapContent() {
             driverPhone: r.driver?.phone || null,
             lat: r.location.lat,
             lng: r.location.lng,
-            accuracyM: r.location.accuracyM || 10,
+            accuracyM: r.location.accuracyM ?? 10,
             speedMps: r.location.speedMps,
             headingDeg: r.location.headingDeg,
             recordedAt: r.location.recordedAt,
@@ -83,24 +98,94 @@ function AdminFleetMapContent() {
             homeLocation: r.homeLocation || null,
             currentOperationalLocation: r.currentLocationInfo || null,
           }));
-        setVehicles(mapped);
-        if (!selectedVehicleId && mapped.length > 0) {
-          setSelectedVehicleId(mapped[0].vehicleId);
+
+        // If filtering by location, also load registered hub vehicles so standby pool units appear on map
+        if (locationFilter) {
+          try {
+            const vRes = await fetch(`/api/vehicles?locationId=${encodeURIComponent(locationFilter)}&limit=100`, { signal });
+            if (vRes.ok) {
+              const vJson = await vRes.json();
+              const hubVehicles: Array<{
+                id: string;
+                plateNumber: string;
+                brand: string;
+                model: string;
+                status: string;
+                homeLocation?: { id: string; name: string; code: string } | null;
+                currentOperationalLocation?: { id: string; name: string; code: string } | null;
+                updatedAt?: string;
+              }> = vJson.data || [];
+
+              const selectedLoc = locationsRef.current.find((l) => l.id === locationFilter);
+              const hubCoords = (selectedLoc && getHubCoordinates(selectedLoc.code || selectedLoc.name)) || DEFAULT_OPS_CENTER;
+
+              let parkedOffset = 0;
+              for (const hv of hubVehicles) {
+                if (!mapped.some((m) => m.vehicleId === hv.id)) {
+                  parkedOffset++;
+                  // Small spiral offset so parked pool units don't render on identical pixel
+                  const angle = parkedOffset * 1.2;
+                  const radius = 0.0003 + (parkedOffset * 0.00012);
+                  mapped.push({
+                    vehicleId: hv.id,
+                    plateNumber: hv.plateNumber,
+                    brand: hv.brand,
+                    model: hv.model,
+                    status: hv.status,
+                    driverName: null,
+                    driverPhone: null,
+                    lat: hubCoords[0] + (Math.sin(angle) * radius),
+                    lng: hubCoords[1] + (Math.cos(angle) * radius),
+                    accuracyM: 10,
+                    speedMps: 0,
+                    headingDeg: 0,
+                    recordedAt: hv.updatedAt || new Date().toISOString(),
+                    movement: 'STOPPED',
+                    homeLocation: hv.homeLocation || null,
+                    currentOperationalLocation: hv.currentOperationalLocation || null,
+                  });
+                }
+              }
+            }
+          } catch {
+            // Non-fatal if vehicle pool enrichment fails
+          }
         }
+
+        setVehicles(mapped);
+        setSelectedVehicleId((current) =>
+          mapped.some((v) => v.vehicleId === current) ? current : mapped[0]?.vehicleId ?? null
+        );
+      } else if (res.status === 401 || res.status === 403) {
+        setVehicles([]);
+        setSelectedVehicleId(null);
       }
     } catch {
       // ignore
     } finally {
-      setIsLoading(false);
+      if (!signal.aborted) setIsLoading(false);
     }
-  };
+  }, [locationFilter]);
 
   useEffect(() => {
-    fetchLiveFleet();
-    syncUrlParams({ locationId: locationFilter });
-    const interval = setInterval(fetchLiveFleet, 10000);
-    return () => clearInterval(interval);
-  }, [locationFilter]);
+    const controller = new AbortController();
+    let fetching = false;
+    const poll = async () => {
+      if (fetching) return;
+      fetching = true;
+      try {
+        await fetchLiveFleet(controller.signal);
+      } finally {
+        fetching = false;
+      }
+    };
+    void poll();
+    const interval = setInterval(poll, 10000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
+  }, [fetchLiveFleet]);
 
   // Admin subscribes to all realtime telemetry via useRealtime
   const { vehicles: realtimeVehicles, connectionState } = useRealtime();
@@ -109,7 +194,7 @@ function AdminFleetMapContent() {
   const mergedVehicles = useMemo(() => {
     return vehicles.map((v) => {
       const rt = realtimeVehicles.get(v.vehicleId);
-      if (rt) {
+      if (rt && Date.parse(rt.recordedAt) > Date.parse(v.recordedAt)) {
         return {
           ...v,
           lat: rt.lat,
@@ -119,8 +204,8 @@ function AdminFleetMapContent() {
           headingDeg: rt.headingDeg,
           recordedAt: rt.recordedAt,
           movement: rt.movement,
-          driverName: rt.driverName ?? v.driverName,
-          driverPhone: rt.driverPhone ?? v.driverPhone,
+          driverName: rt.driverName === undefined ? v.driverName : rt.driverName,
+          driverPhone: rt.driverPhone === undefined ? v.driverPhone : rt.driverPhone,
           plateNumber: rt.plateNumber ?? v.plateNumber,
           tripOrigin: rt.tripOrigin ?? v.tripOrigin,
           tripDestination: rt.tripDestination ?? v.tripDestination,
@@ -138,25 +223,45 @@ function AdminFleetMapContent() {
 
   const movingCount = mergedVehicles.filter((v) => v.movement === 'MOVING').length;
 
+  const selectedLocation = useMemo(
+    () => locations.find((l) => l.id === locationFilter),
+    [locations, locationFilter]
+  );
+
+  const currentMapCenter = useMemo(() => {
+    if (selectedLocation) {
+      return getHubMapCenter(selectedLocation.code || selectedLocation.name);
+    }
+    return { center: DEFAULT_OPS_CENTER, zoom: DEFAULT_OPS_ZOOM };
+  }, [selectedLocation]);
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+      <div className="page-intro">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900">Fleet Command & Map</h1>
+          <span className="eyebrow mb-3">Every vehicle, in view</span>
+          <h1 className="page-heading">
+            {selectedLocation ? `Fleet Map: ${selectedLocation.name} (${selectedLocation.code})` : 'Follow your fleet.'}
+          </h1>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Realtime GPS map of entire corporate vehicle operations ({mergedVehicles.length} reporting, {movingCount} moving)
+            {selectedLocation
+              ? `Operational hub map for ${selectedLocation.name}. Fleet units: ${mergedVehicles.length}, Moving: ${movingCount}`
+              : `Realtime GPS map of entire corporate vehicle operations (${mergedVehicles.length} reporting, ${movingCount} moving)`}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-zinc-500">Hub:</span>
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
             <select
               value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              onChange={(e) => {
+                setLocationFilter(e.target.value);
+                syncUrlParams({ locationId: e.target.value, location_id: '' });
+              }}
+              className="px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
-              <option value="">All Hubs</option>
+              <option value="">All Hubs (Seluruh Wilayah)</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -166,14 +271,14 @@ function AdminFleetMapContent() {
           </div>
 
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded font-mono text-[11px] border ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] ${
               connectionState === 'open'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : 'bg-zinc-100 text-zinc-600 border-zinc-200'
+                ? 'bg-emerald-200 text-zinc-950'
+                : 'bg-zinc-200 text-zinc-800'
             }`}
           >
             <span
-              className={`w-1.5 h-1.5 rounded-full ${
+              className={`w-2 h-2 rounded-full border border-black ${
                 connectionState === 'open' ? 'bg-emerald-500' : 'bg-zinc-400'
               }`}
             />
@@ -183,64 +288,66 @@ function AdminFleetMapContent() {
       </div>
 
       {isLoading ? (
-        <div className="py-24 text-center text-zinc-500 text-sm bg-white rounded-lg border border-zinc-200">
+        <div className="surface py-24 text-center text-zinc-500 text-sm" role="status">
           <Spinner size="lg" className="mb-2" />
           <p>Acquiring fleet telemetry...</p>
         </div>
-      ) : mergedVehicles.length === 0 ? (
-        <div className="p-12 text-center bg-white border border-dashed border-zinc-300 rounded-lg text-zinc-500 text-sm">
-          <p className="font-semibold text-zinc-700">No active vehicle telemetry received</p>
-          <p className="text-xs text-zinc-400 mt-1">
-            Locations will populate as drivers activate trips and stream coordinates.
-          </p>
-        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-3">
+        <div className="tracking-layout">
+          <div className="bezel min-w-0">
             <FleetMap
               vehicles={mergedVehicles}
               selectedVehicleId={selectedVehicleId}
               onSelectVehicle={(v) => setSelectedVehicleId(v.vehicleId)}
-              className="h-[360px] sm:h-[480px] lg:h-[600px] w-full rounded-lg overflow-hidden border border-zinc-200"
+              center={currentMapCenter.center}
+              zoom={currentMapCenter.zoom}
+              className="tracking-map"
             />
           </div>
 
           {/* Telemetry and Driver Details Panel */}
-          <div className="bg-white border border-zinc-200 rounded-lg p-4 flex flex-col justify-between">
-            <div>
-              <div className="border-b border-zinc-100 pb-3 mb-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  Fleet Units ({mergedVehicles.length})
-                </span>
-                <div className="mt-2 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                  {mergedVehicles.map((v) => (
-                    <button
-                      key={v.vehicleId}
-                      type="button"
-                      onClick={() => setSelectedVehicleId(v.vehicleId)}
-                      className={`px-2 py-1 text-xs rounded font-mono font-medium border cursor-pointer ${
-                        v.vehicleId === selectedVehicleId
-                          ? 'bg-zinc-900 text-white border-zinc-900'
-                          : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
-                      }`}
-                    >
-                      {v.plateNumber}
-                    </button>
-                  ))}
-                </div>
+          <div className="surface tracking-panel p-5 sm:p-6 flex flex-col justify-between">
+            {mergedVehicles.length === 0 ? (
+              <div className="py-12 text-center text-zinc-500 text-xs">
+                <p className="font-semibold text-zinc-700 text-sm">Tidak ada armada aktif di wilayah ini</p>
+                <p className="mt-1 text-zinc-400">Peta wilayah {selectedLocation?.name || 'operasional'} tetap aktif di atas.</p>
               </div>
+            ) : (
+              <div>
+                <div className="border-b-2 border-black/10 pb-3 mb-3">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                    Fleet Units ({mergedVehicles.length}) {selectedLocation ? `— ${selectedLocation.name}` : ''}
+                  </span>
+                  <div className="mt-2 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                    {mergedVehicles.map((v) => (
+                      <button
+                        key={v.vehicleId}
+                        type="button"
+                        onClick={() => setSelectedVehicleId(v.vehicleId)}
+                        aria-pressed={v.vehicleId === selectedVehicleId}
+                        className={`min-h-10 px-3.5 py-1.5 text-xs rounded-lg font-mono font-bold border-2 border-black cursor-pointer transition ${
+                          v.vehicleId === selectedVehicleId
+                            ? 'bg-emerald-400 text-zinc-950 shadow-[3px_3px_0px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
+                            : 'bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100'
+                        }`}
+                      >
+                        {v.plateNumber}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
               {selectedVehicle ? (
-                <div className="space-y-3 text-xs">
+                <div className="space-y-4 rounded-xl border-2 border-black bg-zinc-50 p-4 text-sm shadow-[3px_3px_0px_0px_#000]">
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-base text-zinc-900">
+                      <span className="inline-block px-3 py-1 bg-zinc-950 text-white font-mono font-black tracking-wider rounded-md border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000]">
                         {selectedVehicle.plateNumber}
                       </span>
                       <StatusBadge status={selectedVehicle.status} />
                     </div>
                     {selectedVehicle.brand && (
-                      <p className="text-zinc-600 mt-0.5">
+                      <p className="text-zinc-700 font-bold mt-1 text-xs">
                         {selectedVehicle.brand} {selectedVehicle.model}
                       </p>
                     )}
@@ -264,9 +371,9 @@ function AdminFleetMapContent() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-100">
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/10 text-xs">
                     <div>
-                      <span className="text-[10px] text-zinc-400 uppercase font-semibold">
+                      <span className="text-[10px] text-zinc-500 uppercase font-black">
                         Movement
                       </span>
                       <div className="mt-0.5">
@@ -274,7 +381,7 @@ function AdminFleetMapContent() {
                       </div>
                     </div>
                     <div>
-                      <span className="text-[10px] text-zinc-400 uppercase font-semibold">
+                      <span className="text-[10px] text-zinc-500 uppercase font-black">
                         Accuracy
                       </span>
                       <div className="mt-0.5">
@@ -283,21 +390,21 @@ function AdminFleetMapContent() {
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-zinc-100 space-y-1">
-                    <span className="text-[10px] text-zinc-400 uppercase font-semibold">
+                  <div className="pt-2 border-t-2 border-black/10 space-y-0.5 text-xs">
+                    <span className="text-[10px] text-zinc-500 uppercase font-black">
                       Telemetry Time
                     </span>
-                    <div className="text-zinc-700 font-mono">
+                    <div className="text-zinc-800 font-mono font-bold text-[11px]">
                       <RelativeTime date={selectedVehicle.recordedAt} />
                     </div>
                   </div>
 
                   {selectedVehicle.driverName && (
-                    <div className="pt-2 border-t border-zinc-100 space-y-1.5">
-                      <span className="text-[10px] text-zinc-400 uppercase font-semibold">
+                    <div className="pt-2 border-t-2 border-black/10 space-y-1.5 text-xs">
+                      <span className="text-[10px] text-zinc-500 uppercase font-black">
                         Operator
                       </span>
-                      <div className="font-bold text-zinc-900">{selectedVehicle.driverName}</div>
+                      <div className="font-black text-zinc-950">{selectedVehicle.driverName}</div>
                       {selectedVehicle.driverPhone && (
                         <div>
                           {waUrl ? (
@@ -305,12 +412,12 @@ function AdminFleetMapContent() {
                               href={waUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-emerald-700 font-semibold hover:underline"
+                              className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-emerald-300 px-2.5 py-1 text-xs font-bold text-zinc-950 shadow-[1px_1px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[2px_2px_0px_0px_#000]"
                             >
-                              <span>📱 WhatsApp {selectedVehicle.driverPhone}</span>
+                              <span>💬 WhatsApp {selectedVehicle.driverPhone}</span>
                             </a>
                           ) : (
-                            <span className="text-zinc-600">{selectedVehicle.driverPhone}</span>
+                            <span className="font-mono text-zinc-700 font-bold">{selectedVehicle.driverPhone}</span>
                           )}
                         </div>
                       )}
@@ -318,31 +425,32 @@ function AdminFleetMapContent() {
                   )}
 
                   {(selectedVehicle.tripOrigin || selectedVehicle.tripDestination) && (
-                    <div className="pt-2 border-t border-zinc-100 text-[11px] text-zinc-600 space-y-0.5">
+                    <div className="pt-2 border-t-2 border-black/10 text-xs text-zinc-700 space-y-1">
                       {selectedVehicle.tripOrigin && (
                         <div>
-                          <strong className="text-zinc-700">Origin:</strong> {selectedVehicle.tripOrigin}
+                          <strong className="text-zinc-900 font-bold">Origin:</strong> {selectedVehicle.tripOrigin}
                         </div>
                       )}
                       {selectedVehicle.tripDestination && (
                         <div>
-                          <strong className="text-zinc-700">Destination:</strong> {selectedVehicle.tripDestination}
+                          <strong className="text-zinc-900 font-bold">Destination:</strong> {selectedVehicle.tripDestination}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-xs text-zinc-400 py-6 text-center">
+                <div className="text-xs font-semibold text-zinc-500 py-6 text-center">
                   Select a marker on the map to inspect unit details.
                 </div>
               )}
             </div>
-          </div>
+          )}
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 }
 
 export default function AdminFleetMapPage() {

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'fleettrack-v1';
-const PRECACHE_URLS = ['/', '/offline'];
+const CACHE_NAME = 'fleettrack-v4';
+const PRECACHE_URLS = ['/offline'];
 
 // Install: precache essential shell and offline fallback
 self.addEventListener('install', (event) => {
@@ -19,7 +19,7 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) =>
         Promise.all(
           cacheNames
-            .filter((name) => name !== CACHE_NAME)
+            .filter((name) => name.startsWith('fleettrack-') && name !== CACHE_NAME)
             .map((name) => caches.delete(name))
         )
       )
@@ -45,22 +45,19 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // 1. Navigation requests (HTML pages) -> Network-first, fallback to cache, then /offline
+  // Next owns framework bundle caching. Dev chunk URLs can keep the same name
+  // after edits; replaying them against fresh HTML causes hydration mismatches.
+  // Private API/RSC responses must also never outlive their session.
+  if (url.origin === self.location.origin &&
+      (url.pathname.startsWith('/_next/') || url.pathname.startsWith('/api/') || request.headers.get('RSC') === '1')) {
+    return;
+  }
+
+  // Navigation is network-only; never replay another account's HTML offline.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
         .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) {
-            return cached;
-          }
           const offlinePage = await caches.match('/offline');
           return offlinePage || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
         })
@@ -68,48 +65,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Same-origin API GET requests
-  if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) {
-    // Special case: /api/tracking/live -> Stale-while-revalidate for fast cached map render
-    if (url.pathname === '/api/tracking/live') {
-      event.respondWith(
-        caches.match(request).then((cachedResponse) => {
-          const fetchPromise = fetch(request)
-            .then((networkResponse) => {
-              if (networkResponse && networkResponse.status === 200) {
-                const clone = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-              }
-              return networkResponse;
-            })
-            .catch(() => cachedResponse);
 
-          return cachedResponse || fetchPromise;
-        })
-      );
-      return;
-    }
-
-    // Other API GET requests -> Network-first with cache fallback
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // 3. Static assets & icons: cache-first with network refresh
+  // Public images and icons only; framework assets use Next/browser HTTP caching.
   if (
     url.origin === self.location.origin &&
     (url.pathname.startsWith('/icons/') ||
-      url.pathname.startsWith('/_next/static/') ||
       url.pathname.endsWith('.svg') ||
       url.pathname.endsWith('.png'))
   ) {

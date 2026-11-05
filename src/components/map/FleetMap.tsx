@@ -9,6 +9,13 @@ import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { LocationBadge } from '@/components/ui/LocationBadge';
 
+export interface RoutePoint {
+  lat: number;
+  lng: number;
+  label: string;
+  type?: 'pickup' | 'destination';
+}
+
 export interface VehicleMarkerData {
   vehicleId: string;
   plateNumber: string;
@@ -37,13 +44,26 @@ interface FleetMapProps {
   center?: [number, number];
   zoom?: number;
   className?: string;
+  routePoints?: RoutePoint[];
 }
 
 function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
+  const [lat, lng] = center;
+
   useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
+    const currentCenter = map.getCenter();
+    const currentZoom = map.getZoom();
+    const latDiff = Math.abs(currentCenter.lat - lat);
+    const lngDiff = Math.abs(currentCenter.lng - lng);
+    const zoomChanged = currentZoom !== zoom;
+
+    // Only update Leaflet view when coordinates or zoom actually change
+    if (latDiff > 0.0002 || lngDiff > 0.0002 || zoomChanged) {
+      map.setView([lat, lng], zoom, { animate: true });
+    }
+  }, [lat, lng, zoom, map]);
+
   return null;
 }
 
@@ -53,8 +73,8 @@ function createVehicleIcon(movement: string, isSelected: boolean) {
   const isGpsLost = normMovement === 'GPS_LOST';
   const isOffline = normMovement === 'OFFLINE';
 
-  let color = '#2563eb'; // blue
-  if (isMoving) color = '#059669'; // emerald
+  let color = '#62766b'; // stationary
+  if (isMoving) color = '#18765b'; // moving
   else if (isGpsLost) color = '#d97706'; // amber
   else if (isOffline) color = '#dc2626'; // red
 
@@ -65,16 +85,34 @@ function createVehicleIcon(movement: string, isSelected: boolean) {
   return L.divIcon({
     className: 'vehicle-div-icon',
     html: `
-      <div class="relative flex items-center justify-center w-8 h-8 rounded-full text-white shadow-lg border-2 border-white cursor-pointer" style="background-color: ${color};">
+      <div class="relative flex items-center justify-center w-8 h-8 rounded-full text-white border-2 border-white cursor-pointer" style="background-color: ${color};">
         ${pulseHtml}
         <svg class="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8m-8 4h8m-4 4h4m2 4H6a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" d="m5 8 2-4h10l2 4 2 3v7h-3v-2H6v2H3v-7l2-3Zm0 0h14M3 12h18M7 13v1m10-1v1" />
         </svg>
       </div>
     `,
     iconSize: [32, 32],
     iconAnchor: [16, 16],
     popupAnchor: [0, -18],
+  });
+}
+
+function createPointIcon(type: 'pickup' | 'destination', label: string) {
+  const isPickup = type === 'pickup';
+  const bg = isPickup ? '#047857' : '#e11d48';
+  return L.divIcon({
+    className: 'route-point-div-icon',
+    html: `
+      <div class="relative flex items-center justify-center -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold shadow-lg border-2 border-white" style="background-color: ${bg};">
+          <span>${isPickup ? '●' : '■'}</span>
+          <span class="max-w-[120px] truncate">${label}</span>
+        </div>
+      </div>
+    `,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
 
@@ -85,18 +123,19 @@ export default function FleetMap({
   center = [-6.2088, 106.8456], // Default Jakarta / Ops center
   zoom = 13,
   className = 'h-[500px] w-full',
+  routePoints,
 }: FleetMapProps) {
-  // If there are vehicles, center on the first one or selected one
+  // Center on selected vehicle if explicitly chosen, otherwise use center prop (e.g. selected Hub)
   const targetVehicle = selectedVehicleId
     ? vehicles.find((v) => v.vehicleId === selectedVehicleId)
-    : vehicles[0];
+    : null;
 
   const mapCenter: [number, number] = targetVehicle && !isNaN(targetVehicle.lat) && !isNaN(targetVehicle.lng)
     ? [targetVehicle.lat, targetVehicle.lng]
     : center;
 
   return (
-    <div className={`relative rounded-lg overflow-hidden border border-zinc-200 ${className}`}>
+    <div className={`relative rounded-[1.625rem] overflow-hidden isolate ${className}`}>
       <MapContainer
         center={mapCenter}
         zoom={zoom}
@@ -108,7 +147,7 @@ export default function FleetMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {targetVehicle && <MapUpdater center={mapCenter} zoom={zoom} />}
+        <MapUpdater center={mapCenter} zoom={zoom} />
 
         {vehicles.map((v) => {
           if (isNaN(v.lat) || isNaN(v.lng)) return null;
@@ -125,8 +164,8 @@ export default function FleetMap({
                   center={[v.lat, v.lng]}
                   radius={v.accuracyM}
                   pathOptions={{
-                    color: v.movement === 'MOVING' ? '#10b981' : '#3b82f6',
-                    fillColor: v.movement === 'MOVING' ? '#10b981' : '#3b82f6',
+                    color: v.movement === 'MOVING' ? '#18765b' : '#7b8f84',
+                    fillColor: v.movement === 'MOVING' ? '#18765b' : '#7b8f84',
                     fillOpacity: 0.12,
                     weight: 1,
                   }}
@@ -135,6 +174,8 @@ export default function FleetMap({
 
               {/* Vehicle Marker */}
               <Marker
+                title={v.plateNumber}
+                alt={`Vehicle ${v.plateNumber}`}
                 position={[v.lat, v.lng]}
                 icon={icon}
                 eventHandlers={{
@@ -223,6 +264,18 @@ export default function FleetMap({
                 </Popup>
               </Marker>
             </React.Fragment>
+          );
+        })}
+
+        {/* Route Points (Pickup & Destination) */}
+        {routePoints?.map((pt, idx) => {
+          if (isNaN(pt.lat) || isNaN(pt.lng)) return null;
+          return (
+            <Marker
+              key={`route-pt-${idx}-${pt.lat}-${pt.lng}`}
+              position={[pt.lat, pt.lng]}
+              icon={createPointIcon(pt.type || 'pickup', pt.label)}
+            />
           );
         })}
       </MapContainer>

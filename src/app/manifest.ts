@@ -2,15 +2,15 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Vehicle Tracking',
+    name: 'FleetTrack · Vehicle Tracking',
     short_name: 'FleetTrack',
     description:
       'Enterprise vehicle fleet management and live GPS tracking system',
     start_url: '/',
     id: '/',
     display: 'standalone',
-    background_color: '#0f172a',
-    theme_color: '#0f172a',
+    background_color: '#f4f7f5',
+    theme_color: '#f4f7f5',
     orientation: 'portrait-primary',
     icons: [
       {

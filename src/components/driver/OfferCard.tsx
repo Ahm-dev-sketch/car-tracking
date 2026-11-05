@@ -68,7 +68,8 @@ export function OfferCard({ offer, onAccept, onReject, onExpire }: OfferCardProp
   const passengers = offer.passengerCount || offer.booking?.passengerCount || 1;
   const etaText = formatEta(offer.etaSeconds, offer.etaEstimated);
 
-  const pct = Math.min(100, Math.max(0, (secondsRemaining / 30) * 100));
+  const maxSec = 60;
+  const pct = Math.min(100, Math.max(0, (secondsRemaining / maxSec) * 100));
 
   const handleAccept = async () => {
     setIsAccepting(true);
@@ -89,41 +90,41 @@ export function OfferCard({ offer, onAccept, onReject, onExpire }: OfferCardProp
   };
 
   return (
-    <div className="bg-white border-2 border-indigo-500 rounded-lg shadow-md overflow-hidden relative animate-fadeIn">
-      {/* 30s Countdown Bar */}
-      <div className="w-full bg-zinc-100 h-1.5 overflow-hidden">
+    <div className="rounded-xl border-[3px] border-black bg-white overflow-hidden shadow-[6px_6px_0px_0px_#000]">
+      {/* 60s Countdown Bar */}
+      <div className="w-full bg-zinc-200 border-b-2 border-black h-3 overflow-hidden" role="progressbar" aria-label="Time remaining to respond" aria-valuemin={0} aria-valuemax={maxSec} aria-valuenow={Math.min(secondsRemaining, maxSec)}>
         <div
-          className={`h-full transition-all duration-500 ${
-            secondsRemaining <= 5
+          className={`h-full origin-left transition-transform duration-500 ease-out border-r-2 border-black ${
+            secondsRemaining <= 10
               ? 'bg-rose-500'
-              : secondsRemaining <= 10
-              ? 'bg-amber-500'
-              : 'bg-indigo-600'
+              : secondsRemaining <= 20
+              ? 'bg-amber-400'
+              : 'bg-emerald-500'
           }`}
-          style={{ width: `${pct}%` }}
+          style={{ transform: `scaleX(${pct / 100})` }}
         />
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-4 sm:p-5 space-y-4">
         {/* Header with Countdown Badge */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-600" />
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 border border-black bg-emerald-500" />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
-              New Trip Dispatch Offer
+            <span className="text-sm font-black uppercase tracking-wider text-black">
+              Tawaran Perjalanan Baru
             </span>
           </div>
 
           <div
-            className={`font-mono font-bold text-xs px-2 py-0.5 rounded border ${
+            className={`font-mono font-black text-xs px-2.5 py-1 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] ${
               secondsRemaining <= 5
-                ? 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                ? 'bg-rose-300 text-black animate-pulse'
                 : secondsRemaining <= 10
-                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                ? 'bg-amber-300 text-black'
+                : 'bg-emerald-300 text-black'
             }`}
           >
             {secondsRemaining}s remaining
@@ -131,53 +132,53 @@ export function OfferCard({ offer, onAccept, onReject, onExpire }: OfferCardProp
         </div>
 
         {/* Route Details */}
-        <div className="bg-zinc-50 border border-zinc-200 rounded p-3 space-y-2 text-xs">
+        <div className="bg-amber-50/60 rounded-xl border-2 border-black p-4 space-y-3 text-sm shadow-[2px_2px_0px_0px_#000]">
           <div>
-            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Pickup</span>
-            <span className="font-semibold text-zinc-900 text-sm">{pickup}</span>
+            <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500 block">Titik Jemput</span>
+            <span className="font-extrabold text-black text-base">{pickup}</span>
           </div>
-          <div className="pt-2 border-t border-zinc-200">
-            <span className="text-[10px] uppercase font-bold text-zinc-400 block">Destination</span>
-            <span className="font-semibold text-zinc-900 text-sm">{dest}</span>
+          <div className="pt-2 border-t-2 border-dashed border-black/20">
+            <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500 block">Tujuan</span>
+            <span className="font-extrabold text-black text-base">{dest}</span>
           </div>
         </div>
 
         {/* Meta / Metrics */}
-        <div className="flex items-center justify-between text-xs pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1">
           <div className="flex items-center gap-3">
-            <span className="text-zinc-600">
-              👤 <strong className="text-zinc-800">{passengers}</strong> passenger(s)
+            <span className="text-zinc-700 font-bold">
+              <strong className="text-black font-black text-sm">{passengers}</strong> penumpang
             </span>
             {etaText && (
-              <span className="text-indigo-800 font-mono font-semibold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+              <span className="text-black font-mono font-black bg-amber-300 px-2.5 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
                 ETA: {etaText}
               </span>
             )}
           </div>
           {offer.booking?.bookingNumber && (
-            <span className="text-zinc-400 font-mono text-[11px]">
+            <span className="text-zinc-600 font-mono font-black text-[11px]">
               #{offer.booking.bookingNumber}
             </span>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-100">
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t-2 border-black/15">
           <button
             type="button"
             disabled={isAccepting || isRejecting}
             onClick={handleReject}
-            className="w-full py-2 px-3 border border-zinc-300 hover:bg-zinc-50 disabled:opacity-50 text-zinc-700 rounded text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5"
+            className="w-full inline-flex items-center justify-center rounded-xl border-2 border-black bg-rose-200 hover:bg-rose-300 text-black font-extrabold py-3 text-sm shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all disabled:opacity-50 cursor-pointer"
           >
-            {isRejecting ? <Spinner size="sm" /> : 'Decline'}
+            {isRejecting ? <Spinner size="sm" className="text-black" /> : 'Tolak Tawaran'}
           </button>
           <button
             type="button"
             disabled={isAccepting || isRejecting}
             onClick={handleAccept}
-            className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded text-xs font-semibold cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+            className="w-full inline-flex items-center justify-center rounded-xl border-2 border-black bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold py-3 text-sm shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all disabled:opacity-50 cursor-pointer"
           >
-            {isAccepting ? <Spinner size="sm" /> : 'Accept Offer'}
+            {isAccepting ? <Spinner size="sm" className="text-black" /> : 'Terima Tawaran'}
           </button>
         </div>
       </div>

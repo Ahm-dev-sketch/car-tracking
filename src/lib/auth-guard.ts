@@ -1,4 +1,5 @@
 import { auth } from '@/auth';
+import { prisma } from './prisma';
 import { ApiError } from './errors';
 import type { Session } from 'next-auth';
 
@@ -12,15 +13,29 @@ export interface AuthenticatedUser {
 export async function getSessionUser(existingSession?: Session | null): Promise<AuthenticatedUser> {
   const session = existingSession !== undefined ? existingSession : await auth();
 
-  if (!session || !session.user || !session.user.id || !session.user.role) {
+  if (!session?.user?.id) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Authentication required');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      isActive: true,
+      role: { select: { code: true } },
+    },
+  });
+  if (!user?.isActive || !user.role?.code) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Authentication required');
   }
 
   return {
-    id: session.user.id,
-    role: session.user.role,
-    name: session.user.name,
-    email: session.user.email,
+    id: user.id,
+    role: user.role.code,
+    name: user.name,
+    email: user.email,
   };
 }
 

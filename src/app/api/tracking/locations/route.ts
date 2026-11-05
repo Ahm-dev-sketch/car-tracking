@@ -23,6 +23,7 @@ export const POST = withRateLimit(
     const validated = locationIngestSchema.parse(body);
 
     const parsedPoints: LocationPointInput[] = [];
+    const originalIndexes: number[] = [];
     const rejected: Array<{ index: number; reason: string }> = [];
 
     for (let i = 0; i < validated.points.length; i++) {
@@ -34,6 +35,7 @@ export const POST = withRateLimit(
         });
       } else {
         parsedPoints.push(parsed.data);
+        originalIndexes.push(i);
       }
     }
 
@@ -42,7 +44,13 @@ export const POST = withRateLimit(
     return NextResponse.json({
       data: {
         accepted: ingestResult.accepted,
-        rejected: [...rejected, ...ingestResult.rejected],
+        rejected: [
+          ...rejected,
+          ...ingestResult.rejected.map((point) => ({
+            ...point,
+            index: originalIndexes[point.index],
+          })),
+        ].sort((a, b) => a.index - b.index),
       },
     });
   }),

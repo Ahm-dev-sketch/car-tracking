@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LocationBadge } from '@/components/ui/LocationBadge';
@@ -9,6 +9,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
+import { Icon } from '@/components/ui/Icon';
 
 interface VehicleLocation {
   id: string;
@@ -152,48 +153,68 @@ function UserVehiclesContent() {
     setIsBookingOpen(true);
   };
 
+  // Memoize to avoid creating a new object reference on every render,
+  // which would re-trigger BookingModal's initialization useEffect.
+  const memoizedVehiclePref = useMemo(() => {
+    if (!bookingVehicle) return null;
+    return {
+      id: bookingVehicle.id,
+      plateNumber: bookingVehicle.plateNumber,
+      brand: bookingVehicle.brand,
+      model: bookingVehicle.model,
+      vehicleType: bookingVehicle.vehicleType,
+      seatingCapacity: bookingVehicle.seatingCapacity,
+      status: bookingVehicle.status,
+      homeLocationId: bookingVehicle.homeLocation?.id,
+      currentLocationId: (bookingVehicle.currentLocation || bookingVehicle.currentOperationalLocation)?.id,
+    };
+  }, [bookingVehicle]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+      <div className="page-intro">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900">Vehicle Fleet</h1>
+          <span className="eyebrow mb-3">A ride for your workday</span>
+          <h1 className="page-heading">Find your next ride.</h1>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Explore corporate fleet and reserve for authorized trips
+            Choose a vehicle. Make room for your next journey.
           </p>
         </div>
         <button
           type="button"
           onClick={() => handleOpenBooking()}
-          className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+          className="button-primary self-start"
         >
-          <span>+ New Reservation</span>
+          <Icon name="plus" className="size-4" /><span>New reservation</span>
         </button>
       </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-lg border border-zinc-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center gap-2">
+      <div className="surface p-5 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
+        <form onSubmit={handleSearchSubmit} className="min-w-0 flex-1 flex items-center gap-2">
           <input
             type="text"
-            placeholder="Search by plate number, brand, model..."
+            placeholder="Search vehicles..."
+                        aria-label="Search by plate number, brand or model"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
           />
           <button
             type="submit"
-            className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer"
+            className="button-secondary"
           >
             Search
           </button>
         </form>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2 xl:flex xl:flex-wrap">
           {/* Operational Location Filter */}
           <select
+            aria-label="Filter by operational location"
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
             className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
@@ -208,6 +229,7 @@ function UserVehiclesContent() {
 
           {/* Seats Filter */}
           <select
+            aria-label="Filter by seating capacity"
             value={seatsFilter}
             onChange={(e) => setSeatsFilter(e.target.value)}
             className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
@@ -221,6 +243,7 @@ function UserVehiclesContent() {
 
           {/* Status Filter */}
           <select
+            aria-label="Filter by availability"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
@@ -241,48 +264,50 @@ function UserVehiclesContent() {
           <div>Loading fleet catalog...</div>
         </div>
       ) : vehicles.length === 0 ? (
-        <div className="p-12 text-center bg-white border border-dashed border-zinc-300 rounded-lg text-zinc-500 text-sm">
+        <div className="surface p-8 sm:p-12 text-center text-zinc-500 text-sm">
           No vehicles match the selected criteria.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {vehicles.map((v) => {
             const currentLoc = v.currentLocation || v.currentOperationalLocation;
             return (
               <div
                 key={v.id}
-                className="bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col justify-between hover:border-zinc-300 transition-colors"
+                className="bezel flex flex-col justify-between"
               >
-                <div>
+                <div className="bezel-core overflow-hidden flex-1">
                   {/* Image placeholder / thumbnail */}
-                  <div className="h-36 bg-zinc-100 flex items-center justify-center relative overflow-hidden border-b border-zinc-100">
+                  <div className="h-48 sm:h-44 bg-zinc-50 flex items-center justify-center relative overflow-hidden">
                     {v.imageUrl ? (
                       <img
                         src={v.imageUrl}
                         alt={`${v.brand} ${v.model}`}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="text-zinc-400 flex flex-col items-center">
-                        <svg className="w-10 h-10 stroke-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8 7h8m-8 4h8m-4 4h4m2 4H6a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2z"
-                          />
+                        <svg viewBox="0 0 200 88" className="mb-2 h-24 w-48 text-emerald-800" fill="none" aria-hidden="true">
+                          <ellipse cx="100" cy="73" rx="79" ry="5" fill="currentColor" opacity=".05" />
+                          <path d="m29 49 19-5 20-22h57l28 23 24 6 7 17H18l2-13 9-6Z" fill="#e5eee8" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                          <path d="m56 44 17-16h25v16H56Zm49-16h17l20 16h-37V28Z" fill="white" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+                          <path d="M28 53h14m117 0h17M102 48v13m7-12h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                          <circle cx="52" cy="65" r="12" fill="#f4f7f5" stroke="currentColor" strokeWidth="1.2" /><circle cx="52" cy="65" r="5" stroke="currentColor" strokeWidth="1.2" />
+                          <circle cx="151" cy="65" r="12" fill="#f4f7f5" stroke="currentColor" strokeWidth="1.2" /><circle cx="151" cy="65" r="5" stroke="currentColor" strokeWidth="1.2" />
                         </svg>
                         <span className="text-[10px] uppercase font-mono mt-1">{v.vehicleType}</span>
                       </div>
                     )}
-                    <div className="absolute top-2 right-2">
+                    <div className="absolute top-4 right-4">
                       <StatusBadge status={v.status} />
                     </div>
                   </div>
 
-                  <div className="p-4 space-y-2">
+                  <div className="p-5 space-y-3">
                     <div className="flex items-start justify-between gap-1">
                       <div>
-                        <h3 className="font-bold text-sm text-zinc-900 leading-tight">
+                        <h3 className="font-semibold text-xl tracking-tight text-zinc-900 leading-tight">
                           {v.brand} {v.model}
                         </h3>
                         <div className="text-xs font-mono font-semibold text-zinc-600 mt-0.5">
@@ -329,18 +354,18 @@ function UserVehiclesContent() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="p-3 bg-zinc-50 border-t border-zinc-100 flex items-center gap-2">
+                <div className="px-4 pb-4 pt-3 bg-white rounded-b-[1.625rem] flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setSelectedVehicle(v)}
-                    className="flex-1 py-1.5 px-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+                    className="button-secondary flex-1"
                   >
                     Details
                   </button>
                   <button
                     type="button"
                     onClick={() => handleOpenBooking(v)}
-                    className="flex-1 py-1.5 px-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer"
+                    className="button-primary flex-1"
                   >
                     Reserve
                   </button>
@@ -472,21 +497,7 @@ function UserVehiclesContent() {
         onSuccess={() => {
           fetchVehicles(page);
         }}
-        initialVehiclePreference={
-          bookingVehicle
-            ? {
-                id: bookingVehicle.id,
-                plateNumber: bookingVehicle.plateNumber,
-                brand: bookingVehicle.brand,
-                model: bookingVehicle.model,
-                vehicleType: bookingVehicle.vehicleType,
-                seatingCapacity: bookingVehicle.seatingCapacity,
-                status: bookingVehicle.status,
-                homeLocationId: bookingVehicle.homeLocation?.id,
-                currentLocationId: (bookingVehicle.currentLocation || bookingVehicle.currentOperationalLocation)?.id,
-              }
-            : null
-        }
+        initialVehiclePreference={memoizedVehiclePref}
         initialLocationId={locationFilter || undefined}
       />
     </div>

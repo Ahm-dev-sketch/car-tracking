@@ -52,10 +52,10 @@ export function NetworkStatus() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed top-[max(0.5rem,env(safe-area-inset-top))] inset-x-0 z-50 flex justify-center px-4 pointer-events-none transition-all duration-300"
+      className="fixed top-[max(0.5rem,env(safe-area-inset-top))] inset-x-0 z-[var(--layer-toast)] flex justify-center px-4 pointer-events-none"
     >
       <div
-        className={`pointer-events-auto flex items-center gap-2.5 px-4 py-2 rounded-full shadow-lg border text-xs font-semibold backdrop-blur-md transition-all ${
+        className={`pointer-events-auto flex items-center gap-2.5 pl-4 pr-1.5 py-1.5 rounded-full shadow-[0_8px_32px_-12px_rgba(25,76,60,0.15)] border text-xs font-medium ${
           !isOnline
             ? 'bg-rose-600/95 text-white border-rose-700 shadow-rose-950/20'
             : 'bg-emerald-600/95 text-white border-emerald-700 shadow-emerald-950/20'
@@ -79,10 +79,10 @@ export function NetworkStatus() {
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          className="ml-1 p-1 hover:bg-white/20 rounded-full text-white/80 hover:text-white cursor-pointer transition-colors"
+          className="ml-1 min-h-11 min-w-11 flex items-center justify-center hover:bg-white/20 rounded-full text-white/80 hover:text-white cursor-pointer"
           aria-label="Dismiss network notice"
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>

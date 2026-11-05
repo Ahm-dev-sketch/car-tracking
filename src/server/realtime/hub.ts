@@ -2,6 +2,7 @@ import { ServerRealtimeEvent } from '@/types/realtime';
 import { logger } from '@/lib/logger';
 
 export interface CloudflareEnv {
+  REALTIME_INTERNAL_TOKEN?: string;
   LOCATION_HUB?: {
     idFromName: (name: string) => unknown;
     get: (id: unknown) => {
@@ -11,10 +12,24 @@ export interface CloudflareEnv {
   };
 }
 
-const DEV_PUBLISH_URL =
-  process.env.REALTIME_PUBLISH_URL || 'http://localhost:3001/publish';
-const INTERNAL_TOKEN =
-  process.env.REALTIME_INTERNAL_TOKEN || 'dev-realtime-internal-token-12345';
+
+async function deliver<T>(send: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      send(controller.signal),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error('Realtime delivery timed out'));
+          controller.abort();
+        }, 2500);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // Realtime publish facade.
 // In dev / test: delivers to Node dev shim HTTP /publish endpoint.
@@ -32,16 +47,22 @@ export async function publishEvent(
     return;
   }
 
-  // Dev shim publish
+  // No public default secret: failed realtime delivery must not weaken auth.
+  const internalToken = process.env.REALTIME_INTERNAL_TOKEN;
+  if (!internalToken?.trim() || internalToken === 'dev-realtime-internal-token-12345') {
+    logger.warn({ msg: 'Realtime publish skipped: REALTIME_INTERNAL_TOKEN is not configured' });
+    return;
+  }
   try {
-    const res = await fetch(DEV_PUBLISH_URL, {
+    const res = await deliver((signal) => fetch(process.env.REALTIME_PUBLISH_URL || 'http://localhost:3001/publish', {
+      signal,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${INTERNAL_TOKEN}`,
+        Authorization: `Bearer ${internalToken}`,
       },
       body: JSON.stringify(event),
-    });
+    }));
 
     if (!res.ok) {
       logger.warn({
@@ -75,13 +96,25 @@ export async function publishToCloudflareDO(
     const hubId = env.LOCATION_HUB.idFromName('global-fleet');
     const hubStub = env.LOCATION_HUB.get(hubId);
     if (typeof hubStub.broadcast === 'function') {
-      await hubStub.broadcast(event);
+      await deliver(() => hubStub.broadcast!(event));
     } else {
-      await hubStub.fetch('http://durable-object/publish', {
+      const internalToken = env.REALTIME_INTERNAL_TOKEN ?? process.env.REALTIME_INTERNAL_TOKEN;
+      if (!internalToken?.trim() || internalToken === 'dev-realtime-internal-token-12345') {
+        logger.warn({ msg: 'Durable Object HTTP publish skipped: REALTIME_INTERNAL_TOKEN is not configured' });
+        return;
+      }
+      const response = await deliver((signal) => hubStub.fetch('http://durable-object/publish', {
+        signal,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${internalToken}`,
+        },
         body: JSON.stringify(event),
-      });
+      }));
+      if (!response.ok) {
+        logger.warn({ msg: 'Durable Object HTTP publish returned non-200 status', status: response.status });
+      }
     }
   } catch (err: unknown) {
     logger.warn({

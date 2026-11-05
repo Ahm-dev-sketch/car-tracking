@@ -35,7 +35,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     });
   }
 
-  const result = await listBookings(user, query);
+  const result = await listBookings(user, { ...query, driverWorkflow: searchParams.get('workflow') === 'driver' });
   return NextResponse.json(result);
 });
 

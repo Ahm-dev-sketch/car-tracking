@@ -71,12 +71,12 @@ describe('Phase 9 PostgreSQL Integration Tests: Auto-Dispatch and Locations', ()
 
     // Create 2 test locations
     const loc1 = await prisma.location.create({
-      data: { name: 'Halim Station', code: '102' },
+      data: { name: 'Halim', code: '102' },
     });
     location1Id = loc1.id;
 
     const loc2 = await prisma.location.create({
-      data: { name: 'Karawang Station', code: '201' },
+      data: { name: 'Karawang', code: '202' },
     });
     location2Id = loc2.id;
 
@@ -250,7 +250,7 @@ describe('Phase 9 PostgreSQL Integration Tests: Auto-Dispatch and Locations', ()
     // Create booking at location 1 with pickup coordinates
     const booking = await createBooking(userActor.id, {
       operationalLocationId: location1Id,
-      pickupLocation: 'Halim Station Pickup',
+      pickupLocation: 'Halim Pickup',
       pickupLat: 21.0385,
       pickupLng: 105.8642,
       destination: 'Hotel City Center',

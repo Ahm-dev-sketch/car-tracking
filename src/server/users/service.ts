@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
 import { logAuditEvent } from '@/server/audit';
+import { assertDriverCanDeactivate } from '@/server/drivers/service';
 
 export interface UserMutationContext {
   actorUserId?: string | null;
@@ -98,19 +99,28 @@ export async function updateUser(
     data.passwordHash = await bcrypt.hash(input.password, 10);
   }
 
-  const user = await prisma.user.update({
-    where: { id },
-    data,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      isActive: true,
-      role: { select: { id: true, code: true, name: true } },
-      createdAt: true,
-      updatedAt: true,
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    if (input.isActive === false) {
+      const driver = await tx.driver.findUnique({ where: { userId: id } });
+      if (driver) {
+        await assertDriverCanDeactivate(tx, driver.id);
+        await tx.driver.update({ where: { id: driver.id }, data: { status: 'OFFLINE' } });
+      }
+    }
+    return tx.user.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        isActive: true,
+        role: { select: { id: true, code: true, name: true } },
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
   });
 
   await logAuditEvent({

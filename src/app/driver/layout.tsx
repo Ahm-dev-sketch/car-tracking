@@ -3,9 +3,10 @@ import { NavBar } from '@/components/layout/NavBar';
 
 export default function DriverLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh flex flex-col bg-zinc-50">
+    <div className="app-shell flex flex-col">
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <NavBar />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main id="main-content" tabIndex={-1} className="app-main">
         {children}
       </main>
     </div>

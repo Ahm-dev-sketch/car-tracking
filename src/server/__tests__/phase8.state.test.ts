@@ -15,7 +15,8 @@ import {
   transitionBooking,
   getBookingById,
 } from '@/server/bookings/service';
-import { startTrip, endTrip } from '@/server/trips/service';
+import { startTrip, endTrip, arriveTrip } from '@/server/trips/service';
+import { unassignVehicle } from '@/server/assignments/service';
 import { createVehicle } from '@/server/vehicles/service';
 import { createDriver } from '@/server/drivers/service';
 import { createUser } from '@/server/users/service';
@@ -165,6 +166,8 @@ describe('Phase 8a State Machine Guards Integration Tests', () => {
       undefined,
       { driverId }
     );
+    const firstTrip = await startTrip(driverId, { bookingId: booking1.id, startLat: 21, startLng: 105 });
+    await arriveTrip(driverActor, firstTrip.id);
     await transitionBooking(booking1.id, BookingStatus.IN_PROGRESS, driverActor);
     await transitionBooking(booking1.id, BookingStatus.COMPLETED, driverActor);
 
@@ -173,6 +176,10 @@ describe('Phase 8a State Machine Guards Integration Tests', () => {
     ).rejects.toThrowError(
       expect.objectContaining({ status: 409, code: 'INVALID_TRANSITION' })
     );
+
+    // Explicitly release the standing mirror before assigning another unit.
+    await unassignVehicle(driverId);
+    await prisma.driver.update({ where: { id: driverId }, data: { status: DriverStatus.AVAILABLE } });
 
     // 2b. reject IN_PROGRESS -> 409
     const vehicle2 = await createVehicle({
@@ -199,6 +206,8 @@ describe('Phase 8a State Machine Guards Integration Tests', () => {
       undefined,
       { driverId }
     );
+    const secondTrip = await startTrip(driverId, { bookingId: booking2.id, startLat: 21, startLng: 105 });
+    await arriveTrip(driverActor, secondTrip.id);
     await transitionBooking(booking2.id, BookingStatus.IN_PROGRESS, driverActor);
 
     await expect(
@@ -257,6 +266,8 @@ describe('Phase 8a State Machine Guards Integration Tests', () => {
       startLat: 21.0,
       startLng: 105.8,
     });
+    await arriveTrip(driverActor, trip.id);
+    await transitionBooking(booking.id, BookingStatus.IN_PROGRESS, driverActor);
     // End trip first time -> succeeds
     const ended = await endTrip(driverId, trip.id, {
       endLat: 21.05,

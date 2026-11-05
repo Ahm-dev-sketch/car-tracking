@@ -1,7 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+
+const authMocks = vi.hoisted(() => ({ auth: vi.fn(), findUser: vi.fn() }));
+vi.mock('@/lib/prisma', () => ({ prisma: { user: { findUnique: authMocks.findUser } } }));
 
 vi.mock('@/auth', () => ({
-  auth: vi.fn(),
+  auth: authMocks.auth,
 }));
 
 import bcrypt from 'bcryptjs';
@@ -79,6 +82,14 @@ describe('Auth & Security Unit Tests', () => {
       expires: '2099-01-01',
     };
 
+    beforeEach(() => {
+      vi.resetAllMocks();
+      authMocks.findUser.mockResolvedValue({
+        id: 'usr_admin', name: 'Current Admin', email: 'current@example.com',
+        isActive: true, role: { code: 'ADMIN' },
+      });
+    });
+
     it('allows user with matching role', () => {
       expect(() => requireRole(adminSession, 'ADMIN')).not.toThrow();
       const user = requireRole(adminSession, 'ADMIN');
@@ -117,6 +128,62 @@ describe('Auth & Security Unit Tests', () => {
       const user = await getSessionUser(adminSession);
       expect(user.id).toBe('usr_admin');
       expect(user.role).toBe('ADMIN');
+      expect(user.name).toBe('Current Admin');
+      expect(user.email).toBe('current@example.com');
+      expect(authMocks.auth).not.toHaveBeenCalled();
+      expect(authMocks.findUser).toHaveBeenCalledWith({
+        where: { id: 'usr_admin' },
+        select: {
+          id: true, name: true, email: true, isActive: true,
+          role: { select: { code: true } },
+        },
+      });
+    });
+
+    it.each([null, { isActive: false, role: { code: 'ADMIN' } }, { isActive: true, role: null }])(
+      'rejects a removed, inactive, or role-less account despite a valid JWT', async (record) => {
+        authMocks.findUser.mockResolvedValue(record);
+        await expect(getSessionUser(adminSession)).rejects.toMatchObject({ status: 401, code: 'UNAUTHORIZED' });
+      }
+    );
+
+    it('uses the current database role rather than a stale ADMIN claim', async () => {
+      authMocks.findUser.mockResolvedValue({
+        id: 'usr_admin', isActive: true, name: 'Demoted', email: 'demoted@example.com', role: { code: 'USER' },
+      });
+      const user = await getSessionUser(adminSession);
+      expect(user.role).toBe('USER');
+      expect(() => requireRole(user, 'ADMIN')).toThrowError(ApiError);
+    });
+
+    it('accepts an identified session without a cached role and loads the current role', async () => {
+      const session = { ...adminSession, user: { id: 'usr_admin' } } as Session;
+      expect((await getSessionUser(session)).role).toBe('ADMIN');
+    });
+
+    it('revalidates every request instead of caching activation or roles', async () => {
+      await getSessionUser(adminSession);
+      authMocks.findUser.mockResolvedValue(null);
+      await expect(getSessionUser(adminSession)).rejects.toMatchObject({ status: 401 });
+      expect(authMocks.findUser).toHaveBeenCalledTimes(2);
+    });
+
+    it('loads and revalidates the Auth.js session when no session argument is provided', async () => {
+      authMocks.auth.mockResolvedValue(adminSession);
+      expect((await getSessionUser()).role).toBe('ADMIN');
+      expect(authMocks.auth).toHaveBeenCalledOnce();
+      expect(authMocks.findUser).toHaveBeenCalledOnce();
+    });
+
+    it('does not trust JWT claims when the database lookup fails', async () => {
+      authMocks.findUser.mockRejectedValue(new Error('Database unavailable'));
+      await expect(getSessionUser(adminSession)).rejects.toThrow('Database unavailable');
+    });
+
+    it('rejects an unidentified session without querying the database', async () => {
+      await expect(getSessionUser({ ...adminSession, user: { role: 'ADMIN' } } as Session))
+        .rejects.toMatchObject({ status: 401 });
+      expect(authMocks.findUser).not.toHaveBeenCalled();
     });
 
     it('getSessionUser throws 401 ApiError if session is null', async () => {

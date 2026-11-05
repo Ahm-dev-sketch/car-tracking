@@ -22,7 +22,7 @@ export function GPSBadge({
       dotColor = 'bg-emerald-500';
     } else if (accuracyM <= 100) {
       quality = 'MEDIUM';
-      dotColor = 'bg-amber-500';
+      dotColor = 'bg-amber-400';
     } else {
       quality = 'LOW';
       dotColor = 'bg-rose-500';
@@ -31,13 +31,13 @@ export function GPSBadge({
 
   if (signal) {
     if (signal === 'green') dotColor = 'bg-emerald-500';
-    else if (signal === 'amber') dotColor = 'bg-amber-500';
+    else if (signal === 'amber') dotColor = 'bg-amber-400';
     else dotColor = 'bg-rose-500';
   }
 
   return (
-    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs bg-zinc-100 text-zinc-700 border border-zinc-200 font-mono ${className}`}>
-      <span className={`w-2 h-2 rounded-full ${dotColor}`} aria-hidden="true" />
+    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] bg-white text-black border-2 border-black font-mono font-bold shadow-[2px_2px_0px_0px_#000] ${className}`}>
+      <span className={`w-2.5 h-2.5 rounded-full border border-black ${dotColor}`} aria-hidden="true" />
       {showDetails && (
         <span>
           {quality} {accuracyM !== undefined && accuracyM !== null ? `(±${Math.round(accuracyM)}m)` : ''}

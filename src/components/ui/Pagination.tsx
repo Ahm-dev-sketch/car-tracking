@@ -18,45 +18,37 @@ export function Pagination({
   if (totalPages <= 1 && !totalRecords) return null;
 
   return (
-    <div
-      className={`flex items-center justify-between gap-4 py-3 px-1 text-sm text-zinc-600 ${className}`}
-    >
-      <div>
+    <nav aria-label="Pagination" className={`flex flex-col gap-4 px-1 py-5 text-sm font-semibold text-black sm:flex-row sm:items-center sm:justify-between ${className}`}>
+      <p>
         {totalRecords !== undefined ? (
-          <span>
-            Total: <strong className="font-semibold text-zinc-800">{totalRecords}</strong> records
-          </span>
+          <>Total: <strong className="font-extrabold tabular-nums text-black">{totalRecords}</strong> records</>
         ) : (
-          <span>
-            Page <strong className="font-semibold text-zinc-800">{page}</strong> of{' '}
-            <strong className="font-semibold text-zinc-800">{Math.max(1, totalPages)}</strong>
-          </span>
+          <>Page <strong className="font-extrabold tabular-nums text-black">{page}</strong> of <strong className="font-extrabold tabular-nums text-black">{Math.max(1, totalPages)}</strong></>
         )}
-      </div>
-
-      <div className="flex items-center gap-2">
+      </p>
+      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:gap-3">
         <button
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="min-h-[44px] px-3.5 py-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
+          className="inline-flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-amber-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-5"
         >
+          <svg className="hidden size-4 shrink-0 min-[360px]:block" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m11.5 5-5 5 5 5" /></svg>
           Previous
         </button>
-
-        <span className="text-xs text-zinc-500 font-mono px-1">
-          {page} / {Math.max(1, totalPages)}
+        <span className="shrink-0 rounded-lg border-2 border-black bg-amber-300 px-3 py-1 font-mono text-xs font-bold text-black shadow-[2px_2px_0px_0px_#000]" aria-live="polite" aria-atomic="true" aria-label={`Page ${page} of ${Math.max(1, totalPages)}`}>
+          {page} <span className="mx-1 text-black" aria-hidden="true">/</span> {Math.max(1, totalPages)}
         </span>
-
         <button
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="min-h-[44px] px-3.5 py-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 active:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center"
+          className="inline-flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-4 py-2 text-sm font-extrabold text-black shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-emerald-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-5"
         >
           Next
+          <svg className="hidden size-4 shrink-0 min-[360px]:block" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m8.5 5 5 5-5 5" /></svg>
         </button>
       </div>
-    </div>
+    </nav>
   );
 }

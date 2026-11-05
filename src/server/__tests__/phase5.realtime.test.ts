@@ -80,7 +80,7 @@ describe('Phase 5 Realtime System & Dev Shim', () => {
 
   it('(b) auth with valid token and subscribe to vehicle A', async () => {
     const userToken = await encode({
-      token: { userId: 'usr-regular-1', role: 'USER' },
+      token: { userId: 'usr-regular-1', role: 'USER', allowedVehicleIds: ['veh-A'] },
       secret: AUTH_SECRET,
       salt: SALT,
     });
@@ -111,7 +111,7 @@ describe('Phase 5 Realtime System & Dev Shim', () => {
 
   it('(c) & (d) publish location:update for A delivered to subscriber; B not delivered', async () => {
     const userToken = await encode({
-      token: { userId: 'usr-regular-2', role: 'USER' },
+      token: { userId: 'usr-regular-2', role: 'USER', allowedVehicleIds: ['veh-A'] },
       secret: AUTH_SECRET,
       salt: SALT,
     });
@@ -257,10 +257,12 @@ describe('Phase 5 Realtime System & Dev Shim', () => {
   it('(g) hub.publishEvent dev-mode failure does not throw on dead endpoint', async () => {
     const originalUrl = process.env.REALTIME_PUBLISH_URL;
     const originalMode = process.env.REALTIME_MODE;
+    const originalToken = process.env.REALTIME_INTERNAL_TOKEN;
 
     // Point to a closed port
     process.env.REALTIME_PUBLISH_URL = 'http://localhost:59999/publish';
     process.env.REALTIME_MODE = 'dev';
+    process.env.REALTIME_INTERNAL_TOKEN = INTERNAL_TOKEN;
 
     try {
       await expect(
@@ -278,8 +280,12 @@ describe('Phase 5 Realtime System & Dev Shim', () => {
         })
       ).resolves.toBeUndefined();
     } finally {
-      process.env.REALTIME_PUBLISH_URL = originalUrl;
-      process.env.REALTIME_MODE = originalMode;
+      if (originalUrl === undefined) delete process.env.REALTIME_PUBLISH_URL;
+      else process.env.REALTIME_PUBLISH_URL = originalUrl;
+      if (originalMode === undefined) delete process.env.REALTIME_MODE;
+      else process.env.REALTIME_MODE = originalMode;
+      if (originalToken === undefined) delete process.env.REALTIME_INTERNAL_TOKEN;
+      else process.env.REALTIME_INTERNAL_TOKEN = originalToken;
     }
   });
 });

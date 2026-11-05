@@ -85,15 +85,15 @@ export function LocationCapacityChart({
             <span className="text-zinc-700">Maks Kapasitas</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-sm border border-black bg-emerald-500" />
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#10b981]" />
             <span className="text-zinc-700">Available</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-sm border border-black bg-amber-400" />
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#f59e0b]" />
             <span className="text-zinc-700">Sedang Digunakan</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-sm border border-black bg-sky-500" />
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#0284c7]" />
             <span className="text-zinc-700">Permintaan Masuk</span>
           </div>
         </div>
@@ -143,7 +143,7 @@ export function LocationCapacityChart({
                 <span
                   className={`text-[10px] font-black rounded-full px-1.5 py-0.2 ${
                     avail > 0
-                      ? isSelected ? 'bg-emerald-400 text-black' : 'bg-emerald-100 text-emerald-800'
+                      ? isSelected ? 'bg-[#86efac] text-black' : 'bg-[#dcfce7] text-[#15803d]'
                       : isSelected ? 'bg-zinc-200 text-black' : 'bg-zinc-200 text-zinc-700'
                   }`}
                   title={`${avail} unit siap operasi`}
@@ -279,7 +279,7 @@ export function LocationCapacityChart({
                     x={groupX + barW + 2 + barW / 2}
                     y={baseY - hAvail - 5}
                     textAnchor="middle"
-                    className="font-mono text-[9px] font-black fill-emerald-700"
+                    className="font-mono text-[9px] font-black fill-[#059669]"
                   >
                     {avail}
                   </text>
@@ -374,7 +374,7 @@ export function LocationCapacityChart({
                 </div>
                 <span
                   className={`rounded-md border-2 border-black px-2 py-0.5 text-xs font-black shadow-[1px_1px_0px_0px_#000] ${
-                    avail > 0 ? 'bg-emerald-300 text-zinc-950' : 'bg-rose-300 text-rose-950'
+                    avail > 0 ? 'bg-[#86efac] text-zinc-950' : 'bg-rose-300 text-rose-950'
                   }`}
                 >
                   {avail > 0 ? `Siap +${avail} Order` : 'Kapasitas Penuh'}
@@ -395,7 +395,7 @@ export function LocationCapacityChart({
                   />
                   <div
                     style={{ width: `${maxCap > 0 ? (avail / maxCap) * 100 : 0}%` }}
-                    className="bg-emerald-400 h-full transition-all"
+                    className="bg-[#10b981] h-full transition-all"
                     title={`Tersedia: ${avail} unit`}
                   />
                 </div>
@@ -413,11 +413,11 @@ export function LocationCapacityChart({
                   <span className="text-[10px] text-zinc-500 font-medium">Batas order simultan</span>
                 </div>
 
-                <div className="rounded-xl border border-black bg-emerald-50 p-2.5 shadow-[1.5px_1.5px_0px_0px_#000]">
-                  <dt className="text-[10px] font-black uppercase tracking-wider text-emerald-900">
+                <div className="rounded-xl border border-black bg-[#ecfdf5] p-2.5 shadow-[1.5px_1.5px_0px_0px_#000]">
+                  <dt className="text-[10px] font-black uppercase tracking-wider text-[#065f46]">
                     Sedang Available
                   </dt>
-                  <dd className="mt-1 font-mono text-xl font-black text-emerald-800">
+                  <dd className="mt-1 font-mono text-xl font-black text-[#047857]">
                     {avail} <span className="text-xs font-bold">unit</span>
                   </dd>
                   <span className="text-[10px] text-zinc-500 font-medium">Siap terima order</span>

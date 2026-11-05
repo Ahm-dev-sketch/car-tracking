@@ -6,44 +6,7 @@ import { signIn } from 'next-auth/react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Spinner } from '@/components/ui/Spinner';
 import { Icon as LoginIcon } from '@/components/ui/Icon';
-
-
-function RouteArtwork() {
-  return (
-    <svg viewBox="0 0 560 340" fill="none" className="h-auto w-full" aria-hidden="true">
-      <rect x="1" y="1" width="558" height="338" rx="30" fill="#EDF3EE" />
-      <g stroke="#DCE7DE" strokeWidth="1.2">
-        <path d="M0 80h170l78 78h312M0 246h132l58-58h370M86 0v125l95 95v120M367 0v102l-67 67v171M488 0v340" />
-        <path d="M0 32h205l75 75h280M0 300h165l65-65h330M32 0v147l95 95v98M423 0v120l-65 65v155" />
-      </g>
-      <g fill="#E3ECE4">
-        <rect x="103" y="35" width="55" height="29" rx="8" />
-        <rect x="383" y="35" width="27" height="50" rx="8" />
-        <rect x="447" y="258" width="27" height="47" rx="8" />
-        <rect x="48" y="263" width="59" height="23" rx="8" />
-        <path d="M205 270h67v38h-98z" />
-      </g>
-      <path d="M112 119h64a36 36 0 0 1 36 36v29a36 36 0 0 0 36 36h111a36 36 0 0 0 36-36v-62" stroke="#FFFFFF" strokeWidth="12" strokeLinecap="round" />
-      <path d="M112 119h64a36 36 0 0 1 36 36v29a36 36 0 0 0 36 36h111a36 36 0 0 0 36-36v-62" stroke="#397963" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="112" cy="119" r="19" fill="#EDF3EE" stroke="#C8DACD" />
-      <circle cx="112" cy="119" r="9" fill="white" stroke="#397963" strokeWidth="1.5" />
-      <circle cx="112" cy="119" r="3" fill="#397963" />
-      <circle cx="395" cy="116" r="23" fill="#397963" fillOpacity=".08" />
-      <path d="M395 128s12-11 12-19a12 12 0 1 0-24 0c0 8 12 19 12 19Z" fill="white" stroke="#397963" strokeWidth="1.5" />
-      <circle cx="395" cy="109" r="4" stroke="#397963" strokeWidth="1.5" />
-      <g transform="translate(294 220) rotate(90)">
-        <rect x="-16" y="-35" width="38" height="76" rx="13" fill="#1F3C30" fillOpacity=".09" />
-        <path d="M-18-19h-3v13h3m36-13h3v13h-3M-18 17h-3v12h3m36-12h3v12h-3" stroke="#253E33" strokeWidth="3" strokeLinecap="round" />
-        <rect x="-17" y="-38" width="34" height="76" rx="12" fill="white" stroke="#9AB6A4" strokeWidth="1.2" />
-        <path d="m-12-15 2-10h20l2 10-2 5h-20zM-12 17l2 10h20l2-10-2-5h-20z" fill="#739886" />
-        <path d="M-12-6v14m24-14v14M-9-34H9M-10 33h20" stroke="#A7BFAF" strokeWidth="1.2" />
-        <path d="M-15-30v5m30-5v5" stroke="#DEE8DD" strokeWidth="2" strokeLinecap="round" />
-      </g>
-      <path d="m466 67 5-15 5 15-5-3-5 3Z" stroke="#7B9B88" strokeWidth="1.2" strokeLinejoin="round" />
-      <path d="M466 76h10" stroke="#A3BBAA" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
+import { VehicleTracking3D } from '@/components/ui/VehicleTracking3D';
 
 function LoginForm() {
   const router = useRouter();
@@ -188,10 +151,8 @@ export default function LoginPage() {
           <div><span className="eyebrow">A little less logistics</span></div>
           <h2 className="mt-5 max-w-xl text-[clamp(2.5rem,4.2vw,4.25rem)] font-black leading-[1.08] tracking-tight text-black">A smoother route<br />through your workday.</h2>
           <p className="mt-5 max-w-sm text-base font-semibold leading-relaxed text-zinc-600">From the first booking to the last mile. Your vehicles, trips, and team, moving together.</p>
-          <figure className="mt-10">
-            <div className="overflow-hidden rounded-2xl border-[3px] border-black bg-[#edf3ee] p-3 shadow-[6px_6px_0px_0px_#000]">
-              <RouteArtwork />
-            </div>
+          <figure className="mt-8">
+            <VehicleTracking3D />
             <figcaption className="mt-4 flex items-center justify-between gap-4 px-1 text-xs font-bold text-black">
               <span>One fleet. Every journey.</span>
               <span className="flex items-center gap-2 text-black"><span className="h-2 w-2 rounded-full border border-black bg-emerald-500" />Connected mobility</span>

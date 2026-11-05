@@ -4,6 +4,8 @@ import dynamic from 'next/dynamic';
 import { Spinner } from '@/components/ui/Spinner';
 
 export type { VehicleMarkerData, RoutePoint } from './FleetMap';
+export { getVehicleConditionVisual } from './condition';
+export type { ConditionVisual } from './condition';
 
 export const FleetMap = dynamic(() => import('./FleetMap'), {
   ssr: false,

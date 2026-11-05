@@ -8,6 +8,10 @@ import { MovementBadge } from '@/components/ui/MovementBadge';
 import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { LocationBadge } from '@/components/ui/LocationBadge';
+import { getVehicleConditionVisual, ConditionVisual } from './condition';
+
+export type { ConditionVisual };
+export { getVehicleConditionVisual };
 
 export interface RoutePoint {
   lat: number;
@@ -67,28 +71,25 @@ function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }
   return null;
 }
 
-function createVehicleIcon(movement: string, isSelected: boolean) {
-  const normMovement = movement ? movement.toUpperCase() : 'STOPPED';
-  const isMoving = normMovement === 'MOVING';
-  const isGpsLost = normMovement === 'GPS_LOST';
-  const isOffline = normMovement === 'OFFLINE';
-
-  let color = '#62766b'; // stationary
-  if (isMoving) color = '#18765b'; // moving
-  else if (isGpsLost) color = '#d97706'; // amber
-  else if (isOffline) color = '#dc2626'; // red
+function createVehicleIcon(status: string, movement: string, isSelected: boolean) {
+  const visual = getVehicleConditionVisual(status, movement);
+  const isMoving = movement?.toUpperCase() === 'MOVING';
 
   const pulseHtml = (isMoving || isSelected)
-    ? `<span class="absolute -inset-1 rounded-full bg-emerald-400 opacity-60 animate-ping"></span>`
+    ? `<span class="absolute -inset-1.5 rounded-full ${visual.pulseColor} opacity-75 animate-ping"></span>`
     : '';
+
+  const selectedBorder = isSelected
+    ? 'border-2 border-black ring-2 ring-white scale-110 shadow-lg'
+    : 'border-2 border-white shadow-md';
 
   return L.divIcon({
     className: 'vehicle-div-icon',
     html: `
-      <div class="relative flex items-center justify-center w-8 h-8 rounded-full text-white border-2 border-white cursor-pointer" style="background-color: ${color};">
+      <div class="relative flex items-center justify-center w-8 h-8 rounded-full text-white cursor-pointer transition-transform ${selectedBorder}" style="background-color: ${visual.color};">
         ${pulseHtml}
         <svg class="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" d="m5 8 2-4h10l2 4 2 3v7h-3v-2H6v2H3v-7l2-3Zm0 0h14M3 12h18M7 13v1m10-1v1" />
+          ${visual.iconSvg}
         </svg>
       </div>
     `,
@@ -152,29 +153,32 @@ export default function FleetMap({
         {vehicles.map((v) => {
           if (isNaN(v.lat) || isNaN(v.lng)) return null;
           const isSelected = v.vehicleId === selectedVehicleId;
-          const icon = createVehicleIcon(v.movement, isSelected);
+          const visual = getVehicleConditionVisual(v.status, v.movement);
+          const icon = createVehicleIcon(v.status, v.movement, isSelected);
           const rawPhone = v.driverPhone ? v.driverPhone.replace(/\D/g, '') : '';
           const waUrl = rawPhone ? `https://wa.me/${rawPhone}` : null;
+          const isMoving = v.movement === 'MOVING';
 
           return (
             <React.Fragment key={v.vehicleId}>
-              {/* GPS Accuracy Circle */}
+              {/* Radar Perimeter & GPS Accuracy Circle */}
               {v.accuracyM && v.accuracyM > 0 && v.accuracyM <= 500 && (
                 <Circle
                   center={[v.lat, v.lng]}
-                  radius={v.accuracyM}
+                  radius={Math.max(v.accuracyM || 15, 25)}
                   pathOptions={{
-                    color: v.movement === 'MOVING' ? '#18765b' : '#7b8f84',
-                    fillColor: v.movement === 'MOVING' ? '#18765b' : '#7b8f84',
-                    fillOpacity: 0.12,
-                    weight: 1,
+                    color: visual.radarColor,
+                    fillColor: visual.radarColor,
+                    fillOpacity: isSelected ? 0.35 : (isMoving ? 0.25 : 0.12),
+                    weight: isSelected ? 2.5 : 1.5,
+                    dashArray: v.status === 'MAINTENANCE' || v.status === 'INACTIVE' ? '4, 4' : undefined,
                   }}
                 />
               )}
 
               {/* Vehicle Marker */}
               <Marker
-                title={v.plateNumber}
+                title={`${v.plateNumber} (${visual.badgeText})`}
                 alt={`Vehicle ${v.plateNumber}`}
                 position={[v.lat, v.lng]}
                 icon={icon}
@@ -183,7 +187,7 @@ export default function FleetMap({
                 }}
               >
                 <Popup className="custom-leaflet-popup">
-                  <div className="p-1 min-w-[200px] text-zinc-900 font-sans">
+                  <div className="p-1 min-w-[210px] text-zinc-900 font-sans">
                     <div className="flex items-center justify-between gap-2 border-b border-zinc-200 pb-2 mb-2">
                       <span className="font-bold text-sm tracking-tight">{v.plateNumber}</span>
                       <StatusBadge status={v.status} />
@@ -210,12 +214,22 @@ export default function FleetMap({
 
                     <div className="space-y-1.5 text-xs">
                       {v.brand && (
-                        <div className="text-zinc-600">
+                        <div className="text-zinc-600 font-semibold">
                           {v.brand} {v.model}
                         </div>
                       )}
 
                       <div className="flex items-center justify-between gap-1 pt-1 border-t border-zinc-100">
+                        <span className="text-zinc-500 font-medium">Condition:</span>
+                        <span
+                          className="font-bold text-[10px] px-2 py-0.5 rounded text-white tracking-wide"
+                          style={{ backgroundColor: visual.color }}
+                        >
+                          {visual.badgeText}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-1">
                         <span className="text-zinc-500">Movement:</span>
                         <MovementBadge movement={v.movement} />
                       </div>
@@ -230,9 +244,9 @@ export default function FleetMap({
                         <RelativeTime date={v.recordedAt} />
                       </div>
 
-                      {v.driverName && (
+                      {v.driverName ? (
                         <div className="pt-2 border-t border-zinc-100">
-                          <div className="text-zinc-500 text-[11px]">Driver:</div>
+                          <div className="text-zinc-500 text-[11px]">Assigned Driver:</div>
                           <div className="font-semibold text-zinc-800">{v.driverName}</div>
                           {v.driverPhone && v.driverPhone !== 'REDACTED' && (
                             <div className="mt-1">
@@ -250,6 +264,14 @@ export default function FleetMap({
                               )}
                             </div>
                           )}
+                        </div>
+                      ) : (
+                        <div className="pt-2 border-t border-zinc-100 text-[11px] text-zinc-400 italic">
+                          {v.status === 'MAINTENANCE'
+                            ? 'Unit under workshop maintenance'
+                            : v.status === 'INACTIVE'
+                            ? 'Unit non-operational'
+                            : 'Standby in operational pool'}
                         </div>
                       )}
 

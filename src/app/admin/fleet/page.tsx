@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FleetMap, VehicleMarkerData } from '@/components/map';
+import { FleetMap, VehicleMarkerData, getVehicleConditionVisual } from '@/components/map';
 import { useRealtime } from '@/hooks/useRealtime';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LocationBadge } from '@/components/ui/LocationBadge';
@@ -16,6 +16,8 @@ import {
   getHubCoordinates,
   DEFAULT_OPS_CENTER,
   DEFAULT_OPS_ZOOM,
+  ALL_HUBS_CORRIDOR_CENTER,
+  ALL_HUBS_CORRIDOR_ZOOM,
 } from '@/lib/operational-locations';
 
 type TrackingRow = Pick<VehicleMarkerData, 'vehicleId' | 'plateNumber' | 'brand' | 'model' | 'status' | 'homeLocation'> & {
@@ -100,57 +102,83 @@ function AdminFleetMapContent() {
             currentOperationalLocation: r.currentLocationInfo || null,
           }));
 
-        // If filtering by location, also load registered hub vehicles so standby pool units appear on map
-        if (locationFilter) {
-          try {
-            const vRes = await fetch(`/api/vehicles?locationId=${encodeURIComponent(locationFilter)}&limit=100`, { signal });
-            if (vRes.ok) {
-              const vJson = await vRes.json();
-              const hubVehicles: Array<{
+        // Load registered fleet units to ensure ALL units (Available, Inactive, Maintenance, etc.)
+        // appear on the radar map across the entire corridor or for the filtered hub
+        try {
+          const vUrl = locationFilter
+            ? `/api/vehicles?locationId=${encodeURIComponent(locationFilter)}&limit=100`
+            : '/api/vehicles?limit=100';
+
+          const vRes = await fetch(vUrl, { signal, cache: 'no-store' });
+          if (vRes.ok) {
+            const vJson = await vRes.json();
+            const hubVehicles: Array<{
+              id: string;
+              plateNumber: string;
+              brand: string;
+              model: string;
+              status: string;
+              homeLocation?: { id: string; name: string; code: string } | null;
+              currentOperationalLocation?: { id: string; name: string; code: string } | null;
+              currentDriver?: {
                 id: string;
-                plateNumber: string;
-                brand: string;
-                model: string;
-                status: string;
-                homeLocation?: { id: string; name: string; code: string } | null;
-                currentOperationalLocation?: { id: string; name: string; code: string } | null;
-                updatedAt?: string;
-              }> = vJson.data || [];
+                licenseNumber: string;
+                user: { id: string; name: string; phone: string };
+              } | null;
+              updatedAt?: string;
+            }> = vJson.data || [];
 
-              const selectedLoc = locationsRef.current.find((l) => l.id === locationFilter);
-              const hubCoords = (selectedLoc && getHubCoordinates(selectedLoc.code || selectedLoc.name)) || DEFAULT_OPS_CENTER;
+            // Group offsets per hub so parked pool units cluster around their respective operational hub
+            const hubCounters: Record<string, number> = {};
 
-              let parkedOffset = 0;
-              for (const hv of hubVehicles) {
-                if (!mapped.some((m) => m.vehicleId === hv.id)) {
-                  parkedOffset++;
-                  // Small spiral offset so parked pool units don't render on identical pixel
-                  const angle = parkedOffset * 1.2;
-                  const radius = 0.0003 + (parkedOffset * 0.00012);
-                  mapped.push({
-                    vehicleId: hv.id,
-                    plateNumber: hv.plateNumber,
-                    brand: hv.brand,
-                    model: hv.model,
-                    status: hv.status,
-                    driverName: null,
-                    driverPhone: null,
-                    lat: hubCoords[0] + (Math.sin(angle) * radius),
-                    lng: hubCoords[1] + (Math.cos(angle) * radius),
-                    accuracyM: 10,
-                    speedMps: 0,
-                    headingDeg: 0,
-                    recordedAt: hv.updatedAt || new Date().toISOString(),
-                    movement: 'STOPPED',
-                    homeLocation: hv.homeLocation || null,
-                    currentOperationalLocation: hv.currentOperationalLocation || null,
-                  });
+            for (const hv of hubVehicles) {
+              const existingIdx = mapped.findIndex((m) => m.vehicleId === hv.id);
+              if (existingIdx >= 0) {
+                // Enrich existing live telemetry unit with DB status and hub relations if missing
+                if (!mapped[existingIdx].status) mapped[existingIdx].status = hv.status;
+                if (!mapped[existingIdx].homeLocation && hv.homeLocation) {
+                  mapped[existingIdx].homeLocation = hv.homeLocation;
                 }
+                if (!mapped[existingIdx].currentOperationalLocation && hv.currentOperationalLocation) {
+                  mapped[existingIdx].currentOperationalLocation = hv.currentOperationalLocation;
+                }
+                continue;
               }
+
+              // Vehicle without live telemetry: position at its operational hub or home location
+              const targetLoc = hv.currentOperationalLocation || hv.homeLocation;
+              const hubKey = targetLoc?.code || targetLoc?.name || 'Halim';
+              const hubCoords = getHubCoordinates(hubKey) || DEFAULT_OPS_CENTER;
+
+              hubCounters[hubKey] = (hubCounters[hubKey] || 0) + 1;
+              const parkedOffset = hubCounters[hubKey];
+
+              // Spiral distribution around hub so vehicles don't overlap on identical pixel
+              const angle = parkedOffset * 1.15;
+              const radius = 0.00035 + (parkedOffset * 0.00012);
+
+              mapped.push({
+                vehicleId: hv.id,
+                plateNumber: hv.plateNumber,
+                brand: hv.brand,
+                model: hv.model,
+                status: hv.status,
+                driverName: hv.currentDriver?.user?.name || null,
+                driverPhone: hv.currentDriver?.user?.phone || null,
+                lat: hubCoords[0] + (Math.sin(angle) * radius),
+                lng: hubCoords[1] + (Math.cos(angle) * radius),
+                accuracyM: 15,
+                speedMps: 0,
+                headingDeg: 0,
+                recordedAt: hv.updatedAt || new Date().toISOString(),
+                movement: hv.status === 'MAINTENANCE' ? 'MAINTENANCE' : hv.status === 'INACTIVE' ? 'OFFLINE' : 'STOPPED',
+                homeLocation: hv.homeLocation || null,
+                currentOperationalLocation: hv.currentOperationalLocation || null,
+              });
             }
-          } catch {
-            // Non-fatal if vehicle pool enrichment fails
           }
+        } catch {
+          // Non-fatal if vehicle pool enrichment fails
         }
 
         setVehicles(mapped);
@@ -248,8 +276,27 @@ function AdminFleetMapContent() {
     if (selectedLocation) {
       return getHubMapCenter(selectedLocation.code || selectedLocation.name);
     }
-    return { center: DEFAULT_OPS_CENTER, zoom: DEFAULT_OPS_ZOOM };
+    return { center: ALL_HUBS_CORRIDOR_CENTER, zoom: ALL_HUBS_CORRIDOR_ZOOM };
   }, [selectedLocation]);
+
+  const conditionStats = useMemo(() => {
+    let available = 0;
+    let inUse = 0;
+    let reserved = 0;
+    let maintenance = 0;
+    let inactive = 0;
+
+    for (const v of mergedVehicles) {
+      const s = (v.status || '').toUpperCase();
+      if (s === 'MAINTENANCE') maintenance++;
+      else if (s === 'INACTIVE') inactive++;
+      else if (s === 'RESERVED') reserved++;
+      else if (s === 'IN_USE' || v.movement === 'MOVING') inUse++;
+      else available++;
+    }
+
+    return { total: mergedVehicles.length, available, inUse, reserved, maintenance, inactive };
+  }, [mergedVehicles]);
 
   return (
     <div className="space-y-4">
@@ -303,6 +350,39 @@ function AdminFleetMapContent() {
         </div>
       </div>
 
+      {/* Radar Condition Status Bar */}
+      <div className="flex flex-wrap items-center gap-2 p-2 sm:p-2.5 bg-white border-2 border-black rounded-xl shadow-[2px_2px_0px_0px_#000] text-xs font-mono">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-100 font-bold text-zinc-900 border border-zinc-300">
+          <span>FLEET:</span>
+          <span className="text-zinc-600">{conditionStats.total} UNITS</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-teal-50 border border-teal-300 text-teal-900 font-bold">
+          <span className="w-2.5 h-2.5 rounded-full bg-teal-600 border border-white shadow-sm inline-block"></span>
+          <span>AVAILABLE ({conditionStats.available})</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-rose-50 border border-rose-300 text-rose-900 font-bold">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-600 border border-white shadow-sm inline-block animate-ping"></span>
+          <span>IN USE / MOVING ({conditionStats.inUse})</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-50 border border-amber-300 text-amber-900 font-bold">
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-white shadow-sm inline-block"></span>
+          <span>RESERVED ({conditionStats.reserved})</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-orange-50 border border-orange-300 text-orange-900 font-bold">
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-600 border border-white shadow-sm inline-block"></span>
+          <span>MAINTENANCE ({conditionStats.maintenance})</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-100 border border-slate-300 text-slate-800 font-bold">
+          <span className="w-2.5 h-2.5 rounded-full bg-slate-600 border border-white shadow-sm inline-block"></span>
+          <span>INACTIVE ({conditionStats.inactive})</span>
+        </div>
+      </div>
+
       {isLoading ? (
         <div className="surface py-24 text-center text-zinc-500 text-sm" role="status">
           <Spinner size="lg" className="mb-2" />
@@ -334,22 +414,30 @@ function AdminFleetMapContent() {
                   <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
                     Fleet Units ({mergedVehicles.length}) {selectedLocation ? `— ${selectedLocation.name}` : ''}
                   </span>
-                  <div className="mt-2 flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
-                    {mergedVehicles.map((v) => (
-                      <button
-                        key={v.vehicleId}
-                        type="button"
-                        onClick={() => setSelectedVehicleId(v.vehicleId)}
-                        aria-pressed={v.vehicleId === selectedVehicleId}
-                        className={`min-h-10 px-3.5 py-1.5 text-xs rounded-lg font-mono font-bold border-2 border-black cursor-pointer transition ${
-                          v.vehicleId === selectedVehicleId
-                            ? 'bg-emerald-400 text-zinc-950 shadow-[3px_3px_0px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
-                            : 'bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100'
-                        }`}
-                      >
-                        {v.plateNumber}
-                      </button>
-                    ))}
+                  <div className="mt-2 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+                    {mergedVehicles.map((v) => {
+                      const visual = getVehicleConditionVisual(v.status, v.movement);
+                      const isSelected = v.vehicleId === selectedVehicleId;
+                      return (
+                        <button
+                          key={v.vehicleId}
+                          type="button"
+                          onClick={() => setSelectedVehicleId(v.vehicleId)}
+                          aria-pressed={isSelected}
+                          className={`min-h-9 px-2.5 py-1 text-xs rounded-lg font-mono font-bold border-2 border-black cursor-pointer transition flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-zinc-950 text-white shadow-[3px_3px_0px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
+                              : 'bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100'
+                          }`}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full border border-black/30 shrink-0"
+                            style={{ backgroundColor: visual.color }}
+                          />
+                          <span>{v.plateNumber}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -385,6 +473,25 @@ function AdminFleetMapContent() {
                         )}
                       </div>
                     )}
+
+                    <div
+                      className="flex items-center justify-between p-2 rounded-lg border border-black/10 text-xs mt-2.5"
+                      style={{
+                        backgroundColor: `${getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).color}15`,
+                      }}
+                    >
+                      <span className="text-zinc-700 font-black text-[10px] uppercase tracking-wider">
+                        Radar Condition:
+                      </span>
+                      <span
+                        className="font-black text-xs uppercase tracking-wide"
+                        style={{
+                          color: getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).color,
+                        }}
+                      >
+                        {getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).badgeText}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/10 text-xs">

@@ -16,6 +16,9 @@ export interface OperationalHubInfo {
 export const DEFAULT_OPS_CENTER: [number, number] = [-6.2088, 106.8456]; // Jakarta Ops
 export const DEFAULT_OPS_ZOOM = 12;
 
+export const ALL_HUBS_CORRIDOR_CENTER: [number, number] = [-6.6079, 107.3076]; // Midpoint of Jakarta-Bandung KCIC Corridor
+export const ALL_HUBS_CORRIDOR_ZOOM = 9;
+
 export const OPERATIONAL_HUBS: Record<string, OperationalHubInfo> = {
   // Halim (Code: 102)
   '102': {

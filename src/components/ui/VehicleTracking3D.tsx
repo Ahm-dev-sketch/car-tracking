@@ -70,7 +70,7 @@ export function VehicleTracking3D() {
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="group relative w-full select-none overflow-hidden rounded-2xl border-[3px] border-black bg-[#edf3ee] shadow-[6px_6px_0px_0px_#000] transition-shadow duration-300 hover:shadow-[8px_8px_0px_0px_#000]"
+      className="group relative w-full select-none overflow-hidden rounded-2xl border-[3px] border-black bg-[#fbf7f7] shadow-[6px_6px_0px_0px_#000] transition-shadow duration-300 hover:shadow-[8px_8px_0px_0px_#000]"
       style={{ perspective: '1100px' }}
       aria-label="3D Live Vehicle Tracking Simulation"
       role="region"
@@ -102,7 +102,7 @@ export function VehicleTracking3D() {
 
       {/* 2. 3D TILT STAGE VIEWPORT */}
       <div
-        className="relative h-[280px] w-full overflow-hidden bg-[#e4ede6] sm:h-[320px]"
+        className="relative h-[280px] w-full overflow-hidden bg-[#f5e8e8] sm:h-[320px]"
         style={{
           transformStyle: 'preserve-3d',
           transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
@@ -147,22 +147,22 @@ export function VehicleTracking3D() {
               <stop offset="100%" stopColor="#fde047" stopOpacity="0" />
             </linearGradient>
 
-            {/* Car Body Gradients */}
+            {/* Car Body Gradients (KCIC Whoosh Crimson Komodo) */}
             <linearGradient id="carBodyLit" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#10b981" />
-              <stop offset="100%" stopColor="#059669" />
+              <stop offset="0%" stopColor="#e11d48" />
+              <stop offset="100%" stopColor="#be123c" />
             </linearGradient>
             <linearGradient id="carBodyShade" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#047857" />
-              <stop offset="100%" stopColor="#064e3b" />
+              <stop offset="0%" stopColor="#9f1239" />
+              <stop offset="100%" stopColor="#881337" />
             </linearGradient>
             <linearGradient id="windshieldGlass" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#a7f3d0" />
-              <stop offset="100%" stopColor="#34d399" />
+              <stop offset="0%" stopColor="#fecdd3" />
+              <stop offset="100%" stopColor="#fb7185" />
             </linearGradient>
             <linearGradient id="radarWaveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#059669" stopOpacity="0" />
+              <stop offset="0%" stopColor="#e11d48" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#be123c" stopOpacity="0" />
             </linearGradient>
           </defs>
 
@@ -357,7 +357,7 @@ export function VehicleTracking3D() {
           {/* D. BOOST SPEED LINES (Shown when boosted)   */}
           {/* ------------------------------------------- */}
           {isBoosted && (
-            <g stroke="#34d399" strokeWidth="2.5" strokeDasharray="30 40">
+            <g stroke="#fb7185" strokeWidth="2.5" strokeDasharray="30 40">
               <line
                 x1="20"
                 y1="30"
@@ -443,7 +443,7 @@ export function VehicleTracking3D() {
                 cy="0"
                 rx="7"
                 ry="12"
-                fill="#34d399"
+                fill="#fb7185"
                 stroke="#000"
                 strokeWidth="2"
                 transform="rotate(24)"
@@ -471,7 +471,7 @@ export function VehicleTracking3D() {
                 cy="0"
                 rx="7"
                 ry="12"
-                fill="#34d399"
+                fill="#fb7185"
                 stroke="#000"
                 strokeWidth="2"
                 transform="rotate(24)"
@@ -522,7 +522,7 @@ export function VehicleTracking3D() {
             {/* KCIC Fleet Decal on Car Door */}
             <g transform="translate(236, 192) rotate(24)">
               <rect x="0" y="0" width="46" height="13" rx="2" fill="#ffffff" stroke="#000" strokeWidth="1.5" />
-              <text x="23" y="9.5" textAnchor="middle" fontSize="7.5" fontWeight="900" fontFamily="sans-serif" fill="#059669">
+              <text x="23" y="9.5" textAnchor="middle" fontSize="7.5" fontWeight="900" fontFamily="sans-serif" fill="#be123c">
                 KCIC FLEET
               </text>
             </g>
@@ -593,7 +593,7 @@ export function VehicleTracking3D() {
               strokeWidth="3"
             />
             {/* Side Window White Specular Line */}
-            <line x1="202" y1="138" x2="258" y2="166" stroke="#6ee7b7" strokeWidth="2" opacity="0.6" />
+            <line x1="202" y1="138" x2="258" y2="166" stroke="#fda4af" strokeWidth="2" opacity="0.6" />
             {/* B-Pillar divider */}
             <line x1="230" y1="148" x2="230" y2="171" stroke="#000" strokeWidth="3" />
 
@@ -619,7 +619,7 @@ export function VehicleTracking3D() {
               cy="128"
               rx="9"
               ry="5"
-              fill="#10b981"
+              fill="#e11d48"
               stroke="#000"
               strokeWidth="2"
             />
@@ -632,7 +632,7 @@ export function VehicleTracking3D() {
               rx="18"
               ry="9"
               fill="none"
-              stroke="#059669"
+              stroke="#be123c"
               strokeWidth="2.5"
               style={{ animation: 'radarRingPulse 2s ease-out infinite' }}
             />
@@ -643,7 +643,7 @@ export function VehicleTracking3D() {
               rx="18"
               ry="9"
               fill="none"
-              stroke="#10b981"
+              stroke="#e11d48"
               strokeWidth="2.5"
               style={{ animation: 'radarRingPulse 2s ease-out infinite 0.75s' }}
             />
@@ -661,7 +661,7 @@ export function VehicleTracking3D() {
               strokeWidth="2.5"
               strokeDasharray="4 3"
             />
-            <circle cx="255" cy="124" r="3.5" fill="#10b981" stroke="#000" strokeWidth="2" />
+            <circle cx="255" cy="124" r="3.5" fill="#e11d48" stroke="#000" strokeWidth="2" />
 
             {/* Floating 3D Billboard Tag */}
             <g transform="translate(175, 16)">
@@ -680,7 +680,7 @@ export function VehicleTracking3D() {
               />
 
               {/* Status Header */}
-              <circle cx="14" cy="15" r="4" fill="#10b981" stroke="#000" strokeWidth="1.5" />
+              <circle cx="14" cy="15" r="4" fill="#e11d48" stroke="#000" strokeWidth="1.5" />
               <text x="24" y="18" fontSize="10" fontWeight="900" fontFamily="sans-serif" fill="#000">
                 KCIC-08 // IN TRANSIT
               </text>

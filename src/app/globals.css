@@ -4,8 +4,8 @@
 :root {
   --background: #faf9f5;
   --foreground: #121212;
-  --accent: #059669;
-  --accent-soft: #a7f3d0;
+  --accent: #be123c;
+  --accent-soft: #fecdd3;
   --motion: cubic-bezier(0.22, 1, 0.36, 1);
   --layer-nav: 30;
   --layer-toast: 40;
@@ -27,17 +27,17 @@
   --color-zinc-700: #38342a;
   --color-zinc-800: #24211a;
   --color-zinc-900: #121212;
-  --color-emerald-50: #ecfdf5;
-  --color-emerald-100: #d1fae5;
-  --color-emerald-200: #a7f3d0;
-  --color-emerald-300: #6ee7b7;
-  --color-emerald-400: #34d399;
-  --color-emerald-500: #10b981;
-  --color-emerald-600: #059669;
-  --color-emerald-700: #047857;
-  --color-emerald-800: #065f46;
-  --color-emerald-900: #064e3b;
-  --color-emerald-950: #022c22;
+  --color-emerald-50: #fff1f2;
+  --color-emerald-100: #ffe4e6;
+  --color-emerald-200: #fecdd3;
+  --color-emerald-300: #fda4af;
+  --color-emerald-400: #fb7185;
+  --color-emerald-500: #e11d48;
+  --color-emerald-600: #be123c;
+  --color-emerald-700: #9f1239;
+  --color-emerald-800: #881337;
+  --color-emerald-900: #4c0519;
+  --color-emerald-950: #2a030d;
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.5;
 }
@@ -75,7 +75,7 @@ input:not([type="checkbox"]):not([type="radio"]), select, textarea {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: #121212;
-  box-shadow: 4px 4px 0px 0px #059669;
+  box-shadow: 4px 4px 0px 0px #be123c;
 }
 input::placeholder, textarea::placeholder { color: #71717a; }
 h1, h2, h3 { text-wrap: balance; }
@@ -128,7 +128,7 @@ p { text-wrap: pretty; }
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 .app-main :where(button, a)[class*="bg-zinc-900"]:hover:not(:disabled) {
-  background-color: #10b981;
+  background-color: #e11d48;
   transform: translate(-1px, -1px);
   box-shadow: 4px 4px 0px 0px #121212;
 }
@@ -202,12 +202,12 @@ p { text-wrap: pretty; }
   transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 .button-primary {
-  background: #059669;
+  background: #be123c;
   color: #ffffff;
   box-shadow: 3px 3px 0px 0px #121212;
 }
 .button-primary:hover:not(:disabled) {
-  background: #10b981;
+  background: #e11d48;
   transform: translate(-1px, -1px);
   box-shadow: 4px 4px 0px 0px #121212;
 }
@@ -298,7 +298,7 @@ a:hover .button-icon, button:hover .button-icon { transform: translate(1px, -1px
   height: 2.5rem;
   border-radius: 0.625rem;
   border: 2px solid #121212;
-  background: #10b981;
+  background: #be123c;
   color: #121212;
   box-shadow: 2px 2px 0px 0px #121212;
 }

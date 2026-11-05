@@ -65,6 +65,12 @@ interface AssignedBooking {
   } | null;
 }
 
+interface LocationOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 interface VehicleOption {
   id: string;
   plateNumber: string;
@@ -72,6 +78,8 @@ interface VehicleOption {
   model: string;
   status: string;
   seatingCapacity: number;
+  homeLocation?: { id: string; name: string; code: string } | null;
+  currentOperationalLocation?: { id: string; name: string; code: string } | null;
 }
 
 interface DashboardConfig {
@@ -131,6 +139,8 @@ export default function DriverDashboardPage() {
   const [manualPlate, setManualPlate] = useState('');
   const [matchingVehicles, setMatchingVehicles] = useState<VehicleOption[]>([]);
   const [poolVehicles, setPoolVehicles] = useState<VehicleOption[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleOption | null>(null);
   const [startPhase, setStartPhase] = useState<'gps' | 'request' | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
@@ -277,6 +287,17 @@ export default function DriverDashboardPage() {
     },
   });
 
+  const fetchPoolVehicles = useCallback(async (locId: string) => {
+    try {
+      const params = new URLSearchParams({ status: 'AVAILABLE', limit: '30' });
+      if (locId) params.set('locationId', locId);
+      const poolRes = await fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?${params.toString()}`);
+      setPoolVehicles(poolRes.data || []);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
   // Load config, active session, active trip, assigned bookings
   const loadDashboardData = useCallback(async () => {
     const version = ++dashboardRequest.current;
@@ -301,8 +322,17 @@ export default function DriverDashboardPage() {
       } while (page <= totalPages);
       setAssignedBookings(bookings);
       try {
-        const poolRes = await fetchJson<{ data: VehicleOption[] }>('/api/vehicles?status=AVAILABLE&limit=12');
-        if (version === dashboardRequest.current) setPoolVehicles(poolRes.data || []);
+        const poolParams = new URLSearchParams({ status: 'AVAILABLE', limit: '30' });
+        if (selectedLocationId) poolParams.set('locationId', selectedLocationId);
+
+        const [poolRes, locsRes] = await Promise.all([
+          fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?${poolParams.toString()}`),
+          fetchJson<{ data: LocationOption[] }>('/api/locations'),
+        ]);
+        if (version === dashboardRequest.current) {
+          setPoolVehicles(poolRes.data || []);
+          if (locsRes.data) setLocations(locsRes.data);
+        }
       } catch {
         // Pool vehicle list non-fatal
       }
@@ -314,7 +344,7 @@ export default function DriverDashboardPage() {
     } finally {
       if (version === dashboardRequest.current) setIsLoading(false);
     }
-  }, [fetchOffers]);
+  }, [fetchOffers, selectedLocationId]);
 
   useEffect(() => {
     let refreshing = false;
@@ -469,7 +499,7 @@ export default function DriverDashboardPage() {
   };
 
   // Vehicle plate search autocomplete
-  const searchVehicle = async (term: string) => {
+  const searchVehicle = async (term: string, locId = selectedLocationId) => {
     const version = ++vehicleSearchRequest.current;
     setManualPlate(term);
     setSelectedVehicle(null);
@@ -477,11 +507,15 @@ export default function DriverDashboardPage() {
     setStartError(null);
     if (term.trim().length < 2) return;
     try {
-      const json = await fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?search=${encodeURIComponent(term.trim())}&limit=20`);
+      const params = new URLSearchParams({ search: term.trim(), limit: '20' });
+      if (locId) params.set('locationId', locId);
+      const json = await fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?${params.toString()}`);
       if (version === vehicleSearchRequest.current) {
         const available = json.data.filter((vehicle) => ['AVAILABLE', 'RESERVED'].includes(vehicle.status));
         setMatchingVehicles(available);
-        if (available.length === 0) setStartError('No available vehicle matches this plate.');
+        if (available.length === 0) {
+          setStartError(locId ? 'No available vehicle matches this plate at the selected hub.' : 'No available vehicle matches this plate.');
+        }
       }
     } catch (error) {
       if (version === vehicleSearchRequest.current) {
@@ -1177,26 +1211,155 @@ export default function DriverDashboardPage() {
             </div>
 
             <div className="max-w-md space-y-3">
+              {/* Hub Location Filter */}
+              <div className="rounded-xl border-2 border-black bg-zinc-50 p-3 shadow-[2px_2px_0px_0px_#000] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                    <Icon name="pin" className="h-3.5 w-3.5 text-[#be123c]" />
+                    Filter Lokasi Hub:
+                  </span>
+                  {selectedLocationId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLocationId('');
+                        void fetchPoolVehicles('');
+                      }}
+                      className="text-[11px] font-black text-[#be123c] hover:underline cursor-pointer"
+                    >
+                      Reset Filter
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLocationId('');
+                      void fetchPoolVehicles('');
+                    }}
+                    className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black transition-all cursor-pointer ${
+                      !selectedLocationId
+                        ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                        : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                    }`}
+                  >
+                    Semua Hub
+                  </button>
+                  {locations.map((loc) => {
+                    const isSelected = selectedLocationId === loc.id;
+                    return (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => {
+                          const next = isSelected ? '' : loc.id;
+                          setSelectedLocationId(next);
+                          void fetchPoolVehicles(next);
+                        }}
+                        className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                            : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                        }`}
+                      >
+                        <span>{loc.name}</span>
+                        <span className={`ml-1 text-[10px] font-mono px-1 py-0.2 rounded border ${
+                          isSelected ? 'border-white/40 bg-white/20 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
+                        }`}>
+                          {loc.code}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="vehicle-plate" className="mb-2 block text-xs font-black uppercase tracking-wider text-zinc-700">
-                  Search license plate
+                  Search license plate {selectedLocationId && `(di ${locations.find((l) => l.id === selectedLocationId)?.name || 'hub'})`}
                 </label>
                 <input
                   id="vehicle-plate"
                   type="text"
-                  placeholder="e.g. B 1234 ABC or D 8888 GH"
+                  placeholder="e.g. B 1234 CD or T 2020 AB"
                   value={manualPlate}
                   disabled={isStartingTrip || isTogglingOnline}
                   onChange={(e) => searchVehicle(e.target.value)}
-                  className="min-h-14 w-full rounded-xl border-2 border-black bg-white px-4 py-3 font-mono text-base font-bold text-zinc-950 shadow-[3px_3px_0px_0px_#000] outline-none placeholder:font-sans placeholder:font-normal placeholder:text-zinc-400 focus:shadow-[4px_4px_0px_0px_#059669]"
+                  className="min-h-14 w-full rounded-xl border-2 border-black bg-white px-4 py-3 font-mono text-base font-bold text-zinc-950 shadow-[3px_3px_0px_0px_#000] outline-none placeholder:font-sans placeholder:font-normal placeholder:text-zinc-400 focus:shadow-[4px_4px_0px_0px_#be123c]"
                 />
               </div>
 
               {poolVehicles.length > 0 && !selectedVehicle && !manualPlate && (
                 <div className="space-y-2 pt-1">
-                  <p className="text-xs font-black uppercase tracking-wider text-zinc-500">Available in pool</p>
-                  <div className="flex flex-wrap gap-2">
-                    {poolVehicles.map((v) => (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                      Available in pool ({poolVehicles.length})
+                    </p>
+                    {selectedLocationId && (
+                      <span className="text-[11px] font-bold text-zinc-600">
+                        Hub: {locations.find((l) => l.id === selectedLocationId)?.name}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {poolVehicles.map((v) => {
+                      const hub = v.currentOperationalLocation || v.homeLocation;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            vehicleSearchRequest.current += 1;
+                            setStartError(null);
+                            setSelectedVehicle(v);
+                            setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
+                            setMatchingVehicles([]);
+                          }}
+                          className="flex flex-col items-start gap-1 rounded-xl border-2 border-black bg-white p-3 text-left shadow-[2px_2px_0px_0px_#000] transition hover:bg-rose-50 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000] cursor-pointer"
+                        >
+                          <div className="flex w-full items-center justify-between gap-1">
+                            <span className="font-mono text-sm font-black text-zinc-950">{v.plateNumber}</span>
+                            {hub && (
+                              <span className="rounded border border-black/30 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-800">
+                                {hub.name} ({hub.code})
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-zinc-600">
+                            {v.brand} {v.model} • {v.seatingCapacity} seats
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {poolVehicles.length === 0 && !selectedVehicle && !manualPlate && selectedLocationId && (
+                <div className="rounded-xl border-2 border-dashed border-zinc-300 p-4 text-center">
+                  <p className="text-xs font-bold text-zinc-600">
+                    Tidak ada armada AVAILABLE di hub {locations.find((l) => l.id === selectedLocationId)?.name || 'ini'}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLocationId('');
+                      void fetchPoolVehicles('');
+                    }}
+                    className="mt-2 text-xs font-black text-[#be123c] underline cursor-pointer"
+                  >
+                    Tampilkan armada di semua hub
+                  </button>
+                </div>
+              )}
+
+              {matchingVehicles.length > 0 && !selectedVehicle && (
+                <div className="overflow-hidden rounded-xl border-2 border-black bg-white divide-y-2 divide-black shadow-[4px_4px_0px_0px_#000]">
+                  {matchingVehicles.map((v) => {
+                    const hub = v.currentOperationalLocation || v.homeLocation;
+                    return (
                       <button
                         key={v.id}
                         type="button"
@@ -1207,48 +1370,40 @@ export default function DriverDashboardPage() {
                           setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
                           setMatchingVehicles([]);
                         }}
-                        className="inline-flex cursor-pointer items-center gap-2 rounded-lg border-2 border-black bg-white px-3 py-2 text-xs font-bold text-zinc-900 shadow-[2px_2px_0px_0px_#000] transition hover:bg-emerald-100 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000]"
+                        className="flex min-h-14 w-full cursor-pointer flex-wrap items-center justify-between gap-3 p-4 text-left text-sm hover:bg-zinc-50"
                       >
-                        <span className="font-mono font-black text-zinc-950">{v.plateNumber}</span>
-                        <span className="text-zinc-600">{v.brand} {v.model}</span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-zinc-950">{v.plateNumber}</span>
+                            {hub && (
+                              <span className="rounded border border-black/30 bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-zinc-800">
+                                {hub.name} ({hub.code})
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-zinc-600 text-xs font-medium">
+                            {v.brand} {v.model}
+                          </span>
+                        </div>
+                        <StatusBadge status={v.status} />
                       </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {matchingVehicles.length > 0 && !selectedVehicle && (
-                <div className="overflow-hidden rounded-xl border-2 border-black bg-white divide-y-2 divide-black shadow-[4px_4px_0px_0px_#000]">
-                  {matchingVehicles.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => {
-                        vehicleSearchRequest.current += 1;
-                        setStartError(null);
-                        setSelectedVehicle(v);
-                        setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
-                        setMatchingVehicles([]);
-                      }}
-                      className="flex min-h-14 w-full cursor-pointer flex-wrap items-center justify-between gap-3 p-4 text-left text-sm hover:bg-zinc-50"
-                    >
-                      <div>
-                        <span className="font-mono font-black text-zinc-950">{v.plateNumber}</span>
-                        <span className="text-zinc-600 ml-2 font-medium">
-                          {v.brand} {v.model}
-                        </span>
-                      </div>
-                      <StatusBadge status={v.status} />
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
               {selectedVehicle && (
-                <div className="space-y-4 rounded-xl border-2 border-black bg-emerald-100 p-5 text-sm shadow-[4px_4px_0px_0px_#000]">
+                <div className="space-y-4 rounded-xl border-2 border-black bg-rose-50 p-5 text-sm shadow-[4px_4px_0px_0px_#000]">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-black text-zinc-950 text-base">{selectedVehicle.plateNumber}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-zinc-950 text-base">{selectedVehicle.plateNumber}</span>
+                        {(selectedVehicle.currentOperationalLocation || selectedVehicle.homeLocation) && (
+                          <span className="rounded border border-black bg-amber-200 px-1.5 py-0.5 text-[10px] font-black text-zinc-900 shadow-[1px_1px_0px_0px_#000]">
+                            {(selectedVehicle.currentOperationalLocation || selectedVehicle.homeLocation)?.name}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs font-semibold text-zinc-700">
                         {selectedVehicle.brand} {selectedVehicle.model} ({selectedVehicle.seatingCapacity} seats)
                       </p>

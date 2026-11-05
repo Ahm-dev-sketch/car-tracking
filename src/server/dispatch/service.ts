@@ -1609,9 +1609,18 @@ export async function getAdminStats() {
   };
 
   const byLocation = locations.map((loc) => {
-    const locVehicles = vehicles.filter(
+    const locVehiclesList = vehicles.filter(
       (v) => v.homeLocationId === loc.id || v.currentLocationId === loc.id
-    ).length;
+    );
+    const locVehicles = locVehiclesList.length;
+    const locAvailable = locVehiclesList.filter((v) => v.status === VehicleStatus.AVAILABLE).length;
+    const locInUse = locVehiclesList.filter((v) => v.status === VehicleStatus.IN_USE).length;
+    const locReserved = locVehiclesList.filter((v) => v.status === VehicleStatus.RESERVED).length;
+    const locMaintenance = locVehiclesList.filter((v) => v.status === VehicleStatus.MAINTENANCE).length;
+    const inUseCount = locInUse + locReserved;
+    const maxCapacity = locVehicles;
+    const remainingCapacity = Math.max(0, locAvailable);
+    const utilizationRate = maxCapacity > 0 ? Math.round((inUseCount / maxCapacity) * 100) : 0;
 
     const locDrivers = activeSessions.filter((s) => {
       const v = s.vehicle;
@@ -1630,6 +1639,19 @@ export async function getAdminStats() {
         ).includes(b.status)
     ).length;
 
+    const locPending = bookings.filter(
+      (b) =>
+        b.operationalLocationId === loc.id &&
+        (
+          [
+            BookingStatus.PENDING,
+            BookingStatus.SEARCHING_DRIVER,
+            BookingStatus.DRIVER_NOTIFIED,
+            BookingStatus.ADMIN_INTERVENTION,
+          ] as BookingStatus[]
+        ).includes(b.status)
+    ).length;
+
     return {
       locationId: loc.id,
       name: loc.name,
@@ -1637,6 +1659,13 @@ export async function getAdminStats() {
       vehicles: locVehicles,
       drivers: locDrivers,
       bookings: locBookings,
+      maxCapacity,
+      inUseVehicles: inUseCount,
+      availableVehicles: locAvailable,
+      maintenanceVehicles: locMaintenance,
+      remainingCapacity,
+      utilizationRate,
+      pendingRequests: locPending,
     };
   });
 

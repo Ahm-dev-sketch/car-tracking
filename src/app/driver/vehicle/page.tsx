@@ -263,6 +263,43 @@ function DriverVehicleContent() {
           </p>
         </div>
 
+        {/* Quick Location Pills */}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setLocationFilter('')}
+            className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black transition-all cursor-pointer ${
+              !locationFilter
+                ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+            }`}
+          >
+            Semua Hub
+          </button>
+          {locations.map((loc) => {
+            const isSelected = locationFilter === loc.id;
+            return (
+              <button
+                key={loc.id}
+                type="button"
+                onClick={() => setLocationFilter(isSelected ? '' : loc.id)}
+                className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                    : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                }`}
+              >
+                <span>{loc.name}</span>
+                <span className={`ml-1 text-[10px] font-mono px-1 py-0.2 rounded border ${
+                  isSelected ? 'border-white/40 bg-white/20 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
+                }`}>
+                  {loc.code}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Filter bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <input

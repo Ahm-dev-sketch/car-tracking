@@ -477,7 +477,17 @@ export async function listTrips(
       include: {
         vehicle: true,
         driver: { include: { user: { select: { id: true, name: true, phone: true } } } },
-        booking: { select: { id: true, bookingNumber: true, purpose: true, userId: true } },
+        booking: {
+          select: {
+            id: true,
+            bookingNumber: true,
+            purpose: true,
+            userId: true,
+            pickupLocation: true,
+            destination: true,
+            operationalLocationId: true,
+          },
+        },
       },
     }),
   ]);

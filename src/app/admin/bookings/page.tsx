@@ -14,6 +14,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 import { FleetMap, VehicleMarkerData } from '@/components/map';
+import { Icon } from '@/components/ui/Icon';
 
 interface AdminBooking {
   id: string;
@@ -433,13 +434,14 @@ function AdminBookingsContent() {
           <button
             type="button"
             onClick={() => setStatusFilter('ADMIN_INTERVENTION')}
-            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition inline-flex items-center gap-1.5 ${
               statusFilter === 'ADMIN_INTERVENTION'
                 ? 'bg-amber-400 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
                 : 'bg-amber-100 text-zinc-950 shadow-[1px_1px_0px_0px_#000] hover:bg-amber-200'
             }`}
           >
-            ⚠️ Intervention Required
+            <Icon name="alert" className="size-3.5 shrink-0 text-amber-950" />
+            <span>Intervention Required</span>
           </button>
           <button
             type="button"

@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FleetMap, VehicleMarkerData } from '@/components/map';
 import { formatEta } from '@/components/booking/DispatchProgress';
+import { Icon } from '@/components/ui/Icon';
 
 export interface CandidateDriver {
   driverId: string;
@@ -206,8 +207,9 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
 
       {actionError && <ErrorBanner message={actionError} onDismiss={() => setActionError(null)} />}
       {successMessage && (
-        <div className="p-3 bg-emerald-100 border-2 border-black rounded-xl text-zinc-950 text-xs font-bold shadow-[2px_2px_0px_0px_#000]">
-          ✓ {successMessage}
+        <div className="flex items-center gap-1.5 p-3 bg-emerald-100 border-2 border-black rounded-xl text-zinc-950 text-xs font-bold shadow-[2px_2px_0px_0px_#000]">
+          <Icon name="check" className="size-4 shrink-0 text-emerald-800" />
+          <span>{successMessage}</span>
         </div>
       )}
 
@@ -353,9 +355,10 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                             href={waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-2.5 py-1.5 border-2 border-black bg-emerald-300 text-zinc-950 rounded-lg text-xs font-bold inline-flex items-center gap-1 shadow-[1px_1px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[2px_2px_0px_0px_#000]"
+                            className="px-2.5 py-1.5 border-2 border-black bg-emerald-300 text-zinc-950 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[2px_2px_0px_0px_#000]"
                           >
-                            <span>💬 WhatsApp</span>
+                            <Icon name="message" className="size-3.5 shrink-0" />
+                            <span>WhatsApp</span>
                           </a>
                         )}
 

@@ -696,13 +696,15 @@ export default function DriverDashboardPage() {
                   {confidenceScore > 0 ? `${confidenceScore}% Akurat` : signalStatus}
                 </span>
 
-                <span className="inline-flex items-center gap-1 rounded-md border-2 border-black bg-white px-2 py-0.5 text-[11px] font-bold text-zinc-900 shadow-[2px_2px_0px_0px_#000]">
-                  {locationSource === 'wifi_cell_triangulation' ? '📡 Wi-Fi/Cell' : '🛰️ GPS Presisi'}
+                <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-black bg-white px-2 py-0.5 text-[11px] font-bold text-zinc-900 shadow-[2px_2px_0px_0px_#000]">
+                  <Icon name={locationSource === 'wifi_cell_triangulation' ? 'wifi' : 'satellite'} className="size-3 text-zinc-700" />
+                  <span>{locationSource === 'wifi_cell_triangulation' ? 'Wi-Fi/Cell' : 'GPS Presisi'}</span>
                 </span>
 
                 {jumpyDiscardCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-md border-2 border-black bg-teal-200 px-2 py-0.5 text-[11px] font-bold text-teal-950 shadow-[2px_2px_0px_0px_#000]" title="Titik jumpy akibat sinyal dipantulkan telah dibersihkan otomatis">
-                    🛡️ {jumpyDiscardCount} jumpy difilter
+                  <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-black bg-teal-200 px-2 py-0.5 text-[11px] font-bold text-teal-950 shadow-[2px_2px_0px_0px_#000]" title="Titik jumpy akibat sinyal dipantulkan telah dibersihkan otomatis">
+                    <Icon name="shield" className="size-3 text-teal-900" />
+                    <span>{jumpyDiscardCount} jumpy difilter</span>
                   </span>
                 )}
               </div>
@@ -1136,8 +1138,9 @@ export default function DriverDashboardPage() {
                       </div>
 
                       {b.vehicle && (
-                        <div className="wrap-anywhere border-t-2 border-black/10 pt-3 text-sm font-bold text-zinc-800">
-                          🚗 {b.vehicle.plateNumber} ({b.vehicle.brand} {b.vehicle.model})
+                        <div className="wrap-anywhere flex items-center gap-1.5 border-t-2 border-black/10 pt-3 text-sm font-bold text-zinc-800">
+                          <Icon name="car" className="size-4 shrink-0 text-zinc-700" />
+                          <span>{b.vehicle.plateNumber} ({b.vehicle.brand} {b.vehicle.model})</span>
                         </div>
                       )}
                     </div>

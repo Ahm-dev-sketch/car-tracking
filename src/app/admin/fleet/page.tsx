@@ -10,6 +10,7 @@ import { MovementBadge } from '@/components/ui/MovementBadge';
 import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Spinner } from '@/components/ui/Spinner';
+import { Icon } from '@/components/ui/Icon';
 import {
   getHubMapCenter,
   getHubCoordinates,
@@ -414,7 +415,8 @@ function AdminFleetMapContent() {
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-emerald-300 px-2.5 py-1 text-xs font-bold text-zinc-950 shadow-[1px_1px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[2px_2px_0px_0px_#000]"
                             >
-                              <span>💬 WhatsApp {selectedVehicle.driverPhone}</span>
+                              <Icon name="message" className="size-3.5 shrink-0" />
+                              <span>WhatsApp {selectedVehicle.driverPhone}</span>
                             </a>
                           ) : (
                             <span className="font-mono text-zinc-700 font-bold">{selectedVehicle.driverPhone}</span>

@@ -498,8 +498,9 @@ function UserTrackingContent() {
                         <span className="text-[10px] text-zinc-500 uppercase font-black">
                           Posisi Terkini Armada
                         </span>
-                        <p className="mt-0.5 text-zinc-900 font-bold line-clamp-2">
-                          📍 {driverCurrentAddress}
+                        <p className="mt-0.5 flex items-center gap-1.5 text-zinc-900 font-bold line-clamp-2">
+                          <Icon name="pin" className="size-3.5 shrink-0 text-emerald-700" />
+                          <span>{driverCurrentAddress}</span>
                         </p>
                       </div>
                     )}

@@ -597,7 +597,8 @@ export function BookingModal({
                     className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-[2.5px] border-black bg-emerald-400 px-4 py-3.5 text-sm font-black text-black shadow-[4px_4px_0px_0px_#000] hover:bg-emerald-300 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition cursor-pointer"
                   >
                     <Icon name="tracking" className="size-5" />
-                    <span>Lacak Posisi Driver di Peta Langsung ➔</span>
+                    <span>Lacak Posisi Driver di Peta Langsung</span>
+                    <Icon name="arrow" className="size-4" />
                   </button>
                 </div>
               )}
@@ -754,7 +755,8 @@ export function BookingModal({
             <div className="space-y-2 text-black">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold flex items-center gap-1.5 text-black">
-                  ⚠️ Izin Lokasi (GPS) Wajib Diaktifkan
+                  <Icon name="alert" className="size-4 text-rose-600" />
+                  <span>Izin Lokasi (GPS) Wajib Diaktifkan</span>
                 </span>
                 <button
                   type="button"
@@ -771,7 +773,8 @@ export function BookingModal({
           ) : (
             <div className="flex items-center justify-between">
               <span className="text-black font-extrabold flex items-center gap-1.5">
-                📍 Lokasi (GPS) Wajib untuk Penjemputan
+                <Icon name="pin" className="size-4 text-emerald-700" />
+                <span>Lokasi (GPS) Wajib untuk Penjemputan</span>
               </span>
               <button
                 type="button"
@@ -848,7 +851,8 @@ export function BookingModal({
                     }}
                     className="text-emerald-700 hover:text-emerald-900 font-medium underline inline-flex items-center gap-1 cursor-pointer"
                   >
-                    📍 Gunakan alamat lokasi saya
+                    <Icon name="pin" className="size-3 text-emerald-700" />
+                    <span>Gunakan alamat lokasi saya</span>
                   </button>
                   {isResolvingAddress ? (
                     <span className="text-zinc-400 italic text-[10px]">Mencari alamat...</span>

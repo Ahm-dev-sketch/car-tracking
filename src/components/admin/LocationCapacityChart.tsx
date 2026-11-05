@@ -79,23 +79,22 @@ export function LocationCapacityChart({
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-black bg-zinc-50 p-2 text-xs font-bold shadow-[2px_2px_0px_0px_#000]">
-          <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 px-1">Keterangan Bar:</span>
-          <div className="flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-2 py-1 text-rose-950 shadow-sm">
-            <span className="h-3 w-3 rounded-full border border-black bg-[#be123c] shrink-0" />
-            <span>Maks Kapasitas</span>
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-black bg-zinc-50 p-2.5 text-xs font-bold shadow-[2px_2px_0px_0px_#000]">
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#be123c]" />
+            <span className="text-zinc-700">Maks Kapasitas</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-emerald-950 shadow-sm">
-            <span className="h-3 w-3 rounded-full border border-black bg-emerald-500 shrink-0" />
-            <span>Available (Siap)</span>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-emerald-500" />
+            <span className="text-zinc-700">Available</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-amber-950 shadow-sm">
-            <span className="h-3 w-3 rounded-full border border-black bg-amber-400 shrink-0" />
-            <span>Sedang Digunakan</span>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-amber-400" />
+            <span className="text-zinc-700">Sedang Digunakan</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-sky-300 bg-sky-50 px-2 py-1 text-sky-950 shadow-sm">
-            <span className="h-3 w-3 rounded-full border border-black bg-sky-500 shrink-0" />
-            <span>Permintaan Masuk</span>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-sky-500" />
+            <span className="text-zinc-700">Permintaan Masuk</span>
           </div>
         </div>
       </div>

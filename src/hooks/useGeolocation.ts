@@ -322,6 +322,56 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [isTracking, getCurrentPosition]);
 
+  // Screen Wake Lock API: Prevent driver phone screen from locking/sleeping during active tracking
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+
+    let wakeLockSentinel: any = null;
+
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isTracking && document.visibilityState === 'visible') {
+        try {
+          wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
+          wakeLockSentinel?.addEventListener?.('release', () => {
+            wakeLockSentinel = null;
+          });
+        } catch {
+          // Battery saver or system policy may deny lock; fail safely
+        }
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLockSentinel) {
+        try {
+          await wakeLockSentinel.release();
+        } catch {
+          // ignore
+        }
+        wakeLockSentinel = null;
+      }
+    };
+
+    if (isTracking) {
+      void requestWakeLock();
+    } else {
+      void releaseWakeLock();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isTracking && !wakeLockSentinel) {
+        void requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      void releaseWakeLock();
+    };
+  }, [isTracking]);
+
   useEffect(() => () => stopWatch(), [stopWatch]);
 
   return {

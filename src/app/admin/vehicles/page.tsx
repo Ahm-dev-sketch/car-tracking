@@ -85,6 +85,7 @@ function AdminVehiclesContent() {
   const [formTransmission, setFormTransmission] = useState('AUTOMATIC');
   const [formImageUrl, setFormImageUrl] = useState('');
   const [formStatus, setFormStatus] = useState('AVAILABLE');
+  const [formLocationId, setFormLocationId] = useState('');
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -199,6 +200,7 @@ function AdminVehiclesContent() {
     setFormTransmission('AUTOMATIC');
     setFormImageUrl('');
     setFormStatus('AVAILABLE');
+    setFormLocationId(locationFilter || '');
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -213,6 +215,7 @@ function AdminVehiclesContent() {
     setFormTransmission(v.transmission || 'AUTOMATIC');
     setFormImageUrl(v.imageUrl || '');
     setFormStatus(v.status);
+    setFormLocationId(v.homeLocation?.id || v.currentOperationalLocation?.id || '');
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -231,6 +234,8 @@ function AdminVehiclesContent() {
       transmission: formTransmission || null,
       imageUrl: formImageUrl.trim() || null,
       status: formStatus,
+      homeLocationId: formLocationId || null,
+      currentLocationId: formLocationId || null,
     };
 
     try {
@@ -548,7 +553,39 @@ function AdminVehiclesContent() {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Operational Hub" required>
+              <select
+                value={formLocationId}
+                onChange={(e) => setFormLocationId(e.target.value)}
+                required
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800 font-medium"
+              >
+                <option value="">-- Pilih Hub Operasional KCIC --</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} ({loc.code})
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Status" required>
+              <select
+                value={formStatus}
+                onChange={(e) => setFormStatus(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              >
+                <option value="AVAILABLE">AVAILABLE (Aktif di Pool)</option>
+                <option value="RESERVED">RESERVED</option>
+                <option value="IN_USE">IN_USE</option>
+                <option value="MAINTENANCE">MAINTENANCE (Perawatan)</option>
+                <option value="INACTIVE">INACTIVE (Nonaktif)</option>
+              </select>
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Seats" required>
               <input
                 type="number"
@@ -569,20 +606,6 @@ function AdminVehiclesContent() {
               >
                 <option value="AUTOMATIC">AUTOMATIC</option>
                 <option value="MANUAL">MANUAL</option>
-              </select>
-            </FormField>
-
-            <FormField label="Status" required>
-              <select
-                value={formStatus}
-                onChange={(e) => setFormStatus(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
-              >
-                <option value="AVAILABLE">AVAILABLE</option>
-                <option value="RESERVED">RESERVED</option>
-                <option value="IN_USE">IN_USE</option>
-                <option value="MAINTENANCE">MAINTENANCE</option>
-                <option value="INACTIVE">INACTIVE</option>
               </select>
             </FormField>
           </div>

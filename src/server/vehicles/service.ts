@@ -19,6 +19,9 @@ export interface CreateVehicleInput {
   transmission?: Transmission | null;
   imageUrl?: string | null;
   status?: VehicleStatus;
+  homeLocationId?: string | null;
+  currentLocationId?: string | null;
+  locationId?: string | null;
 }
 
 export interface UpdateVehicleInput {
@@ -30,6 +33,9 @@ export interface UpdateVehicleInput {
   transmission?: Transmission | null;
   imageUrl?: string | null;
   status?: VehicleStatus;
+  homeLocationId?: string | null;
+  currentLocationId?: string | null;
+  locationId?: string | null;
 }
 
 export interface VehicleQueryFilters {
@@ -270,6 +276,9 @@ export async function createVehicle(
     throw new ApiError(409, 'PLATE_EXISTS', 'A vehicle with this plate number already exists');
   }
 
+  const homeLocationId = input.homeLocationId ?? input.locationId ?? null;
+  const currentLocationId = input.currentLocationId ?? homeLocationId;
+
   const vehicle = await prisma.vehicle.create({
     data: {
       plateNumber,
@@ -280,6 +289,12 @@ export async function createVehicle(
       transmission: input.transmission ?? null,
       imageUrl: input.imageUrl ?? null,
       status: input.status ?? VehicleStatus.AVAILABLE,
+      ...(homeLocationId ? { homeLocation: { connect: { id: homeLocationId } } } : {}),
+      ...(currentLocationId ? { currentOperationalLocation: { connect: { id: currentLocationId } } } : {}),
+    },
+    include: {
+      homeLocation: true,
+      currentOperationalLocation: true,
     },
   });
 
@@ -332,6 +347,25 @@ export async function updateVehicle(
     if (input.seatingCapacity !== undefined) data.seatingCapacity = input.seatingCapacity;
     if (input.transmission !== undefined) data.transmission = input.transmission;
     if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl;
+
+    if (input.homeLocationId !== undefined || input.locationId !== undefined) {
+      const locId = input.homeLocationId !== undefined ? input.homeLocationId : input.locationId;
+      if (locId) {
+        data.homeLocation = { connect: { id: locId } };
+        if (!existing.currentLocationId) {
+          data.currentOperationalLocation = { connect: { id: locId } };
+        }
+      } else {
+        data.homeLocation = { disconnect: true };
+      }
+    }
+    if (input.currentLocationId !== undefined) {
+      if (input.currentLocationId) {
+        data.currentOperationalLocation = { connect: { id: input.currentLocationId } };
+      } else {
+        data.currentOperationalLocation = { disconnect: true };
+      }
+    }
 
     if (input.status && input.status !== existing.status) {
       if (input.status === VehicleStatus.IN_USE) {

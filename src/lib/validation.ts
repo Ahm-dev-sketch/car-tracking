@@ -64,6 +64,12 @@ export const createVehicleSchema = z
     image_url: z.string().url('Invalid image URL').optional().nullable(),
     imageUrl: z.string().url('Invalid image URL').optional().nullable(),
     status: vehicleStatusEnum.optional().default('AVAILABLE'),
+    location_id: z.string().trim().min(1).optional().nullable(),
+    locationId: z.string().trim().min(1).optional().nullable(),
+    home_location_id: z.string().trim().min(1).optional().nullable(),
+    homeLocationId: z.string().trim().min(1).optional().nullable(),
+    current_location_id: z.string().trim().min(1).optional().nullable(),
+    currentLocationId: z.string().trim().min(1).optional().nullable(),
   })
   .superRefine((data, ctx) => {
     if (!data.plate_number && !data.plateNumber) {
@@ -94,6 +100,8 @@ export const createVehicleSchema = z
     const vehicleType = (data.vehicle_type ?? data.vehicleType)!;
     const seatingCapacity = (data.seating_capacity ?? data.seatingCapacity)!;
     const imageUrl = data.image_url ?? data.imageUrl ?? null;
+    const homeLocationId = data.home_location_id ?? data.homeLocationId ?? data.location_id ?? data.locationId ?? null;
+    const currentLocationId = data.current_location_id ?? data.currentLocationId ?? homeLocationId;
 
     return {
       plateNumber,
@@ -104,6 +112,8 @@ export const createVehicleSchema = z
       transmission: data.transmission ?? null,
       imageUrl,
       status: data.status,
+      homeLocationId,
+      currentLocationId,
     };
   });
 
@@ -120,11 +130,25 @@ export const updateVehicleSchema = z.object({
   image_url: z.string().url().optional().nullable(),
   imageUrl: z.string().url().optional().nullable(),
   status: vehicleStatusEnum.optional(),
+  location_id: z.string().trim().min(1).optional().nullable(),
+  locationId: z.string().trim().min(1).optional().nullable(),
+  home_location_id: z.string().trim().min(1).optional().nullable(),
+  homeLocationId: z.string().trim().min(1).optional().nullable(),
+  current_location_id: z.string().trim().min(1).optional().nullable(),
+  currentLocationId: z.string().trim().min(1).optional().nullable(),
 }).transform((data) => {
   const plateNumber = data.plate_number ?? data.plateNumber;
   const vehicleType = data.vehicle_type ?? data.vehicleType;
   const seatingCapacity = data.seating_capacity ?? data.seatingCapacity;
   const imageUrl = data.image_url !== undefined ? data.image_url : data.imageUrl;
+  const homeLocationId = data.home_location_id !== undefined
+    ? data.home_location_id
+    : data.homeLocationId !== undefined
+      ? data.homeLocationId
+      : data.location_id !== undefined
+        ? data.location_id
+        : data.locationId;
+  const currentLocationId = data.current_location_id !== undefined ? data.current_location_id : data.currentLocationId;
 
   return {
     ...(plateNumber ? { plateNumber } : {}),
@@ -135,6 +159,8 @@ export const updateVehicleSchema = z.object({
     ...(data.transmission !== undefined ? { transmission: data.transmission } : {}),
     ...(imageUrl !== undefined ? { imageUrl } : {}),
     ...(data.status ? { status: data.status } : {}),
+    ...(homeLocationId !== undefined ? { homeLocationId } : {}),
+    ...(currentLocationId !== undefined ? { currentLocationId } : {}),
   };
 });
 

@@ -118,7 +118,7 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
         if (!isDownloading) onClose();
       }}
       title="Download Laporan Operasional Excel"
-      description="Rekapitulasi perjalanan armada KCIC, driver, tracking jarak, dan link dokumen Nota Dinas"
+      description="Rekapitulasi perjalanan armada KCIC, driver, tracking jarak, dan foto fisik dokumen Nota Dinas"
       maxWidth="md"
     >
       <div className="space-y-4">
@@ -256,7 +256,7 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
             <span>Format Excel Khusus KCIC Fleet (.xlsx)</span>
           </div>
           <p className="text-[11px] text-zinc-700">
-            Laporan didesain rapi dengan palet resmi KCIC, KPI ringkasan, rincian pengemudi/kendaraan, jarak tempuh GPS, status verifikasi, serta <span className="font-bold text-zinc-900 underline">link dokumen Nota Dinas</span> yang dapat langsung diklik dari file Excel.
+            Laporan didesain rapi dengan palet resmi KCIC, KPI ringkasan, rincian pengemudi/kendaraan, jarak tempuh GPS, status verifikasi, serta <span className="font-bold text-zinc-900 underline">foto fisik Nota Dinas</span> yang langsung tersemat di dalam sel Excel (dapat diklik untuk memperbesar ukuran asli).
           </p>
         </div>
 

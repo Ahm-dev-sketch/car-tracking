@@ -3,6 +3,9 @@ import { withErrorHandling } from '@/lib/errors';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
 import { prisma } from '@/lib/prisma';
 import ExcelJS from 'exceljs';
+import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
 import { BookingStatus, ServiceType } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -224,7 +227,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     { header: 'HUB OPERASIONAL', key: 'hubName', width: 20 },
     { header: 'JARAK (KM)', key: 'distanceKm', width: 14 },
     { header: 'STATUS NOTA DINAS', key: 'notaDinasStatus', width: 22 },
-    { header: 'LINK DOKUMEN NOTA DINAS', key: 'notaDinasLink', width: 32 },
+    { header: 'FOTO NOTA DINAS', key: 'notaDinasPhoto', width: 32 },
   ];
 
   const headerRowNumber = 7;
@@ -249,10 +252,10 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   });
 
   // 4. Data Rows
-  bookings.forEach((b, index) => {
+  for (let index = 0; index < bookings.length; index++) {
+    const b = bookings[index];
     const rowNumber = headerRowNumber + 1 + index;
     const row = worksheet.getRow(rowNumber);
-    row.height = 24;
 
     const isEven = index % 2 === 1;
     const rowBg = isEven ? COLOR_ROW_ALT : COLOR_WHITE;
@@ -277,6 +280,38 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       ? (b.notaDinasUrl.startsWith('http') ? b.notaDinasUrl : `${baseUrl}${b.notaDinasUrl}`)
       : null;
 
+    let hasPhoto = false;
+    let photoBuffer: Buffer | null = null;
+    const isPdf =
+      Boolean(b.notaDinasUrl && b.notaDinasUrl.toLowerCase().endsWith('.pdf')) ||
+      Boolean(b.notaDinasFilename && b.notaDinasFilename.toLowerCase().endsWith('.pdf'));
+
+    if (b.notaDinasUrl && !isPdf) {
+      try {
+        const cleanPath = b.notaDinasUrl.replace(/^\//, '');
+        const diskPath = path.join(process.cwd(), 'public', cleanPath);
+        if (fs.existsSync(diskPath)) {
+          const rawBuf = await fs.promises.readFile(diskPath);
+          photoBuffer = await sharp(rawBuf)
+            .resize({ width: 220, height: 110, fit: 'inside', withoutEnlargement: true })
+            .png()
+            .toBuffer();
+          hasPhoto = true;
+        }
+      } catch {
+        // fallback if file not on disk or unreadable
+      }
+    }
+
+    // Adjust row height depending on content (photos get 80pt, pdfs 32pt, standard 24pt)
+    if (hasPhoto) {
+      row.height = 80;
+    } else if (isPdf) {
+      row.height = 32;
+    } else {
+      row.height = 24;
+    }
+
     const rowData = [
       index + 1, // 1. NO
       b.bookingNumber, // 2. No Booking
@@ -294,7 +329,13 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       b.operationalLocation ? `${b.operationalLocation.name} (${b.operationalLocation.code})` : '-', // 14. Hub
       distanceKm !== '-' ? Number(distanceKm) : '-', // 15. Jarak
       notaStatus, // 16. Status Nota
-      fullNotaUrl ? { text: b.notaDinasFilename || 'Buka Dokumen Nota Dinas', hyperlink: fullNotaUrl } : '-', // 17. Link Dokumen
+      hasPhoto
+        ? ''
+        : isPdf
+        ? { text: `[Dokumen PDF] ${b.notaDinasFilename || 'Buka PDF'}`, hyperlink: fullNotaUrl }
+        : fullNotaUrl
+        ? { text: b.notaDinasFilename || 'Buka Dokumen', hyperlink: fullNotaUrl }
+        : '-', // 17. Foto / Dokumen
     ];
 
     rowData.forEach((val, colIdx) => {
@@ -335,16 +376,36 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'BE123C' } };
         }
       } else if (colIdx === 16) {
-        // Link Nota Dinas
+        // Foto / Link Nota Dinas
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        if (fullNotaUrl) {
-          cell.font = { name: 'Calibri', size: 10, color: { argb: '1D4ED8' }, underline: true };
+        if (!hasPhoto && fullNotaUrl) {
+          cell.font = { name: 'Calibri', size: 9, color: { argb: '1D4ED8' }, underline: true };
         }
       } else {
         cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
       }
     });
-  });
+
+    // Embed photo directly inside the cell if available
+    if (hasPhoto && photoBuffer) {
+      const imageId = workbook.addImage({
+        buffer: photoBuffer as any,
+        extension: 'png',
+      });
+
+      worksheet.addImage(imageId, {
+        tl: { col: 16 + 0.05, row: rowNumber - 1 + 0.05 } as any,
+        br: { col: 17 - 0.05, row: rowNumber - 0.05 } as any,
+        editAs: 'oneCell',
+        hyperlinks: fullNotaUrl
+          ? {
+              hyperlink: fullNotaUrl,
+              tooltip: 'Klik untuk membuka foto ukuran penuh',
+            }
+          : undefined,
+      });
+    }
+  }
 
   // Generate buffer
   const buffer = await workbook.xlsx.writeBuffer();

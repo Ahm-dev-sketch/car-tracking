@@ -71,8 +71,8 @@ describe('GET /api/admin/reports/excel', () => {
         destination: 'Kantor Pusat KCIC',
         purpose: 'Drop Off Tamu Direksi',
         notes: '[Layanan Drop Off]',
-        notaDinasUrl: '/uploads/nota-dinas/nota-001.pdf',
-        notaDinasFilename: 'nota-tamu-direksi.pdf',
+        notaDinasUrl: '/uploads/nota-dinas/nota-BK-2026-0001-1793933276001-10c5e8e0fd86.jpeg',
+        notaDinasFilename: 'foto-nota.jpeg',
         rejectedReason: null,
         user: {
           id: 'user-1',
@@ -106,6 +106,31 @@ describe('GET /api/admin/reports/excel', () => {
           },
         ],
       },
+      {
+        id: 'booking-2',
+        bookingNumber: 'KCIC-2026-0002',
+        serviceType: ServiceType.STANDBY,
+        status: BookingStatus.PENDING_COMPLETION,
+        departureAt: new Date('2026-03-11T09:00:00Z'),
+        expectedReturnAt: new Date('2026-03-11T17:00:00Z'),
+        pickupLocation: 'Stasiun Tegalluar',
+        destination: 'Bandung Area',
+        purpose: 'Operasional Lapangan',
+        notes: null,
+        notaDinasUrl: '/uploads/nota-dinas/dokumen-nota.pdf',
+        notaDinasFilename: 'dokumen-nota.pdf',
+        rejectedReason: null,
+        user: {
+          id: 'user-2',
+          name: 'Siti Aminah',
+          email: 'siti@kcic.co.id',
+          phone: '0811223344',
+        },
+        driver: null,
+        vehicle: null,
+        operationalLocation: null,
+        trips: [],
+      },
     ];
 
     mocks.bookingFindMany.mockResolvedValue(mockBookings);
@@ -136,9 +161,9 @@ describe('GET /api/admin/reports/excel', () => {
     // Check header row (row 7)
     expect(worksheet?.getCell('B7').value).toBe('NO. BOOKING');
     expect(worksheet?.getCell('P7').value).toBe('STATUS NOTA DINAS');
-    expect(worksheet?.getCell('Q7').value).toBe('LINK DOKUMEN NOTA DINAS');
+    expect(worksheet?.getCell('Q7').value).toBe('FOTO NOTA DINAS');
 
-    // Check data row (row 8)
+    // Check data row 1 (row 8) - Image embedded
     const bookingNumCell = worksheet?.getCell('B8');
     expect(bookingNumCell?.value).toBe('KCIC-2026-0001');
 
@@ -151,10 +176,18 @@ describe('GET /api/admin/reports/excel', () => {
     const notaStatusCell = worksheet?.getCell('P8');
     expect(notaStatusCell?.value).toBe('Terverifikasi & Selesai');
 
-    const notaLinkCell = worksheet?.getCell('Q8');
-    expect(notaLinkCell?.value).toMatchObject({
-      text: 'nota-tamu-direksi.pdf',
-      hyperlink: expect.stringContaining('/uploads/nota-dinas/nota-001.pdf'),
+    // Row height should be expanded for photo
+    expect(worksheet?.getRow(8).height).toBe(80);
+
+    // Worksheet should contain embedded image
+    const images = worksheet?.getImages();
+    expect(images && images.length).toBeGreaterThan(0);
+
+    // Check data row 2 (row 9) - PDF document fallback with link
+    const pdfCell = worksheet?.getCell('Q9');
+    expect(pdfCell?.value).toMatchObject({
+      text: expect.stringContaining('dokumen-nota.pdf'),
+      hyperlink: expect.stringContaining('/uploads/nota-dinas/dokumen-nota.pdf'),
     });
   });
 });

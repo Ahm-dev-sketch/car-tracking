@@ -606,10 +606,6 @@ function AdminBookingsContent() {
                 </>
               )
             )}
-                  <span>Tolak Nota</span>
-                </button>
-              </>
-            )}
             <button
               type="button"
               onClick={() => setSelectedBooking(b)}

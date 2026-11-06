@@ -720,18 +720,17 @@ function UserBookingsContent() {
                 <div className="font-semibold text-zinc-900">
                   {selectedBooking.driver.user.name}
                 </div>
-                <div className="text-zinc-500 flex items-center gap-2">
-                  <span>Phone: {selectedBooking.driver.user.phone}</span>
-                  {selectedBooking.driver.user.phone && (
-                    <a
-                      href={`https://wa.me/${selectedBooking.driver.user.phone.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-emerald-600 hover:text-emerald-700 font-semibold underline"
-                    >
-                      WhatsApp
-                    </a>
-                  )}
+                <div className="text-[11px] text-zinc-600 flex items-center gap-2 pt-0.5">
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-800">
+                    <span className="size-1.5 rounded-full bg-emerald-500 inline-block" />
+                    Kontak Terproteksi In-App
+                  </span>
+                  <Link
+                    href={`/user/tracking?vehicleId=${selectedBooking.vehicle?.id || ''}`}
+                    className="text-[#be123c] hover:underline font-bold"
+                  >
+                    Buka Tracking & Chat
+                  </Link>
                 </div>
               </div>
             )}

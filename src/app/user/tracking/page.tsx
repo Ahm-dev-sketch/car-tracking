@@ -429,9 +429,10 @@ function UserTrackingContent() {
                               Driver KCIC
                             </span>
                           </div>
-                          {selectedVehicle.driverPhone && selectedVehicle.driverPhone !== 'REDACTED' && (
-                            <p className="text-xs text-zinc-600 font-mono font-bold mt-0.5">{selectedVehicle.driverPhone}</p>
-                          )}
+                          <p className="text-[11px] text-zinc-600 font-bold mt-0.5 flex items-center gap-1.5">
+                            <span className="size-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                            <span>Kontak Terproteksi (In-App Saja)</span>
+                          </p>
                         </div>
                       </div>
 
@@ -448,33 +449,6 @@ function UserTrackingContent() {
                           variant="buttons"
                         />
                       </div>
-
-                      {/* Contact Actions (WhatsApp & Call) */}
-                      {rawPhone && (
-                        <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/10">
-                          <a
-                            href={`https://wa.me/${rawPhone}?text=${encodeURIComponent(
-                              `Halo Pak ${selectedVehicle.driverName}, saya penumpang untuk pemesanan #${selectedBooking?.bookingNumber || ''}. Saya menunggu di ${selectedBooking?.pickupLocation || ''}.`
-                            )}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border-2 border-black bg-emerald-400 px-3 py-2 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000] transition"
-                          >
-                            <svg className="size-3.5 fill-current shrink-0" viewBox="0 0 24 24">
-                              <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.698.074-2.001-.466-1.503-.623-2.529-2.115-2.607-2.219-.074-.103-.615-.818-.615-1.56 0-.743.391-1.107.531-1.258.14-.15.307-.188.409-.188.103 0 .205.004.296.009.096.005.225-.036.352.27.13.313.444 1.082.483 1.161.039.08.065.173.013.277-.052.103-.079.168-.156.259-.078.09-.163.201-.233.27-.08.077-.163.161-.07.32.093.16.413.682.886 1.103.609.543 1.123.711 1.282.79.16.08.254.07.348-.039.095-.109.406-.473.514-.635.109-.162.217-.135.367-.08.151.054.958.452 1.123.535.165.083.276.124.316.193.04.07.04.405-.104.81z"/>
-                            </svg>
-                            <span>WhatsApp</span>
-                          </a>
-
-                          <a
-                            href={`tel:${selectedVehicle.driverPhone}`}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border-2 border-black bg-white px-3 py-2 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000] transition"
-                          >
-                            <Icon name="phone" className="size-3.5 shrink-0" />
-                            <span>Telepon</span>
-                          </a>
-                        </div>
-                      )}
                     </div>
                   )}
 

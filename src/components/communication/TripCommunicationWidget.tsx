@@ -34,8 +34,15 @@ export function TripCommunicationWidget({
 
   const channelId = bookingId ? `booking-${bookingId}` : tripId ? `trip-${tripId}` : 'general';
 
-  // Realtime Chat Hook for unread badge
-  const { unreadCount } = useRealtimeChat({
+  // Realtime Chat Hook for unread badge & chat state
+  const {
+    messages,
+    isLoading,
+    isSending,
+    error,
+    unreadCount,
+    sendMessage,
+  } = useRealtimeChat({
     bookingId,
     tripId,
     currentUserId,
@@ -183,6 +190,11 @@ export function TripCommunicationWidget({
         partnerId={partnerId}
         partnerName={partnerName}
         partnerRole={partnerRole}
+        messages={messages}
+        isLoading={isLoading}
+        isSending={isSending}
+        error={error}
+        sendMessage={sendMessage}
         onStartCall={() => {
           setIsChatOpen(false);
           handleStartCall();

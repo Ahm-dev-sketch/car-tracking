@@ -262,6 +262,15 @@ export function useWebRTCCall({
     if (!channelId) return;
 
     const channelName = `call:${channelId}`;
+
+    // Clean up any stale/existing channel on the same topic before subscribing
+    const existing = supabase
+      .getChannels()
+      .find((c) => c.topic === `realtime:${channelName}` || c.topic === channelName);
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
+
     const channel = supabase.channel(channelName);
     channelRef.current = channel;
 

@@ -132,6 +132,15 @@ export function useRealtimeChat({
     if (!channelKey) return;
 
     const channelName = `chat:${channelKey}`;
+
+    // Clean up any stale/existing channel on the same topic before subscribing
+    const existing = supabase
+      .getChannels()
+      .find((c) => c.topic === `realtime:${channelName}` || c.topic === channelName);
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
+
     const channel = supabase.channel(channelName);
 
     // 1. Zero-latency peer delivery via Supabase Broadcast

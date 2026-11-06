@@ -17,6 +17,11 @@ interface ChatDrawerProps {
   partnerName: string;
   partnerRole?: string;
   onStartCall?: (partnerId: string, partnerName: string, partnerRole?: string) => void;
+  messages: ReturnType<typeof useRealtimeChat>['messages'];
+  isLoading: boolean;
+  isSending: boolean;
+  error: string | null;
+  sendMessage: (text: string, receiverId?: string | null) => Promise<void>;
 }
 
 const QUICK_CHIPS = [
@@ -29,27 +34,19 @@ const QUICK_CHIPS = [
 export function ChatDrawer({
   isOpen,
   onClose,
-  bookingId,
-  tripId,
-  currentUserId,
-  currentUserName = 'User',
-  currentUserRole = 'USER',
   partnerId,
   partnerName,
   partnerRole = 'Driver',
+  currentUserId,
   onStartCall,
+  messages,
+  isLoading,
+  isSending,
+  error,
+  sendMessage,
 }: ChatDrawerProps) {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  const { messages, isLoading, isSending, error, sendMessage } = useRealtimeChat({
-    bookingId,
-    tripId,
-    currentUserId,
-    currentUserName,
-    currentUserRole,
-    isOpen,
-  });
 
   // Auto scroll to bottom on new message or when opened
   useEffect(() => {

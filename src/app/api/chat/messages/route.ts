@@ -38,8 +38,13 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
         .order('created_at', { ascending: true })
         .limit(100);
 
-      if (bookingId) query = query.eq('booking_id', bookingId);
-      if (tripId) query = query.eq('trip_id', tripId);
+      if (bookingId && tripId) {
+        query = query.or(`booking_id.eq.${bookingId},trip_id.eq.${tripId}`);
+      } else if (bookingId) {
+        query = query.eq('booking_id', bookingId);
+      } else if (tripId) {
+        query = query.eq('trip_id', tripId);
+      }
 
       const { data, error } = await query;
       if (!error && data) {
@@ -57,8 +62,10 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
               sender_name AS "senderName", sender_role AS "senderRole", receiver_id AS "receiverId", 
               message, is_read AS "isRead", created_at AS "createdAt"
        FROM fleet_chat_messages
-       WHERE ($1::text IS NULL OR booking_id = $1)
-         AND ($2::text IS NULL OR trip_id = $2)
+       WHERE (
+         ($1::text IS NOT NULL AND booking_id = $1)
+         OR ($2::text IS NOT NULL AND trip_id = $2)
+       )
        ORDER BY created_at ASC
        LIMIT 100`,
       bookingId ?? null,
@@ -78,6 +85,33 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   const senderId = user.id;
   const senderName = validated.senderName || user.name || 'User';
+
+  // Auto-link bookingId and tripId if one is omitted
+  if (validated.bookingId && !validated.tripId) {
+    try {
+      const activeTrip = await prisma.trip.findFirst({
+        where: { bookingId: validated.bookingId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (activeTrip) {
+        validated.tripId = activeTrip.id;
+      }
+    } catch {
+      // ignore
+    }
+  } else if (validated.tripId && !validated.bookingId) {
+    try {
+      const trip = await prisma.trip.findUnique({
+        where: { id: validated.tripId },
+        select: { bookingId: true },
+      });
+      if (trip?.bookingId) {
+        validated.bookingId = trip.bookingId;
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   let savedMessage: any = null;
 

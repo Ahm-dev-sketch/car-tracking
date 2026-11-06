@@ -83,6 +83,16 @@ export function useRealtimeChat({
               created_at: m.created_at ?? m.createdAt ?? new Date().toISOString(),
             }));
             setMessages(normalized);
+
+            // Compute unread count from fetched history if chat is closed
+            if (!isOpenRef.current) {
+              const unread = normalized.filter(
+                (m) => m.sender_id !== currentUserId && !m.is_read
+              ).length;
+              if (unread > 0) {
+                setUnreadCount(unread);
+              }
+            }
           }
         }
       } catch (err: unknown) {

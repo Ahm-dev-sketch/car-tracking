@@ -1214,6 +1214,33 @@ export async function manualAssignBooking(
 
     await assertAssignmentVehicle(tx, targetVehicleId, driverId, booking.passengerCount);
 
+    if (booking.operationalLocationId) {
+      const targetVehicle = await tx.vehicle.findUniqueOrThrow({
+        where: { id: targetVehicleId },
+        include: { homeLocation: true, currentOperationalLocation: true },
+      });
+
+      const isLocationMatched = checkLocationMatch(
+        targetVehicle,
+        booking.operationalLocationId,
+        false
+      );
+
+      if (!isLocationMatched) {
+        const vehicleLocationName =
+          targetVehicle.currentOperationalLocation?.name ||
+          targetVehicle.homeLocation?.name ||
+          'lokasi lain';
+        const bookingLocationName = booking.operationalLocation?.name || 'lokasi pesanan';
+
+        throw new ApiError(
+          400,
+          'LOCATION_MISMATCH',
+          `Kendaraan/driver berada di ${vehicleLocationName}, berbeda dengan lokasi pesanan (${bookingLocationName}). Penugasan driver antar-stasiun tidak diizinkan.`
+        );
+      }
+    }
+
     await ensureVehicleAssignment(tx, driver.id, targetVehicleId);
 
     // Cancel any pending offers for this booking

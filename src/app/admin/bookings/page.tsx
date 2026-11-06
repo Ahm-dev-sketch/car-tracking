@@ -1299,14 +1299,38 @@ function AdminBookingsContent() {
                           const isAssigning = assigningCandidateId === d.id;
                           const hasVehicle = Boolean(d.currentVehicle);
                           const chosenVehicle = selectedVehicleMap[d.id] || (d.currentVehicle?.id ?? '');
+                          const chosenVehicleObj = availableVehicles.find((v) => v.id === chosenVehicle);
+
+                          const isDriverLocationMismatch = Boolean(
+                            interventionBooking?.operationalLocation?.id &&
+                            hasVehicle &&
+                            d.currentVehicle &&
+                            d.currentVehicle.currentOperationalLocation?.id !== interventionBooking.operationalLocation.id &&
+                            d.currentVehicle.homeLocation?.id !== interventionBooking.operationalLocation.id
+                          );
+
+                          const isChosenVehicleMismatch = Boolean(
+                            interventionBooking?.operationalLocation?.id &&
+                            !hasVehicle &&
+                            chosenVehicleObj &&
+                            chosenVehicleObj.currentOperationalLocation?.id !== interventionBooking.operationalLocation.id &&
+                            chosenVehicleObj.homeLocation?.id !== interventionBooking.operationalLocation.id
+                          );
+
+                          const isBlocked = isDriverLocationMismatch || isChosenVehicleMismatch || (!hasVehicle && !chosenVehicle);
+
+                          const driverHubName = d.currentVehicle?.currentOperationalLocation?.name || d.currentVehicle?.homeLocation?.name;
+                          const chosenHubName = chosenVehicleObj?.currentOperationalLocation?.name || chosenVehicleObj?.homeLocation?.name;
 
                           return (
                             <div
                               key={d.id}
-                              className="p-3 bg-zinc-50 border-2 border-black rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs"
+                              className={`p-3 border-2 border-black rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs ${
+                                isDriverLocationMismatch ? 'bg-rose-50/50 opacity-80' : 'bg-zinc-50'
+                              }`}
                             >
                               <div className="space-y-1">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-bold text-zinc-950">{d.user?.name || 'Driver'}</span>
                                   {d.licenseNumber && (
                                     <span className="text-[10px] font-mono text-zinc-500">SIM: {d.licenseNumber}</span>
@@ -1314,6 +1338,16 @@ function AdminBookingsContent() {
                                   <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
                                     ONLINE
                                   </span>
+                                  {isDriverLocationMismatch && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-100 text-rose-800 border border-rose-300">
+                                      Beda Lokasi: {driverHubName}
+                                    </span>
+                                  )}
+                                  {isChosenVehicleMismatch && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-100 text-rose-800 border border-rose-300">
+                                      Mobil di {chosenHubName}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-zinc-600 font-mono text-[11px]">
                                   {d.user?.phone || 'No phone'}
@@ -1326,6 +1360,7 @@ function AdminBookingsContent() {
                                     </span>
                                     <span className="text-[11px] text-zinc-600">
                                       {d.currentVehicle.brand} {d.currentVehicle.model}
+                                      {driverHubName ? ` (${driverHubName})` : ''}
                                     </span>
                                   </div>
                                 ) : (
@@ -1366,14 +1401,27 @@ function AdminBookingsContent() {
                                     )}
                                   </div>
                                 )}
+
+                                {isDriverLocationMismatch && (
+                                  <p className="text-[10px] text-rose-600 font-bold pt-0.5">
+                                    Driver berada di {driverHubName}. Tidak dapat ditugaskan ke order {interventionBooking?.operationalLocation?.name}.
+                                  </p>
+                                )}
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
                                 <button
                                   type="button"
-                                  disabled={Boolean(assigningCandidateId)}
+                                  disabled={Boolean(assigningCandidateId) || isBlocked}
                                   onClick={() => handleManualAssign(d.id, chosenVehicle || undefined)}
-                                  className="px-3.5 py-1.5 bg-[#be123c] hover:bg-[#9f1239] disabled:opacity-50 text-white rounded-lg border-2 border-black text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000]"
+                                  title={
+                                    isDriverLocationMismatch || isChosenVehicleMismatch
+                                      ? `Driver/armada berada di lokasi berbeda dengan pesanan (${interventionBooking?.operationalLocation?.name || 'lokasi order'})`
+                                      : !hasVehicle && !chosenVehicle
+                                      ? 'Pilih kendaraan terlebih dahulu'
+                                      : undefined
+                                  }
+                                  className="px-3.5 py-1.5 bg-[#be123c] hover:bg-[#9f1239] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg border-2 border-black text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000]"
                                 >
                                   {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Tugaskan Driver'}
                                 </button>

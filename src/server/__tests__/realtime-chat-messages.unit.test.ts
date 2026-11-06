@@ -112,3 +112,34 @@ it('saves and returns 201 for valid POST /api/chat/messages', async () => {
   const json = await res.json();
   expect(json.data.message).toBe('Halo Pak Driver');
 });
+
+it('returns messages when both bookingId and tripId are provided without excluding messages with null tripId', async () => {
+  mocks.user.mockResolvedValue({ id: 'driver-1', name: 'Budi Driver', role: 'DRIVER' });
+  mocks.queryRawUnsafe.mockResolvedValue([
+    {
+      id: 'msg-user',
+      bookingId: 'b-101',
+      tripId: null,
+      senderId: 'user-1',
+      senderName: 'John Doe',
+      senderRole: 'USER',
+      receiverId: 'driver-1',
+      message: 'Saya sudah tunggu di depan lobi',
+      isRead: false,
+      createdAt: '2026-11-06T10:00:00Z',
+    },
+  ]);
+
+  const req = new NextRequest('https://example.test/api/chat/messages?bookingId=b-101&tripId=t-202');
+  const res = await GET(req, undefined);
+
+  expect(res.status).toBe(200);
+  const json = await res.json();
+  expect(json.data).toHaveLength(1);
+  expect(json.data[0].message).toBe('Saya sudah tunggu di depan lobi');
+  expect(mocks.queryRawUnsafe).toHaveBeenCalledWith(
+    expect.stringContaining('OR ($2::text IS NOT NULL AND trip_id = $2)'),
+    'b-101',
+    't-202'
+  );
+});

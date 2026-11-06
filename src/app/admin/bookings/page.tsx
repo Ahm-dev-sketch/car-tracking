@@ -109,6 +109,7 @@ function AdminBookingsContent() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Detail Drawer
   const [selectedBooking, setSelectedBooking] = useState<AdminBooking | null>(null);
@@ -353,6 +354,9 @@ function AdminBookingsContent() {
       if (selectedBooking && selectedBooking.id === updated.id) {
         setSelectedBooking((prev) => (prev ? { ...prev, ...updated } : null));
       }
+      setSuccessMessage(
+        `Penyelesaian pemesanan #${updated.bookingNumber || bookingId} berhasil disetujui (COMPLETED).`
+      );
     } catch {
       setApiError('Terjadi kesalahan jaringan saat menyetujui penyelesaian');
     } finally {
@@ -386,6 +390,9 @@ function AdminBookingsContent() {
       if (selectedBooking && selectedBooking.id === updated.id) {
         setSelectedBooking((prev) => (prev ? { ...prev, ...updated } : null));
       }
+      setSuccessMessage(
+        `Nota dinas untuk pemesanan #${rejectingBooking.bookingNumber} berhasil ditolak. Pemesan telah dinotifikasi untuk mengunggah dokumen revisi.`
+      );
       setRejectingBooking(null);
       setRejectReason('');
     } catch {
@@ -504,6 +511,11 @@ function AdminBookingsContent() {
       cell: (b) => (
         <div className="space-y-1">
           <StatusBadge status={b.status} />
+          {b.status === 'PENDING_COMPLETION' && b.rejectedReason && (
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded border border-rose-300 bg-rose-100 text-rose-800 text-[9px] font-black uppercase">
+              Nota Ditolak
+            </div>
+          )}
           {b.etaSeconds !== undefined && b.etaSeconds !== null && (
             <div className="text-[10px] font-mono text-indigo-700">
               ETA: {formatEta(b.etaSeconds, b.etaEstimated)}
@@ -551,25 +563,49 @@ function AdminBookingsContent() {
               </button>
             )}
             {b.status === 'PENDING_COMPLETION' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleApproveCompletion(b.id)}
-                  disabled={approvingBookingId === b.id}
-                  className="px-2.5 py-1 text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
-                >
-                  {approvingBookingId === b.id && <Spinner size="sm" className="text-white" />}
-                  <span>Approve Selesai</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRejectingBooking(b);
-                    setRejectReason('');
-                    setRejectError(null);
-                  }}
-                  className="px-2.5 py-1 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
-                >
+              b.rejectedReason ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-1 text-[11px] font-black text-rose-800 bg-rose-100 border border-rose-300 rounded-lg">
+                    Menunggu Revisi Pemesan
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectingBooking(b);
+                      setRejectReason(b.rejectedReason || '');
+                      setRejectError(null);
+                    }}
+                    className="px-2 py-1 text-xs font-bold text-zinc-700 hover:text-black border border-zinc-300 bg-white rounded-lg hover:bg-zinc-50 cursor-pointer"
+                  >
+                    Edit Alasan
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleApproveCompletion(b.id)}
+                    disabled={approvingBookingId === b.id}
+                    className="px-2.5 py-1 text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                  >
+                    {approvingBookingId === b.id && <Spinner size="sm" className="text-white" />}
+                    <span>Approve Selesai</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectingBooking(b);
+                      setRejectReason('');
+                      setRejectError(null);
+                    }}
+                    className="px-2.5 py-1 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
+                  >
+                    <Icon name="close" className="size-3.5" />
+                    <span>Tolak Nota Dinas</span>
+                  </button>
+                </>
+              )
+            )}
                   <span>Tolak Nota</span>
                 </button>
               </>
@@ -617,6 +653,23 @@ function AdminBookingsContent() {
       </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
+      {successMessage && (
+        <div className="flex items-center justify-between p-3.5 bg-emerald-100 text-black border-[2.5px] border-black rounded-xl text-xs font-black shadow-[4px_4px_0px_0px_#000] animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-black border border-black text-[10px]">
+              ✓
+            </span>
+            <span>{successMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="p-1 text-zinc-600 hover:text-black cursor-pointer"
+          >
+            <Icon name="close" className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filter and quick selection bar */}
       <div className="surface p-4 flex flex-wrap items-center justify-between gap-3">
@@ -756,33 +809,52 @@ function AdminBookingsContent() {
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
                 {selectedBooking.status === 'PENDING_COMPLETION' && (
-                  <>
-                    <button
-                      type="button"
-                      disabled={approvingBookingId === selectedBooking.id}
-                      onClick={() => handleApproveCompletion(selectedBooking.id)}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
-                    >
-                      {approvingBookingId === selectedBooking.id ? (
-                        <Spinner size="sm" className="text-white" />
-                      ) : (
-                        <Icon name="check" className="size-3.5" />
-                      )}
-                      <span>Approve & Selesaikan</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRejectingBooking(selectedBooking);
-                        setRejectReason('');
-                        setRejectError(null);
-                      }}
-                      className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <Icon name="close" className="size-3.5" />
-                      <span>Tolak Nota Dinas</span>
-                    </button>
-                  </>
+                  selectedBooking.rejectedReason ? (
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1.5 text-xs font-black bg-rose-100 text-rose-900 border-2 border-rose-400 rounded-lg shadow-[2px_2px_0px_0px_#000]">
+                        Nota Ditolak (Menunggu Dokumen Revisi)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejectingBooking(selectedBooking);
+                          setRejectReason(selectedBooking.rejectedReason || '');
+                          setRejectError(null);
+                        }}
+                        className="px-2.5 py-1.5 text-xs font-black bg-white text-zinc-900 border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 cursor-pointer"
+                      >
+                        Ubah Alasan
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={approvingBookingId === selectedBooking.id}
+                        onClick={() => handleApproveCompletion(selectedBooking.id)}
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                      >
+                        {approvingBookingId === selectedBooking.id ? (
+                          <Spinner size="sm" className="text-white" />
+                        ) : (
+                          <Icon name="check" className="size-3.5" />
+                        )}
+                        <span>Approve & Selesaikan</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejectingBooking(selectedBooking);
+                          setRejectReason('');
+                          setRejectError(null);
+                        }}
+                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <Icon name="close" className="size-3.5" />
+                        <span>Tolak Nota Dinas</span>
+                      </button>
+                    </>
+                  )
                 )}
                 {(selectedBooking.status === 'ADMIN_INTERVENTION' ||
                   selectedBooking.status === 'PENDING') && (
@@ -932,33 +1004,52 @@ function AdminBookingsContent() {
                       <span>Lihat / Unduh Dokumen</span>
                     </a>
                     {selectedBooking.status === 'PENDING_COMPLETION' && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={approvingBookingId === selectedBooking.id}
-                          onClick={() => handleApproveCompletion(selectedBooking.id)}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
-                        >
-                          {approvingBookingId === selectedBooking.id ? (
-                            <Spinner size="sm" className="text-white" />
-                          ) : (
-                            <Icon name="check" className="size-3.5" />
-                          )}
-                          <span>Approve Selesai</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRejectingBooking(selectedBooking);
-                            setRejectReason('');
-                            setRejectError(null);
-                          }}
-                          className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
-                        >
-                          <Icon name="close" className="size-3.5" />
-                          <span>Tolak Nota</span>
-                        </button>
-                      </>
+                      selectedBooking.rejectedReason ? (
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-black rounded border border-rose-300">
+                            Status: Nota Ditolak
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectingBooking(selectedBooking);
+                              setRejectReason(selectedBooking.rejectedReason || '');
+                              setRejectError(null);
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-zinc-100 text-zinc-800 rounded text-xs font-bold border border-zinc-300 cursor-pointer"
+                          >
+                            Ubah Alasan
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            disabled={approvingBookingId === selectedBooking.id}
+                            onClick={() => handleApproveCompletion(selectedBooking.id)}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {approvingBookingId === selectedBooking.id ? (
+                              <Spinner size="sm" className="text-white" />
+                            ) : (
+                              <Icon name="check" className="size-3.5" />
+                            )}
+                            <span>Approve Selesai</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectingBooking(selectedBooking);
+                              setRejectReason('');
+                              setRejectError(null);
+                            }}
+                            className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
+                          >
+                            <Icon name="close" className="size-3.5" />
+                            <span>Tolak Nota</span>
+                          </button>
+                        </>
+                      )
                     )}
                   </div>
                 </div>

@@ -222,8 +222,8 @@ function AdminBookingsContent() {
     try {
       const [candRes, driverRes, vehicleRes] = await Promise.allSettled([
         fetch(`/api/admin/dispatch/${b.id}/candidates`),
-        fetch(`/api/drivers?limit=50`),
-        fetch(`/api/vehicles?limit=50`),
+        fetch(`/api/drivers?status=AVAILABLE&limit=50`),
+        fetch(`/api/vehicles?status=AVAILABLE&limit=50`),
       ]);
 
       if (candRes.status === 'fulfilled' && candRes.value.ok) {
@@ -241,7 +241,7 @@ function AdminBookingsContent() {
         setAvailableVehicles(json.data || []);
       }
     } catch {
-      setInterventionError('Gagal memuat kandidat dan driver armada');
+      setInterventionError('Gagal memuat kandidat dan driver online');
     } finally {
       setLoadingCandidates(false);
     }
@@ -1124,22 +1124,44 @@ function AdminBookingsContent() {
                   </div>
                 )}
 
-                {/* 2. All Available Registered Fleet Drivers */}
-                <div className="space-y-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                    <Icon name="users" className="size-3.5" />
-                    <span>Daftar Driver Armada KCIC ({fleetDrivers.length})</span>
-                  </span>
+                {/* 2. Other Online Standby Fleet Drivers */}
+                {(() => {
+                  const onlineStandbyDrivers = fleetDrivers.filter(
+                    (d) =>
+                      d.status === 'AVAILABLE' &&
+                      d.user?.isActive !== false &&
+                      !candidates.some((c) => c.driverId === d.id)
+                  );
 
-                  {fleetDrivers.length === 0 ? (
-                    <div className="p-6 bg-zinc-50 border-2 border-dashed border-zinc-300 rounded-lg text-center text-xs text-zinc-500">
-                      Tidak ada data driver terdaftar.
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                      {fleetDrivers
-                        .filter((d) => d.user?.isActive !== false && d.status !== 'ON_TRIP')
-                        .map((d) => {
+                  if (candidates.length === 0 && onlineStandbyDrivers.length === 0) {
+                    return (
+                      <div className="p-8 bg-zinc-50 border-2 border-dashed border-zinc-300 rounded-lg text-center text-xs space-y-2">
+                        <div className="flex justify-center mb-1">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-black bg-zinc-200 text-zinc-700">
+                            <Icon name="signal" className="size-5" />
+                          </span>
+                        </div>
+                        <p className="font-extrabold text-sm text-zinc-900">Tidak Ada Driver yang Sedang Online</p>
+                        <p className="max-w-md mx-auto text-zinc-600">
+                          Sistem hanya menampilkan driver yang sedang <strong>ONLINE (Standby)</strong>. Driver harus membuka dashboard aplikasi driver dan mengaktifkan status online (<strong>&apos;Go online&apos;</strong>) agar siap ditugaskan.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  if (onlineStandbyDrivers.length === 0) {
+                    return null;
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-emerald-500" />
+                        <span>Driver Online Standby ({onlineStandbyDrivers.length})</span>
+                      </span>
+
+                      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                        {onlineStandbyDrivers.map((d) => {
                           const isAssigning = assigningCandidateId === d.id;
                           const hasVehicle = Boolean(d.currentVehicle);
                           const chosenVehicle = selectedVehicleMap[d.id] || (d.currentVehicle?.id ?? '');
@@ -1156,7 +1178,7 @@ function AdminBookingsContent() {
                                     <span className="text-[10px] font-mono text-zinc-500">SIM: {d.licenseNumber}</span>
                                   )}
                                   <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                    {d.status || 'AVAILABLE'}
+                                    ONLINE
                                   </span>
                                 </div>
                                 <div className="text-zinc-600 font-mono text-[11px]">
@@ -1209,9 +1231,10 @@ function AdminBookingsContent() {
                             </div>
                           );
                         })}
+                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
             )}
 

@@ -194,6 +194,7 @@ function AdminBookingsContent() {
         setTotalRecords(json.pagination?.total ?? list.length);
         setTotalPages(json.pagination?.totalPages ?? 1);
         setPage(targetPage);
+        window.dispatchEvent(new Event('bookings:changed'));
       } else {
         const err = await res.json();
         setApiError(err.error?.message || 'Failed to load bookings');

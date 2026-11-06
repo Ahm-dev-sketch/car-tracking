@@ -29,6 +29,7 @@ export function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [pendingActionCount, setPendingActionCount] = useState(0);
   const unreadCount = notifications.filter((item) => !item.readAt).length;
   const name = session?.user?.name || session?.user?.email || 'Your account';
   const initials = name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase();
@@ -53,6 +54,37 @@ export function NavBar() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [session?.user]);
 
+  useEffect(() => {
+    if (!session?.user || role !== 'ADMIN') {
+      setPendingActionCount(0);
+      return;
+    }
+    let cancelled = false;
+    const loadPendingCount = async () => {
+      try {
+        const response = await fetch('/api/admin/bookings/action-required');
+        if (response.ok) {
+          const json = await response.json();
+          if (!cancelled && typeof json.data?.count === 'number') {
+            setPendingActionCount(json.data.count);
+          }
+        }
+      } catch {
+        // Keep previous count on connection interruption.
+      }
+    };
+    void loadPendingCount();
+    const interval = setInterval(loadPendingCount, 15000);
+    const onBookingChanged = () => { void loadPendingCount(); };
+    window.addEventListener('bookings:changed', onBookingChanged);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('bookings:changed', onBookingChanged);
+    };
+  }, [session?.user, role, pathname]);
+
   const markNotificationRead = async (id: string) => {
     try {
       const response = await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
@@ -72,9 +104,27 @@ export function NavBar() {
             <span className="text-xl font-black tracking-tight text-black">KCIC <span className="text-emerald-700 underline decoration-black decoration-2">Fleet</span></span>
           </Link>
           <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
-            {links.map((link) => (
-              <Link key={link.href} href={link.href} className="desktop-link" aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}>{link.label}</Link>
-            ))}
+            {links.map((link) => {
+              const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="desktop-link relative inline-flex items-center gap-1.5"
+                  aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}
+                >
+                  <span>{link.label}</span>
+                  {showBadge && (
+                    <span
+                      aria-label={`${pendingActionCount} pesanan butuh aksi`}
+                      className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full border border-black bg-rose-500 text-white text-[10px] font-black leading-none shadow-[1px_1px_0px_0px_#000]"
+                    >
+                      {pendingActionCount > 99 ? '99+' : pendingActionCount}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </nav>
           <div className="flex shrink-0 items-center gap-2">
             <GreetingClock variant="navbar" />
@@ -91,11 +141,30 @@ export function NavBar() {
       </header>
 
       <nav className="mobile-dock" aria-label="Mobile navigation">
-        {dockLinks.map((link) => (
-          <Link key={link.href} href={link.href} className="dock-link" aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}>
-            <Icon name={link.icon} className="size-[21px]" /><span>{link.shortLabel}</span>
-          </Link>
-        ))}
+        {dockLinks.map((link) => {
+          const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="dock-link relative"
+              aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}
+            >
+              <div className="relative">
+                <Icon name={link.icon} className="size-[21px]" />
+                {showBadge && (
+                  <span
+                    aria-label={`${pendingActionCount} pesanan butuh aksi`}
+                    className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full border border-black bg-rose-500 text-white text-[9px] font-black flex items-center justify-center leading-none shadow-[1px_1px_0px_0px_#000]"
+                  >
+                    {pendingActionCount > 99 ? '99+' : pendingActionCount}
+                  </span>
+                )}
+              </div>
+              <span>{link.shortLabel}</span>
+            </Link>
+          );
+        })}
         {(role === 'ADMIN' || role === 'DRIVER') && (
           <button type="button" onClick={() => setMenuOpen(true)} className="dock-link" aria-expanded={menuOpen} aria-current={moreActive ? 'page' : undefined} aria-haspopup="dialog">
             <Icon name="more" /><span>More</span>
@@ -110,11 +179,32 @@ export function NavBar() {
           <div className="min-w-0"><p className="break-words text-sm font-extrabold text-black">{name}</p><p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-emerald-950">{role === 'ADMIN' ? 'Fleet administrator' : role === 'DRIVER' ? 'Driver workspace' : 'Employee workspace'}</p></div>
         </div>
         <nav aria-label="Workspace navigation" className="space-y-2">
-          {links.map((link) => (
-            <Link key={link.href} href={link.href} onClick={() => setMenuOpen(false)} aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined} className={`flex min-h-12 items-center gap-3 rounded-xl border-2 border-black px-4 text-sm font-bold shadow-[2.5px_2.5px_0px_0px_#000] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${isNavigationActive(pathname, link.href) ? 'bg-amber-300 text-black' : 'bg-white text-black hover:bg-amber-100'}`}>
-              <Icon name={link.icon} /><span className="flex-1">{link.label}</span><Icon name="arrow" className="size-4 opacity-75" />
-            </Link>
-          ))}
+          {links.map((link) => {
+            const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}
+                className={`flex min-h-12 items-center gap-3 rounded-xl border-2 border-black px-4 text-sm font-bold shadow-[2.5px_2.5px_0px_0px_#000] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+                  isNavigationActive(pathname, link.href) ? 'bg-amber-300 text-black' : 'bg-white text-black hover:bg-amber-100'
+                }`}
+              >
+                <Icon name={link.icon} />
+                <span className="flex-1">{link.label}</span>
+                {showBadge && (
+                  <span
+                    aria-label={`${pendingActionCount} pesanan butuh aksi`}
+                    className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full border border-black bg-rose-500 text-white text-xs font-black shadow-[1px_1px_0px_0px_#000]"
+                  >
+                    {pendingActionCount > 99 ? '99+' : pendingActionCount}
+                  </span>
+                )}
+                <Icon name="arrow" className="size-4 opacity-75" />
+              </Link>
+            );
+          })}
         </nav>
         <div className="border-t-2 border-black pt-4">
           <button

@@ -315,7 +315,14 @@ describe('Phase 4 PostgreSQL Integration Tests: GPS Tracking Backend', () => {
     const updatedBooking = await prisma.booking.findUniqueOrThrow({
       where: { id: booking.id },
     });
-    expect(updatedBooking.status).toBe(BookingStatus.COMPLETED);
+    expect(updatedBooking.status).toBe(BookingStatus.PENDING_COMPLETION);
+
+    // Admin approves completion with nota dinas
+    await transitionBooking(booking.id, BookingStatus.COMPLETED, adminActor);
+    const approvedBooking = await prisma.booking.findUniqueOrThrow({
+      where: { id: booking.id },
+    });
+    expect(approvedBooking.status).toBe(BookingStatus.COMPLETED);
 
     const updatedVehicle = await prisma.vehicle.findUniqueOrThrow({
       where: { id: vehicle1Id },

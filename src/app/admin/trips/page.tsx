@@ -7,6 +7,8 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Drawer } from '@/components/ui/Drawer';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
+import { ExportReportModal } from '@/components/admin/ExportReportModal';
 
 interface AdminTrip {
   id: string;
@@ -51,6 +53,15 @@ export default function AdminTripsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedTrip, setSelectedTrip] = useState<AdminTrip | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [locations, setLocations] = useState<Array<{ id: string; name: string; code: string }>>([]);
+
+  useEffect(() => {
+    fetch('/api/locations')
+      .then((res) => (res.ok ? res.json() : { data: [] }))
+      .then((json) => setLocations(json.data || []))
+      .catch(() => {});
+  }, []);
 
   const fetchTrips = async (targetPage = 1) => {
     setIsLoading(true);
@@ -171,9 +182,19 @@ export default function AdminTripsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="pb-4 border-b-2 border-black/10">
-        <h1 className="text-2xl font-black tracking-tight text-zinc-950">Trip Audit & Records</h1>
-        <p className="text-xs font-medium text-zinc-600 mt-0.5">Comprehensive history of all vehicle tracking sessions and routes</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Trip Audit & Records</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">Comprehensive history of all vehicle tracking sessions and routes</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsExportModalOpen(true)}
+          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border-2 border-black text-xs font-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 self-start sm:self-auto transition-transform active:translate-y-0.5"
+        >
+          <Icon name="download" className="size-4" />
+          <span>Download Laporan Excel</span>
+        </button>
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -262,6 +283,13 @@ export default function AdminTripsPage() {
           </div>
         )}
       </Drawer>
+
+      {/* Export Report Excel Modal */}
+      <ExportReportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        locations={locations}
+      />
     </div>
   );
 }

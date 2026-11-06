@@ -8,10 +8,10 @@ import { LocationBadge } from '@/components/ui/LocationBadge';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { Pagination } from '@/components/ui/Pagination';
 import { Modal } from '@/components/ui/Modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Drawer } from '@/components/ui/Drawer';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 
@@ -26,6 +26,10 @@ interface Booking {
   purpose: string;
   notes?: string | null;
   status: string;
+  serviceType?: 'DROP_OFF' | 'STANDBY';
+  notaDinasUrl?: string | null;
+  notaDinasFilename?: string | null;
+  rejectedReason?: string | null;
   createdAt: string;
   etaSeconds?: number | null;
   etaEstimated?: boolean;
@@ -85,6 +89,12 @@ function UserBookingsContent() {
 
   // Create Booking Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  // Upload Nota Dinas Modal
+  const [uploadBooking, setUploadBooking] = useState<Booking | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Fetch locations
   useEffect(() => {
@@ -174,6 +184,41 @@ function UserBookingsContent() {
     }
   };
 
+  const handleUploadNotaDinas = async () => {
+    if (!uploadBooking || !uploadFile) return;
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+
+      const res = await fetch(`/api/bookings/${uploadBooking.id}/nota-dinas`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        setUploadError(json.error?.message || 'Gagal mengunggah nota dinas');
+        return;
+      }
+
+      const updated = json.data;
+      setBookings((prev) =>
+        prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b))
+      );
+      if (selectedBooking && selectedBooking.id === updated.id) {
+        setSelectedBooking((prev) => (prev ? { ...prev, ...updated } : null));
+      }
+      setUploadBooking(null);
+      setUploadFile(null);
+    } catch {
+      setUploadError('Terjadi kesalahan jaringan saat mengunggah');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const columns: Column<Booking>[] = [
     {
       header: 'Booking #',
@@ -181,11 +226,22 @@ function UserBookingsContent() {
       cell: (b) => (
         <div>
           <span className="font-semibold text-zinc-900">{b.bookingNumber}</span>
-          {b.operationalLocation && (
-            <div className="text-[11px] text-zinc-500 font-medium">
-              {b.operationalLocation.name} ({b.operationalLocation.code})
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            <span
+              className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
+                b.serviceType === 'STANDBY'
+                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-rose-100 text-rose-900 border-rose-300'
+              }`}
+            >
+              {b.serviceType === 'STANDBY' ? 'Standby' : 'Drop Off'}
+            </span>
+            {b.operationalLocation && (
+              <span className="text-[10px] text-zinc-500 font-medium">
+                {b.operationalLocation.code}
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
@@ -266,6 +322,19 @@ function UserBookingsContent() {
                 Track
               </Link>
             )}
+            {b.status === 'PENDING_COMPLETION' && (
+              <button
+                type="button"
+                onClick={() => setUploadBooking(b)}
+                className={`px-2.5 py-1 text-xs font-black rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer ${
+                  b.rejectedReason
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                    : 'bg-[#be123c] hover:bg-[#9f1239] text-white'
+                }`}
+              >
+                {b.rejectedReason ? 'Revisi Nota' : b.notaDinasUrl ? 'Ganti Nota' : 'Upload Nota'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setSelectedBooking(b)}
@@ -342,6 +411,7 @@ function UserBookingsContent() {
               <option value="DRIVER_EN_ROUTE">Driver En Route</option>
               <option value="ARRIVED">Arrived</option>
               <option value="IN_PROGRESS">In Progress</option>
+              <option value="PENDING_COMPLETION">Menunggu Approval Nota</option>
               <option value="COMPLETED">Completed</option>
               <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
               <option value="ADMIN_INTERVENTION">Admin Intervention</option>
@@ -396,6 +466,29 @@ function UserBookingsContent() {
                     Track Vehicle Live
                   </Link>
                 )}
+              {selectedBooking.status === 'PENDING_COMPLETION' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const b = selectedBooking;
+                    setUploadBooking(b);
+                  }}
+                  className={`px-3.5 py-2 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 ${
+                    selectedBooking.rejectedReason
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-[#be123c] hover:bg-[#9f1239]'
+                  }`}
+                >
+                  <Icon name="download" className="size-3.5 rotate-180" />
+                  <span>
+                    {selectedBooking.rejectedReason
+                      ? 'Revisi Dokumen Nota Dinas'
+                      : selectedBooking.notaDinasUrl
+                      ? 'Ganti Nota Dinas'
+                      : 'Upload Nota Dinas'}
+                  </span>
+                </button>
+              )}
               {[
                 'PENDING',
                 'SEARCHING_DRIVER',
@@ -427,15 +520,117 @@ function UserBookingsContent() {
               etaEstimated={selectedBooking.etaEstimated}
             />
 
-            {/* Operational Location */}
-            {selectedBooking.operationalLocation && (
-              <div className="flex items-center justify-between pb-3 border-b border-zinc-100 text-xs">
-                <span className="font-semibold uppercase text-zinc-500">Operational Hub</span>
-                <span className="font-medium text-zinc-800">
-                  {selectedBooking.operationalLocation.name} ({selectedBooking.operationalLocation.code})
+            {/* Service Type & Operational Hub */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Jenis Layanan</span>
+                <span
+                  className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[11px] font-black border ${
+                    selectedBooking.serviceType === 'STANDBY'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-rose-100 text-rose-900 border-rose-300'
+                  }`}
+                >
+                  {selectedBooking.serviceType === 'STANDBY'
+                    ? 'Standby (Operasional Seharian)'
+                    : 'Drop Off (Sekali Jalan)'}
                 </span>
               </div>
-            )}
+              {selectedBooking.operationalLocation && (
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">Hub Operasional</span>
+                  <span className="font-bold text-zinc-800">
+                    {selectedBooking.operationalLocation.name} ({selectedBooking.operationalLocation.code})
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Nota Dinas Section */}
+            <div className="p-3 bg-amber-50/70 border-2 border-black rounded-xl space-y-2 shadow-[2px_2px_0px_0px_#000]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                  <Icon name="check" className="size-4 text-emerald-600" />
+                  <span>Dokumen Nota Dinas</span>
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    selectedBooking.rejectedReason
+                      ? 'bg-rose-100 text-rose-800 border-rose-300'
+                      : selectedBooking.notaDinasUrl
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}
+                >
+                  {selectedBooking.rejectedReason
+                    ? 'Ditolak (Perlu Revisi)'
+                    : selectedBooking.notaDinasUrl
+                    ? 'Terlampir'
+                    : 'Belum Dilampirkan'}
+                </span>
+              </div>
+
+              {selectedBooking.rejectedReason && (
+                <div className="p-2.5 bg-rose-50 border-2 border-rose-300 rounded-lg text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                    <Icon name="close" className="size-3.5 text-rose-600" />
+                    <span>Nota Dinas Ditolak Admin</span>
+                  </div>
+                  <p className="text-[11px] text-rose-700">
+                    <span className="font-semibold">Alasan:</span> {selectedBooking.rejectedReason}
+                  </p>
+                  <p className="text-[10px] text-zinc-600">
+                    Silakan unggah dokumen perbaikan melalui tombol Unggah Revisi di bawah.
+                  </p>
+                </div>
+              )}
+
+              {selectedBooking.notaDinasUrl ? (
+                <div className="space-y-1.5 pt-1 text-xs">
+                  <p className="text-[11px] text-zinc-600 truncate">
+                    File: <span className="font-semibold text-zinc-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <a
+                      href={selectedBooking.notaDinasUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 bg-white hover:bg-zinc-100 text-zinc-800 rounded text-xs font-bold border border-black shadow-[1.5px_1.5px_0px_0px_#000] inline-flex items-center gap-1"
+                    >
+                      <Icon name="download" className="size-3.5" />
+                      <span>Lihat / Unduh Dokumen</span>
+                    </a>
+                    {selectedBooking.status === 'PENDING_COMPLETION' && (
+                      <button
+                        type="button"
+                        onClick={() => setUploadBooking(selectedBooking)}
+                        className="px-2.5 py-1 text-xs font-bold text-[#be123c] hover:underline cursor-pointer"
+                      >
+                        {selectedBooking.rejectedReason ? 'Unggah Dokumen Revisi' : 'Unggah Ulang'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs space-y-2 pt-1">
+                  <p className="text-[11px] text-zinc-600">
+                    {selectedBooking.status === 'PENDING_COMPLETION'
+                      ? 'Trip telah selesai. Silakan unggah Nota Dinas untuk diverifikasi oleh admin KCIC.'
+                      : 'Belum ada nota dinas yang dilampirkan pada pesanan ini.'}
+                  </p>
+                  {selectedBooking.status === 'PENDING_COMPLETION' && (
+                    <button
+                      type="button"
+                      onClick={() => setUploadBooking(selectedBooking)}
+                      className="px-3 py-1.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded text-xs font-bold border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <Icon name="download" className="size-3.5 rotate-180" />
+                      <span>Unggah Nota Dinas Sekarang</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Route details */}
             <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2 text-xs">
@@ -598,6 +793,93 @@ function UserBookingsContent() {
           </div>
         </div>
       </Modal>
+
+      {/* Upload Nota Dinas Modal */}
+      {uploadBooking && (
+        <Modal
+          isOpen={Boolean(uploadBooking)}
+          onClose={() => {
+            setUploadBooking(null);
+            setUploadFile(null);
+            setUploadError(null);
+          }}
+          title="Lampirkan Dokumen Nota Dinas"
+          description={`Booking #${uploadBooking.bookingNumber} (${uploadBooking.pickupLocation} → ${uploadBooking.destination})`}
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            {uploadError && <ErrorBanner message={uploadError} onDismiss={() => setUploadError(null)} />}
+
+            {uploadBooking.rejectedReason ? (
+              <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-lg text-xs space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                  <Icon name="close" className="size-3.5 text-rose-600" />
+                  <span>Catatan Penolakan Nota Dinas Sebelumnya:</span>
+                </div>
+                <p className="text-[11px] text-rose-950 font-medium">"{uploadBooking.rejectedReason}"</p>
+                <p className="text-[10px] text-zinc-600 italic">
+                  Pastikan dokumen/foto revisi yang Anda unggah sudah jelas dan sesuai dengan catatan admin.
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 bg-amber-50 border-2 border-black rounded-lg text-xs font-medium text-amber-950">
+                Perjalanan telah selesai. Sesuai ketentuan operasional KCIC, silakan lampirkan Nota Dinas (format PDF, JPG, PNG, atau WebP, maks. 10MB) untuk diverifikasi oleh admin.
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                Pilih File Dokumen / Foto Nota Dinas
+              </label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null;
+                  setUploadFile(f);
+                  setUploadError(null);
+                }}
+                className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-black file:text-xs file:font-black file:bg-zinc-100 hover:file:bg-zinc-200 file:cursor-pointer border-2 border-dashed border-zinc-300 p-2 rounded-lg"
+              />
+            </div>
+
+            {uploadFile && (
+              <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs flex items-center justify-between">
+                <div className="truncate max-w-[280px]">
+                  <span className="font-bold text-zinc-900 block truncate">{uploadFile.name}</span>
+                  <span className="text-[11px] text-zinc-500">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                  Siap Diunggah
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setUploadBooking(null);
+                  setUploadFile(null);
+                }}
+                disabled={isUploading}
+                className="px-3.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleUploadNotaDinas}
+                disabled={!uploadFile || isUploading}
+                className="px-4 py-1.5 text-xs font-black rounded-lg border-2 border-black bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000] hover:bg-[#9f1239] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              >
+                {isUploading ? <Spinner size="sm" /> : <Icon name="download" className="size-3.5 rotate-180" />}
+                <span>{isUploading ? 'Mengunggah...' : 'Unggah Nota Dinas'}</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Reworked Booking Modal */}
       <BookingModal

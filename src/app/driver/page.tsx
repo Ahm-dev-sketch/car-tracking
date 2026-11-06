@@ -1507,6 +1507,15 @@ export default function DriverDashboardPage() {
                 </span>
               </div>
             </div>
+
+            {!completedTripSummary.aborted && (
+              <div className="rounded-xl border-2 border-black bg-amber-50 p-3.5 text-xs text-amber-950 shadow-[2px_2px_0px_0px_#000]">
+                <span className="font-black block mb-0.5">Status: Menunggu Approval Nota Dinas</span>
+                <p className="text-[11px] font-medium text-amber-900">
+                  Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum diselesaikan resmi oleh admin KCIC.
+                </p>
+              </div>
+            )}
           </div>
         </Modal>
       )}

@@ -208,6 +208,13 @@ export function DispatchProgress({
           );
         })}
       </div>
+
+      {normStatus === 'PENDING_COMPLETION' && (
+        <div className="p-3 bg-amber-100 border-2 border-black rounded-lg text-xs font-semibold text-amber-950 flex items-center gap-2">
+          <Icon name="clock" className="size-4 shrink-0 text-amber-700" />
+          <span>Perjalanan telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi & persetujuan admin.</span>
+        </div>
+      )}
     </div>
   );
 }

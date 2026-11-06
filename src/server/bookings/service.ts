@@ -28,6 +28,9 @@ export interface CreateBookingInput {
   passengerCount: number;
   purpose: string;
   notes?: string | null;
+  serviceType?: 'DROP_OFF' | 'STANDBY';
+  notaDinasUrl?: string | null;
+  notaDinasFilename?: string | null;
   status?: BookingStatus;
 }
 
@@ -224,6 +227,9 @@ export async function createBooking(
             passengerCount: input.passengerCount,
             purpose: input.purpose,
             notes: input.notes ?? null,
+            serviceType: input.serviceType ?? 'DROP_OFF',
+            notaDinasUrl: input.notaDinasUrl ?? null,
+            notaDinasFilename: input.notaDinasFilename ?? null,
             status: input.status ?? BookingStatus.PENDING,
           },
           include: {
@@ -340,7 +346,9 @@ export async function transitionBooking(
         to === BookingStatus.CANCELLED)) ||
     (from === BookingStatus.ARRIVED &&
       (to === BookingStatus.IN_PROGRESS || to === BookingStatus.CANCELLED)) ||
-    (from === BookingStatus.IN_PROGRESS && to === BookingStatus.COMPLETED) ||
+    (from === BookingStatus.IN_PROGRESS &&
+      (to === BookingStatus.PENDING_COMPLETION || to === BookingStatus.COMPLETED)) ||
+    (from === BookingStatus.PENDING_COMPLETION && to === BookingStatus.COMPLETED) ||
     (from === BookingStatus.ADMIN_INTERVENTION &&
       (to === BookingStatus.DRIVER_ASSIGNED || to === BookingStatus.CANCELLED)) ||
     (from === BookingStatus.NO_DRIVER_AVAILABLE &&
@@ -383,8 +391,7 @@ export async function transitionBooking(
   } else if (
     to === BookingStatus.DRIVER_EN_ROUTE ||
     to === BookingStatus.ARRIVED ||
-    to === BookingStatus.IN_PROGRESS ||
-    to === BookingStatus.COMPLETED
+    to === BookingStatus.IN_PROGRESS
   ) {
     if (!booking.driverId) {
       throw new ApiError(409, 'ACTIVE_TRIP_REQUIRED', 'Start the matching trip before updating booking progress');
@@ -393,9 +400,54 @@ export async function transitionBooking(
     if (!isAssignedDriver && actor.role !== 'ADMIN') {
       throw new ApiError(403, 'FORBIDDEN', 'Only the assigned driver can update trip progress');
     }
+  } else if (to === BookingStatus.PENDING_COMPLETION) {
+    const isAssignedDriver = actor.role === 'DRIVER' && booking.driver?.userId === actor.id;
+    if (!isAssignedDriver && actor.role !== 'ADMIN') {
+      throw new ApiError(403, 'FORBIDDEN', 'Only the assigned driver or administrator can mark trip complete');
+    }
+  } else if (to === BookingStatus.COMPLETED) {
+    if (from === BookingStatus.PENDING_COMPLETION) {
+      if (actor.role !== 'ADMIN') {
+        throw new ApiError(403, 'FORBIDDEN', 'Only administrators can approve completion of bookings');
+      }
+    } else {
+      if (!booking.driverId) {
+        throw new ApiError(409, 'ACTIVE_TRIP_REQUIRED', 'Start the matching trip before updating booking progress');
+      }
+      const isAssignedDriver = actor.role === 'DRIVER' && booking.driver?.userId === actor.id;
+      if (!isAssignedDriver && actor.role !== 'ADMIN') {
+        throw new ApiError(403, 'FORBIDDEN', 'Only the assigned driver can update trip progress');
+      }
+    }
   }
 
   if (to === BookingStatus.COMPLETED) {
+    if (from === BookingStatus.PENDING_COMPLETION) {
+      const completed = await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.COMPLETED, rejectedReason: null },
+        include: bookingMutationInclude,
+      });
+      await logAuditEvent({
+        actorUserId: ctx?.actorUserId ?? actor.id,
+        action: 'booking.completed',
+        entityType: 'Booking',
+        entityId: bookingId,
+        oldValue: { status: from },
+        newValue: { status: BookingStatus.COMPLETED, driverId: booking.driverId },
+        ip: ctx?.ip,
+        userAgent: ctx?.userAgent,
+      });
+      await publishEvent({ type: 'booking:update', data: { bookingId, status: completed.status, userId: completed.userId } });
+      await notify(completed.userId, {
+        type: 'BOOKING_COMPLETED',
+        title: 'Booking Selesai & Disetujui',
+        body: `Nota dinas dan penyelesaian booking ${completed.bookingNumber} telah disetujui admin.`,
+        data: { bookingId: completed.id },
+      });
+      return completed;
+    }
+
     const trip = booking.driverId && booking.vehicleId
       ? await prisma.trip.findFirst({
           where: { bookingId, driverId: booking.driverId, vehicleId: booking.vehicleId, status: TripStatus.ACTIVE },
@@ -415,6 +467,37 @@ export async function transitionBooking(
     const completed = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId }, include: bookingMutationInclude });
     await publishEvent({ type: 'booking:update', data: { bookingId, status: completed.status, userId: completed.userId } });
     return completed;
+  }
+
+  if (to === BookingStatus.PENDING_COMPLETION) {
+    const trip = booking.driverId && booking.vehicleId
+      ? await prisma.trip.findFirst({
+          where: { bookingId, driverId: booking.driverId, vehicleId: booking.vehicleId, status: TripStatus.ACTIVE },
+        })
+      : null;
+    if (trip) {
+      await endTrip(trip.driverId, trip.id, {}, { ...ctx, actorUserId: ctx?.actorUserId ?? actor.id });
+      const completed = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId }, include: bookingMutationInclude });
+      await publishEvent({ type: 'booking:update', data: { bookingId, status: completed.status, userId: completed.userId } });
+      return completed;
+    }
+    const updated = await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: BookingStatus.PENDING_COMPLETION },
+      include: bookingMutationInclude,
+    });
+    await logAuditEvent({
+      actorUserId: ctx?.actorUserId ?? actor.id,
+      action: 'booking.pending_completion',
+      entityType: 'Booking',
+      entityId: bookingId,
+      oldValue: { status: from },
+      newValue: { status: BookingStatus.PENDING_COMPLETION },
+      ip: ctx?.ip,
+      userAgent: ctx?.userAgent,
+    });
+    await publishEvent({ type: 'booking:update', data: { bookingId, status: updated.status, userId: updated.userId } });
+    return updated;
   }
 
   // 3. Execute transition in transaction

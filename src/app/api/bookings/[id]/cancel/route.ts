@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser } from '@/lib/auth-guard';
 import { getClientContext } from '@/lib/request-context';
 import { cancelBookingSchema } from '@/lib/validation';
 import { transitionBooking } from '@/server/bookings/service';
+import { prisma } from '@/lib/prisma';
 import { BookingStatus } from '@prisma/client';
 
 export const POST = withErrorHandling(
@@ -16,6 +17,32 @@ export const POST = withErrorHandling(
       return NextResponse.json(
         { error: { code: 'INVALID_ID', message: 'Missing booking id' } },
         { status: 400 }
+      );
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+    if (!booking) {
+      throw new ApiError(404, 'NOT_FOUND', 'Booking not found');
+    }
+
+    const nonCancellable: BookingStatus[] = [
+      BookingStatus.DRIVER_EN_ROUTE,
+      BookingStatus.ARRIVED,
+      BookingStatus.IN_PROGRESS,
+      BookingStatus.PENDING_COMPLETION,
+      BookingStatus.COMPLETED,
+      BookingStatus.CANCELLED,
+      BookingStatus.REJECTED,
+    ];
+
+    if (nonCancellable.includes(booking.status)) {
+      throw new ApiError(
+        400,
+        'CANNOT_CANCEL',
+        'Booking tidak dapat dibatalkan karena driver sudah dalam perjalanan atau booking sedang/telah selesai'
       );
     }
 

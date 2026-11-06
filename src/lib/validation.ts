@@ -30,6 +30,7 @@ export const bookingStatusEnum = z.enum([
   'DRIVER_EN_ROUTE',
   'ARRIVED',
   'IN_PROGRESS',
+  'PENDING_COMPLETION',
   'COMPLETED',
   'CANCELLED',
   'NO_DRIVER_AVAILABLE',
@@ -295,8 +296,12 @@ export const createBookingSchema = z
     expectedReturnAt: z.coerce.date().optional(),
     passenger_count: z.coerce.number().int().min(1, 'Passenger count must be at least 1').optional(),
     passengerCount: z.coerce.number().int().min(1, 'Passenger count must be at least 1').optional(),
-    purpose: z.string().trim().min(1, 'Purpose is required'),
+    purpose: z.string().trim().optional().nullable(),
     notes: z.string().trim().optional().nullable(),
+    service_type: z.enum(['DROP_OFF', 'STANDBY']).optional(),
+    serviceType: z.enum(['DROP_OFF', 'STANDBY']).optional(),
+    nota_dinas_url: z.string().trim().optional().nullable(),
+    notaDinasUrl: z.string().trim().optional().nullable(),
   })
   .superRefine((data, ctx) => {
     const operationalLoc = data.operational_location_id ?? data.operationalLocationId;
@@ -305,6 +310,16 @@ export const createBookingSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Operational location is required',
         path: ['operationalLocationId'],
+      });
+    }
+
+    const sType = data.service_type ?? data.serviceType ?? 'DROP_OFF';
+    const trimmedPurpose = data.purpose?.trim() || '';
+    if (sType === 'STANDBY' && !trimmedPurpose) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Keterangan atau keperluan wajib diisi untuk layanan Standby',
+        path: ['purpose'],
       });
     }
 
@@ -364,6 +379,9 @@ export const createBookingSchema = z
     const departureAt = (data.departure_at ?? data.departureAt)!;
     const expectedReturnAt = (data.expected_return_at ?? data.expectedReturnAt)!;
     const passengerCount = (data.passenger_count ?? data.passengerCount)!;
+    const serviceType = (data.service_type ?? data.serviceType ?? 'DROP_OFF') as 'DROP_OFF' | 'STANDBY';
+    const purpose = (data.purpose?.trim()) || (serviceType === 'STANDBY' ? 'Layanan Standby' : 'Layanan Drop Off');
+    const notaDinasUrl = data.nota_dinas_url ?? data.notaDinasUrl ?? null;
 
     return {
       vehicleId,
@@ -378,8 +396,10 @@ export const createBookingSchema = z
       departureAt,
       expectedReturnAt,
       passengerCount,
-      purpose: data.purpose,
+      purpose,
       notes: data.notes ?? null,
+      serviceType,
+      notaDinasUrl,
     };
   });
 
@@ -449,7 +469,7 @@ export const startDriverSessionSchema = z.object({
 }));
 
 export const updateBookingStatusSchema = z.object({
-  status: z.enum(['IN_PROGRESS', 'COMPLETED']),
+  status: z.enum(['IN_PROGRESS', 'PENDING_COMPLETION', 'COMPLETED']),
 });
 
 export const tripStatusEnum = z.enum(['ACTIVE', 'COMPLETED', 'ABORTED']);

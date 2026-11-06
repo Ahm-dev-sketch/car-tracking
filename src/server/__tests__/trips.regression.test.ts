@@ -326,7 +326,7 @@ describe('Trip start guards under booking, vehicle, then driver locks', () => {
 });
 
 const closures = [
-  { name: 'finish', run: () => endTrip('driver-1', 'trip-1', { endLat: 3, endLng: 4, distanceMeters: 100 }), tripStatus: TripStatus.COMPLETED, bookingStatus: BookingStatus.COMPLETED },
+  { name: 'finish', run: () => endTrip('driver-1', 'trip-1', { endLat: 3, endLng: 4, distanceMeters: 100 }), tripStatus: TripStatus.COMPLETED, bookingStatus: BookingStatus.PENDING_COMPLETION },
   { name: 'abort', run: () => abortTrip(actor, 'trip-1', { reason: 'Retry' }), tripStatus: TripStatus.ABORTED, bookingStatus: BookingStatus.DRIVER_ASSIGNED },
 ];
 

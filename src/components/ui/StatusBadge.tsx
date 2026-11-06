@@ -41,6 +41,7 @@ const statusStyles: Record<string, string> = {
   DRIVER_EN_ROUTE: 'bg-indigo-300 text-black',
   ARRIVED: 'bg-teal-300 text-black',
   IN_PROGRESS: 'bg-emerald-300 text-black',
+  PENDING_COMPLETION: 'bg-amber-300 text-black animate-pulse',
   COMPLETED: 'bg-emerald-400 text-black',
   NO_DRIVER_AVAILABLE: 'bg-zinc-200 text-black',
   ADMIN_INTERVENTION: 'bg-orange-300 text-black',
@@ -67,7 +68,10 @@ const statusStyles: Record<string, string> = {
 export function StatusBadge({ status, className = '' }: { status: StatusType; className?: string }) {
   const normalized = status ? status.toUpperCase() : 'UNKNOWN';
   const style = statusStyles[normalized] || 'bg-zinc-200 text-black';
-  const label = normalized.replace(/_/g, ' ');
+  const label =
+    normalized === 'PENDING_COMPLETION'
+      ? 'Menunggu Approval Nota'
+      : normalized.replace(/_/g, ' ');
 
   return (
     <span

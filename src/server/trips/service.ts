@@ -277,7 +277,7 @@ async function closeTrip(
     if (trip.bookingId) {
       await tx.booking.update({
         where: { id: trip.bookingId },
-        data: { status: status === TripStatus.COMPLETED ? BookingStatus.COMPLETED : BookingStatus.DRIVER_ASSIGNED },
+        data: { status: status === TripStatus.COMPLETED ? BookingStatus.PENDING_COMPLETION : BookingStatus.DRIVER_ASSIGNED },
       });
     }
     const reservation = await tx.booking.findFirst({
@@ -352,13 +352,13 @@ export async function endTrip(
     const booking = updatedTrip.booking;
     await sendTripNotifications([
       () => notify(booking.userId, {
-        type: 'BOOKING_COMPLETED', title: 'Trip Completed',
-        body: `Your trip for booking ${booking.bookingNumber} is completed`,
+        type: 'BOOKING_PENDING_COMPLETION', title: 'Perjalanan Selesai',
+        body: `Perjalanan untuk booking ${booking.bookingNumber} telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi admin.`,
         data: { tripId: updatedTrip.id, bookingId: booking.id },
       }),
       () => notifyAdmins({
-        type: 'BOOKING_COMPLETED', title: 'Trip Completed',
-        body: `Trip ${updatedTrip.id} completed for booking ${booking.bookingNumber}`,
+        type: 'BOOKING_PENDING_COMPLETION', title: 'Trip Selesai - Butuh Approval',
+        body: `Trip ${updatedTrip.id} selesai untuk booking ${booking.bookingNumber}. Menunggu lampiran nota dinas & persetujuan admin.`,
         data: { tripId: updatedTrip.id, bookingId: booking.id },
       }),
     ]);

@@ -62,6 +62,11 @@ export function BookingModal({
   const [purpose, setPurpose] = useState('');
   const [notes, setNotes] = useState('');
 
+  // 2 Options: Drop Off vs Standby
+  const [serviceType, setServiceType] = useState<'DROP_OFF' | 'STANDBY'>('DROP_OFF');
+  const [dropOffDate, setDropOffDate] = useState('');
+  const [dropOffTime, setDropOffTime] = useState('');
+
   // Specific vehicle preference (Option B)
   const [preferredVehicle, setPreferredVehicle] = useState<PreferredVehicle | null>(null);
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState('');
@@ -154,8 +159,14 @@ export function BookingModal({
     const toLocalISO = (d: Date) =>
       `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
     setDepartureAt(toLocalISO(now));
     setExpectedReturnAt(toLocalISO(returnTime));
+    setDropOffDate(todayStr);
+    setDropOffTime(timeStr);
+    setServiceType('DROP_OFF');
     setPassengerCount(1);
     setPurpose('');
     setNotes('');
@@ -309,25 +320,66 @@ export function BookingModal({
       return;
     }
 
-    const depDate = new Date(departureAt);
-    const retDate = new Date(expectedReturnAt);
+    const isDropOff = serviceType === 'DROP_OFF';
+    let depDate: Date;
+    let retDate: Date;
 
-    if (isNaN(depDate.getTime()) || isNaN(retDate.getTime())) {
-      setFormError('Please enter valid departure and return dates');
-      setIsSubmitting(false);
-      return;
-    }
+    if (isDropOff) {
+      if (!dropOffDate) {
+        setFormError('Tanggal jemput wajib diisi untuk layanan Drop Off');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!dropOffTime) {
+        setFormError('Jam jemput wajib dipilih untuk layanan Drop Off');
+        setIsSubmitting(false);
+        return;
+      }
+      depDate = new Date(`${dropOffDate}T${dropOffTime}:00`);
+      if (isNaN(depDate.getTime())) {
+        setFormError('Format tanggal atau jam jemput tidak valid');
+        setIsSubmitting(false);
+        return;
+      }
+      // Waktu kembali otomatis 3 jam setelah jam jemput
+      retDate = new Date(depDate.getTime() + 3 * 60 * 60 * 1000);
+    } else {
+      if (!departureAt || !expectedReturnAt) {
+        setFormError('Waktu keberangkatan dan waktu kembali wajib diisi');
+        setIsSubmitting(false);
+        return;
+      }
+      depDate = new Date(departureAt);
+      retDate = new Date(expectedReturnAt);
 
-    if (retDate <= depDate) {
-      setFormError('Return time must be after departure time');
-      setIsSubmitting(false);
-      return;
+      if (isNaN(depDate.getTime()) || isNaN(retDate.getTime())) {
+        setFormError('Format tanggal keberangkatan atau kembali tidak valid');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (retDate <= depDate) {
+        setFormError('Waktu kembali harus setelah waktu keberangkatan');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!purpose.trim()) {
+        setFormError('Keterangan / keperluan wajib diisi untuk layanan Standby');
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     const vehiclePrefId =
       overrideVehiclePreferenceId !== undefined
         ? overrideVehiclePreferenceId
         : preferredVehicle?.id || undefined;
+
+    const effectivePurpose = purpose.trim() || (isDropOff ? 'Layanan Drop Off' : '');
+    const autoNote = isDropOff
+      ? [notes.trim(), `[Layanan Drop Off - Tanggal: ${dropOffDate}, Jam Jemput: ${dropOffTime}]`].filter(Boolean).join(' ')
+      : notes.trim() || undefined;
 
     try {
       const payload = {
@@ -337,8 +389,9 @@ export function BookingModal({
         departureAt: depDate.toISOString(),
         expectedReturnAt: retDate.toISOString(),
         passengerCount: Number(passengerCount),
-        purpose: purpose.trim(),
-        notes: notes.trim() || undefined,
+        purpose: effectivePurpose,
+        notes: autoNote || undefined,
+        serviceType,
         vehiclePreferenceId: vehiclePrefId || undefined,
         pickupLat: userCoords?.lat ?? null,
         pickupLng: userCoords?.lng ?? null,
@@ -825,6 +878,45 @@ export function BookingModal({
           )}
         </FormField>
 
+        {/* Pilihan Layanan: Drop Off vs Standby */}
+        <div className="space-y-1.5">
+          <label className="block text-xs font-black uppercase tracking-wider text-black">
+            Pilihan Layanan Pemesanan
+          </label>
+          <div className="grid grid-cols-2 gap-2 p-1.5 bg-zinc-100 border-2 border-black rounded-xl">
+            <button
+              type="button"
+              onClick={() => setServiceType('DROP_OFF')}
+              className={`py-2 px-3 text-xs font-bold rounded-lg border-2 transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                serviceType === 'DROP_OFF'
+                  ? 'bg-[#be123c] border-black text-white shadow-[2px_2px_0px_0px_#000]'
+                  : 'border-transparent text-zinc-700 hover:text-black hover:bg-zinc-200'
+              }`}
+            >
+              <Icon name="car" className="size-4 shrink-0" />
+              <div className="text-left">
+                <div className="font-extrabold leading-tight">1. Drop Off</div>
+                <div className="text-[10px] opacity-85 leading-tight">Sekali Jalan (Jam Jemput Saja)</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setServiceType('STANDBY')}
+              className={`py-2 px-3 text-xs font-bold rounded-lg border-2 transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                serviceType === 'STANDBY'
+                  ? 'bg-[#be123c] border-black text-white shadow-[2px_2px_0px_0px_#000]'
+                  : 'border-transparent text-zinc-700 hover:text-black hover:bg-zinc-200'
+              }`}
+            >
+              <Icon name="clock" className="size-4 shrink-0" />
+              <div className="text-left">
+                <div className="font-extrabold leading-tight">2. Standby</div>
+                <div className="text-[10px] opacity-85 leading-tight">Operasional Seharian</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Pickup & Destination */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="Pickup Location" name="pickupLocation" required>
@@ -884,29 +976,74 @@ export function BookingModal({
         </div>
 
         {/* Departure & Return */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField label="Departure Time" name="departureAt" required>
-            <input
-              id="departureAt"
-              type="datetime-local"
-              required
-              value={departureAt}
-              onChange={(e) => setDepartureAt(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            />
-          </FormField>
+        {serviceType === 'DROP_OFF' ? (
+          <div className="p-3 bg-rose-50/70 border-2 border-black rounded-xl space-y-2 shadow-[2px_2px_0px_0px_#000]">
+            <div className="flex items-center justify-between text-xs font-black text-zinc-900 border-b border-black/10 pb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Icon name="clock" className="size-3.5 text-[#be123c]" />
+                <span>Jadwal Penjemputan Drop Off</span>
+              </span>
+              <span className="text-[10px] bg-rose-100 text-[#be123c] px-2 py-0.5 rounded font-bold border border-rose-300">
+                Sekali Jalan
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label htmlFor="dropOffDate" className="block text-[11px] font-bold text-zinc-900 mb-1">
+                  Tanggal Jemput <span className="text-[#be123c]">*</span>
+                </label>
+                <input
+                  id="dropOffDate"
+                  type="date"
+                  required
+                  value={dropOffDate}
+                  onChange={(e) => setDropOffDate(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+                />
+              </div>
+              <div>
+                <label htmlFor="dropOffTime" className="block text-[11px] font-bold text-zinc-900 mb-1">
+                  Jam Jemput <span className="text-[#be123c]">*</span>
+                </label>
+                <input
+                  id="dropOffTime"
+                  type="time"
+                  required
+                  value={dropOffTime}
+                  onChange={(e) => setDropOffTime(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-500 italic pt-0.5">
+              * Khusus Drop Off, tanggal & jam selesai tidak perlu diisi (hanya jadwal penjemputan).
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField label="Waktu Mulai Standby" name="departureAt" required>
+              <input
+                id="departureAt"
+                type="datetime-local"
+                required
+                value={departureAt}
+                onChange={(e) => setDepartureAt(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              />
+            </FormField>
 
-          <FormField label="Expected Return" name="expectedReturnAt" required>
-            <input
-              id="expectedReturnAt"
-              type="datetime-local"
-              required
-              value={expectedReturnAt}
-              onChange={(e) => setExpectedReturnAt(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            />
-          </FormField>
-        </div>
+            <FormField label="Waktu Selesai Standby" name="expectedReturnAt" required>
+              <input
+                id="expectedReturnAt"
+                type="datetime-local"
+                required
+                value={expectedReturnAt}
+                onChange={(e) => setExpectedReturnAt(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              />
+            </FormField>
+          </div>
+        )}
 
         {/* Passenger count & Purpose */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -924,14 +1061,22 @@ export function BookingModal({
           </FormField>
 
           <div className="sm:col-span-2">
-            <FormField label="Purpose of Trip" name="purpose" required>
+            <FormField
+              label={serviceType === 'STANDBY' ? 'Keperluan / Keterangan (Wajib)' : 'Keperluan / Keterangan (Opsional)'}
+              name="purpose"
+              required={serviceType === 'STANDBY'}
+            >
               <input
                 id="purpose"
                 type="text"
-                required
+                required={serviceType === 'STANDBY'}
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                placeholder="e.g. Track maintenance inspection"
+                placeholder={
+                  serviceType === 'STANDBY'
+                    ? 'Wajib diisi, misal: Standby pimpinan / inspeksi rel'
+                    : 'Opsional, misal: Antar staf ke Stasiun Halim'
+                }
                 className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>

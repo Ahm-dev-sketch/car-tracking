@@ -52,10 +52,16 @@ enum BookingStatus {
   DRIVER_EN_ROUTE
   ARRIVED
   IN_PROGRESS
+  PENDING_COMPLETION
   COMPLETED
   CANCELLED
   NO_DRIVER_AVAILABLE
   ADMIN_INTERVENTION
+}
+
+enum ServiceType {
+  DROP_OFF
+  STANDBY
 }
 
 enum OfferStatus {
@@ -247,6 +253,9 @@ model Booking {
   passengerCount        Int           @map("passenger_count")
   purpose               String
   notes                 String?
+  serviceType           ServiceType   @default(DROP_OFF) @map("service_type")
+  notaDinasUrl          String?       @map("nota_dinas_url")
+  notaDinasFilename     String?       @map("nota_dinas_filename")
   status                BookingStatus @default(PENDING)
   cancelledReason       String?       @map("cancelled_reason")
   rejectedReason        String?       @map("rejected_reason")

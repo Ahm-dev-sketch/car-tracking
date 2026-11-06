@@ -26,6 +26,8 @@ export const PATCH = withErrorHandling(
     const targetStatus =
       validated.status === 'IN_PROGRESS'
         ? BookingStatus.IN_PROGRESS
+        : validated.status === 'PENDING_COMPLETION'
+        ? BookingStatus.PENDING_COMPLETION
         : BookingStatus.COMPLETED;
 
     const updated = await transitionBooking(id, targetStatus, user, ctx);

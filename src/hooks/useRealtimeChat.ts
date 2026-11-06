@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { sounds } from '@/lib/sound-effects';
 
 export interface ChatMessage {
   id: string;
@@ -121,9 +122,12 @@ export function useRealtimeChat({
       return [...prev, normalized];
     });
 
-    // Increment unread count if received from others while chat is closed
-    if (!isOpenRef.current && normalized.sender_id !== currentUserId) {
-      setUnreadCount((c) => c + 1);
+    // Play sound and increment unread count if received from others
+    if (normalized.sender_id !== currentUserId) {
+      sounds.playMessageReceived();
+      if (!isOpenRef.current) {
+        setUnreadCount((c) => c + 1);
+      }
     }
   }, [currentUserId]);
 

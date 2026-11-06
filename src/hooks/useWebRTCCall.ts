@@ -2,14 +2,21 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { sounds } from '@/lib/sound-effects';
 
 export type CallStatus = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
+
+export interface CallLogEntry {
+  type: 'COMPLETED' | 'MISSED' | 'REJECTED';
+  durationSeconds: number;
+}
 
 interface UseWebRTCCallProps {
   channelId: string; // e.g. bookingId or tripId
   currentUserId: string;
   currentUserName: string;
   currentUserRole?: string;
+  onLogCall?: (entry: CallLogEntry, partnerId?: string | null) => void;
 }
 
 const RTC_CONFIG: RTCConfiguration = {
@@ -24,6 +31,7 @@ export function useWebRTCCall({
   currentUserId,
   currentUserName,
   currentUserRole = 'USER',
+  onLogCall,
 }: UseWebRTCCallProps) {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [isMuted, setIsMuted] = useState(false);
@@ -31,14 +39,33 @@ export function useWebRTCCall({
   const [partnerInfo, setPartnerInfo] = useState<{ id: string; name: string; role?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [missedCallsCount, setMissedCallsCount] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const ringingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
+  const pendingOfferRef = useRef<any>(null);
+  const callDurationRef = useRef<number>(0);
+  const callStatusRef = useRef<CallStatus>('idle');
 
-  // Clean up all resources
+  // Keep ref synchronized
+  callStatusRef.current = callStatus;
+  callDurationRef.current = callDuration;
+
+  const onLogCallRef = useRef(onLogCall);
+  onLogCallRef.current = onLogCall;
+
+  // Clear timers and streams
   const cleanupCall = useCallback(() => {
+    sounds.stopAll();
+
+    if (ringingTimeoutRef.current) {
+      clearTimeout(ringingTimeoutRef.current);
+      ringingTimeoutRef.current = null;
+    }
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -56,12 +83,25 @@ export function useWebRTCCall({
       pcRef.current = null;
     }
 
+    pendingOfferRef.current = null;
     setRemoteStream(null);
     setIsMuted(false);
-    setCallDuration(0);
   }, []);
 
-  // Initialize or get RTCPeerConnection
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setCallDuration(0);
+    callDurationRef.current = 0;
+    timerRef.current = setInterval(() => {
+      setCallDuration((prev) => {
+        const next = prev + 1;
+        callDurationRef.current = next;
+        return next;
+      });
+    }, 1000);
+  }, []);
+
+  // Initialize RTCPeerConnection
   const getOrCreatePeerConnection = useCallback(() => {
     if (pcRef.current) return pcRef.current;
 
@@ -88,11 +128,10 @@ export function useWebRTCCall({
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'connected') {
+        sounds.stopAll();
         setCallStatus('connected');
         if (!timerRef.current) {
-          timerRef.current = setInterval(() => {
-            setCallDuration((d) => d + 1);
-          }, 1000);
+          startTimer();
         }
       } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         endCall();
@@ -101,9 +140,9 @@ export function useWebRTCCall({
 
     pcRef.current = pc;
     return pc;
-  }, [currentUserId]);
+  }, [currentUserId, startTimer]);
 
-  // Acquire user microphone stream
+  // Acquire microphone stream
   const getLocalAudioStream = async () => {
     if (localStreamRef.current) return localStreamRef.current;
     try {
@@ -130,25 +169,13 @@ export function useWebRTCCall({
       setErrorMessage(null);
       setPartnerInfo({ id: targetUserId, name: targetName, role: targetRole });
       setCallStatus('calling');
+      sounds.startRingback();
 
       const stream = await getLocalAudioStream();
       const pc = getOrCreatePeerConnection();
 
-      // Add local audio tracks to connection
       stream.getTracks().forEach((track) => {
         pc.addTrack(track, stream);
-      });
-
-      // Send initial invite signal
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'call-invite',
-        payload: {
-          fromUserId: currentUserId,
-          fromName: currentUserName,
-          fromRole: currentUserRole,
-          toUserId: targetUserId,
-        },
       });
 
       // Create WebRTC Offer
@@ -157,15 +184,25 @@ export function useWebRTCCall({
       });
       await pc.setLocalDescription(offer);
 
+      // Send call invitation containing offer
       channelRef.current?.send({
         type: 'broadcast',
-        event: 'webrtc-offer',
+        event: 'call-invite',
         payload: {
           fromUserId: currentUserId,
+          fromName: currentUserName,
+          fromRole: currentUserRole,
           toUserId: targetUserId,
           offer,
         },
       });
+
+      // Ringing timeout for outgoing call (40 seconds)
+      ringingTimeoutRef.current = setTimeout(() => {
+        if (callStatusRef.current === 'calling') {
+          endCall('MISSED');
+        }
+      }, 40000);
     } catch (err: unknown) {
       cleanupCall();
       setCallStatus('idle');
@@ -173,13 +210,20 @@ export function useWebRTCCall({
     }
   };
 
-  // Accept incoming call
+  // Callee accepts incoming call
   const acceptCall = async () => {
     if (!partnerInfo) return;
+
+    sounds.stopAll();
+    if (ringingTimeoutRef.current) {
+      clearTimeout(ringingTimeoutRef.current);
+      ringingTimeoutRef.current = null;
+    }
 
     try {
       setErrorMessage(null);
       setCallStatus('connected');
+      startTimer();
 
       const stream = await getLocalAudioStream();
       const pc = getOrCreatePeerConnection();
@@ -188,29 +232,32 @@ export function useWebRTCCall({
         pc.addTrack(track, stream);
       });
 
-      // Start timer
-      if (!timerRef.current) {
-        timerRef.current = setInterval(() => {
-          setCallDuration((d) => d + 1);
-        }, 1000);
-      }
+      if (pendingOfferRef.current) {
+        await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
 
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'call-accept',
-        payload: {
-          fromUserId: currentUserId,
-          toUserId: partnerInfo.id,
-        },
-      });
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'call-accept',
+          payload: {
+            fromUserId: currentUserId,
+            toUserId: partnerInfo.id,
+            answer,
+          },
+        });
+      }
     } catch (err: unknown) {
-      endCall();
+      endCall('REJECTED');
       setErrorMessage(err instanceof Error ? err.message : 'Gagal menerima panggilan');
     }
   };
 
-  // Reject incoming call
+  // Callee rejects incoming call
   const rejectCall = () => {
+    sounds.stopAll();
+    sounds.playHangup();
+
     if (partnerInfo) {
       channelRef.current?.send({
         type: 'broadcast',
@@ -220,33 +267,51 @@ export function useWebRTCCall({
           toUserId: partnerInfo.id,
         },
       });
+
+      onLogCallRef.current?.({ type: 'REJECTED', durationSeconds: 0 }, partnerInfo.id);
     }
+
     cleanupCall();
     setCallStatus('idle');
     setPartnerInfo(null);
   };
 
   // End active call
-  const endCall = () => {
-    if (partnerInfo) {
+  const endCall = (explicitReason?: 'COMPLETED' | 'MISSED' | 'REJECTED') => {
+    const finalDuration = callDurationRef.current;
+    const finalStatus = callStatusRef.current;
+    const partner = partnerInfo;
+
+    sounds.stopAll();
+    sounds.playHangup();
+
+    if (partner) {
       channelRef.current?.send({
         type: 'broadcast',
         event: 'call-end',
         payload: {
           fromUserId: currentUserId,
-          toUserId: partnerInfo.id,
+          toUserId: partner.id,
+          reason: explicitReason,
         },
       });
+
+      const entryType: 'COMPLETED' | 'MISSED' | 'REJECTED' =
+        explicitReason ?? (finalStatus === 'connected' && finalDuration > 0 ? 'COMPLETED' : 'MISSED');
+
+      onLogCallRef.current?.({ type: entryType, durationSeconds: finalDuration }, partner.id);
     }
+
     cleanupCall();
     setCallStatus('ended');
     setTimeout(() => {
       setCallStatus('idle');
       setPartnerInfo(null);
+      setCallDuration(0);
     }, 1500);
   };
 
-  // Toggle Mute / Unmute microphone
+  // Toggle Mute
   const toggleMute = () => {
     if (localStreamRef.current) {
       const audioTrack = localStreamRef.current.getAudioTracks()[0];
@@ -257,13 +322,12 @@ export function useWebRTCCall({
     }
   };
 
-  // Supabase Realtime Broadcast signaling channel listener
+  // Supabase Realtime Signaling Listener
   useEffect(() => {
     if (!channelId) return;
 
     const channelName = `call:${channelId}`;
 
-    // Clean up any stale/existing channel on the same topic before subscribing
     const existing = supabase
       .getChannels()
       .find((c) => c.topic === `realtime:${channelName}` || c.topic === channelName);
@@ -275,11 +339,11 @@ export function useWebRTCCall({
     channelRef.current = channel;
 
     // Incoming call invite
-    channel.on('broadcast', { event: 'call-invite' }, async ({ payload }) => {
+    channel.on('broadcast', { event: 'call-invite' }, ({ payload }) => {
       if (payload.toUserId && payload.toUserId !== currentUserId) return;
       if (payload.fromUserId === currentUserId) return;
 
-      if (callStatus !== 'idle') {
+      if (callStatusRef.current !== 'idle') {
         // Line busy
         channel.send({
           type: 'broadcast',
@@ -289,21 +353,56 @@ export function useWebRTCCall({
         return;
       }
 
+      // Store offer for manual user acceptance
+      pendingOfferRef.current = payload.offer;
+
       setPartnerInfo({
         id: payload.fromUserId,
         name: payload.fromName || 'Pengguna',
         role: payload.fromRole,
       });
+
       setCallStatus('ringing');
+      sounds.startRingtone();
+
+      // Auto-missed call after 30 seconds
+      if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
+      ringingTimeoutRef.current = setTimeout(() => {
+        if (callStatusRef.current === 'ringing') {
+          sounds.stopAll();
+          setMissedCallsCount((c) => c + 1);
+          setCallStatus('idle');
+          setPartnerInfo(null);
+          pendingOfferRef.current = null;
+        }
+      }, 30000);
     });
 
-    // Remote call accepted
-    channel.on('broadcast', { event: 'call-accept' }, () => {
-      setCallStatus('connected');
+    // Remote accepted our call
+    channel.on('broadcast', { event: 'call-accept' }, async ({ payload }) => {
+      if (payload.toUserId && payload.toUserId !== currentUserId) return;
+      sounds.stopAll();
+
+      if (ringingTimeoutRef.current) {
+        clearTimeout(ringingTimeoutRef.current);
+        ringingTimeoutRef.current = null;
+      }
+
+      try {
+        if (payload.answer && pcRef.current) {
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
+        }
+        setCallStatus('connected');
+        startTimer();
+      } catch (err) {
+        console.error('Failed to set remote answer:', err);
+      }
     });
 
-    // Remote call rejected
+    // Remote rejected call
     channel.on('broadcast', { event: 'call-reject' }, () => {
+      sounds.stopAll();
+      sounds.playHangup();
       setErrorMessage('Panggilan ditolak oleh lawan bicara');
       cleanupCall();
       setCallStatus('ended');
@@ -311,11 +410,14 @@ export function useWebRTCCall({
         setCallStatus('idle');
         setPartnerInfo(null);
         setErrorMessage(null);
+        setCallDuration(0);
       }, 2000);
     });
 
-    // Remote call busy
+    // Remote busy
     channel.on('broadcast', { event: 'call-busy' }, () => {
+      sounds.stopAll();
+      sounds.playHangup();
       setErrorMessage('Lawan bicara sedang dalam panggilan lain');
       cleanupCall();
       setCallStatus('ended');
@@ -323,75 +425,36 @@ export function useWebRTCCall({
         setCallStatus('idle');
         setPartnerInfo(null);
         setErrorMessage(null);
+        setCallDuration(0);
       }, 2000);
     });
 
-    // Remote call ended
-    channel.on('broadcast', { event: 'call-end' }, () => {
+    // Remote ended call
+    channel.on('broadcast', { event: 'call-end' }, ({ payload }) => {
+      sounds.stopAll();
+      sounds.playHangup();
+
+      if (callStatusRef.current === 'ringing' && payload?.reason === 'MISSED') {
+        setMissedCallsCount((c) => c + 1);
+      }
+
       cleanupCall();
       setCallStatus('ended');
       setTimeout(() => {
         setCallStatus('idle');
         setPartnerInfo(null);
+        setCallDuration(0);
       }, 1500);
     });
 
-    // WebRTC Offer received
-    channel.on('broadcast', { event: 'webrtc-offer' }, async ({ payload }) => {
-      if (payload.toUserId && payload.toUserId !== currentUserId) return;
-      if (payload.fromUserId === currentUserId) return;
-
-      try {
-        const pc = getOrCreatePeerConnection();
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
-
-        const stream = await getLocalAudioStream();
-        stream.getTracks().forEach((track) => {
-          pc.addTrack(track, stream);
-        });
-
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        channel.send({
-          type: 'broadcast',
-          event: 'webrtc-answer',
-          payload: {
-            fromUserId: currentUserId,
-            toUserId: payload.fromUserId,
-            answer,
-          },
-        });
-      } catch (err: unknown) {
-        console.error('Failed to handle WebRTC offer:', err);
-      }
-    });
-
-    // WebRTC Answer received
-    channel.on('broadcast', { event: 'webrtc-answer' }, async ({ payload }) => {
-      if (payload.toUserId && payload.toUserId !== currentUserId) return;
-      if (payload.fromUserId === currentUserId) return;
-
-      try {
-        const pc = getOrCreatePeerConnection();
-        if (pc.signalingState === 'have-local-offer') {
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
-        }
-      } catch (err: unknown) {
-        console.error('Failed to handle WebRTC answer:', err);
-      }
-    });
-
-    // ICE Candidate received
+    // ICE Candidate
     channel.on('broadcast', { event: 'webrtc-ice' }, async ({ payload }) => {
       if (payload.fromUserId === currentUserId) return;
-
       try {
-        const pc = getOrCreatePeerConnection();
-        if (pc.remoteDescription && payload.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        if (pcRef.current && pcRef.current.remoteDescription && payload.candidate) {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
         }
-      } catch (err: unknown) {
+      } catch (err) {
         console.error('Failed to add ICE candidate:', err);
       }
     });
@@ -399,11 +462,12 @@ export function useWebRTCCall({
     channel.subscribe();
 
     return () => {
+      sounds.stopAll();
       supabase.removeChannel(channel);
       channelRef.current = null;
       cleanupCall();
     };
-  }, [channelId, currentUserId, callStatus, cleanupCall, getOrCreatePeerConnection]);
+  }, [channelId, currentUserId, cleanupCall, startTimer]);
 
   return {
     callStatus,
@@ -412,10 +476,12 @@ export function useWebRTCCall({
     partnerInfo,
     errorMessage,
     remoteStream,
+    missedCallsCount,
     startCall,
     acceptCall,
     rejectCall,
     endCall,
     toggleMute,
+    clearMissedCalls: () => setMissedCallsCount(0),
   };
 }

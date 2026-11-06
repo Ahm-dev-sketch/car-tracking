@@ -24,11 +24,20 @@ interface ChatDrawerProps {
   sendMessage: (text: string, receiverId?: string | null) => Promise<void>;
 }
 
-const QUICK_CHIPS = [
+const DRIVER_CHIPS = [
+  'Saya sudah sampai di titik jemput',
+  'Sedang menuju lokasi penjemputan',
+  'Mohon tunggu sebentar ya pak/bu',
+  'Saya menunggu dekat lobi utama',
+  'Perjalanan kita mulai ya',
+];
+
+const USER_CHIPS = [
+  'Saya sedang menuju ke mobil',
+  'Tunggu sebentar, sedang turun lift',
+  'Saya tunggu di dekat pintu lobi',
+  'Mobilnya parkir di sebelah mana ya pak?',
   'Saya sudah di titik jemput',
-  'Sedang menuju lokasi Anda',
-  'Mohon tunggu sebentar',
-  'Sudah sampai di tujuan',
 ];
 
 export function ChatDrawer({
@@ -37,6 +46,7 @@ export function ChatDrawer({
   partnerId,
   partnerName,
   partnerRole = 'Driver',
+  currentUserRole = 'USER',
   currentUserId,
   onStartCall,
   messages,
@@ -47,6 +57,8 @@ export function ChatDrawer({
 }: ChatDrawerProps) {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const activeChips = currentUserRole === 'DRIVER' ? DRIVER_CHIPS : USER_CHIPS;
 
   // Auto scroll to bottom on new message or when opened
   useEffect(() => {
@@ -125,16 +137,35 @@ export function ChatDrawer({
               </div>
               <h4 className="text-sm font-black text-black">Mulai Percakapan</h4>
               <p className="mt-1 text-xs text-zinc-600 max-w-xs">
-                Kirim pesan langsung ke {partnerName} terkait penjemputan, armada, atau konfirmasi perjalanan.
+                Kirim pesan langsung ke {partnerName} terkait penjemputan, armada, atau konfirmasi perjalanan tanpa membagikan nomor pribadi.
               </p>
             </div>
           ) : (
             messages.map((m) => {
-              const isMe = m.sender_id === currentUserId;
               const formattedTime = new Date(m.created_at).toLocaleTimeString('id-ID', {
                 hour: '2-digit',
                 minute: '2-digit',
               });
+
+              // Special formatting for Voice Call History entry
+              if (m.message.startsWith('📞 Panggilan')) {
+                const isMissed = m.message.includes('Tak Terjawab') || m.message.includes('Ditolak');
+                return (
+                  <div key={m.id} className="flex justify-center my-1.5">
+                    <div
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-black shadow-[1.5px_1.5px_0px_0px_#000] text-[11px] font-bold ${
+                        isMissed ? 'bg-rose-100 text-rose-900' : 'bg-emerald-100 text-emerald-950'
+                      }`}
+                    >
+                      <Icon name={isMissed ? 'phoneOff' : 'phone'} className="size-3.5" />
+                      <span>{m.message.replace('📞 ', '')}</span>
+                      <span className="text-[9px] font-mono opacity-60 ml-0.5">{formattedTime}</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              const isMe = m.sender_id === currentUserId;
 
               return (
                 <div
@@ -172,10 +203,10 @@ export function ChatDrawer({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Reply Chips */}
+        {/* Quick Reply Chips (Role-Specific) */}
         <div className="border-t border-zinc-200 bg-white p-2">
           <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            {QUICK_CHIPS.map((chip, idx) => (
+            {activeChips.map((chip, idx) => (
               <button
                 key={idx}
                 type="button"

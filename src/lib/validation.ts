@@ -443,6 +443,8 @@ export const assignBookingDriverSchema = z.object({
 export const manualAssignBookingSchema = z.object({
   driver_id: z.string().trim().min(1).optional(),
   driverId: z.string().trim().min(1).optional(),
+  vehicle_id: z.string().trim().min(1).optional().nullable(),
+  vehicleId: z.string().trim().min(1).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (!data.driver_id && !data.driverId) {
     ctx.addIssue({
@@ -453,6 +455,7 @@ export const manualAssignBookingSchema = z.object({
   }
 }).transform((data) => ({
   driverId: (data.driver_id ?? data.driverId)!,
+  vehicleId: data.vehicle_id ?? data.vehicleId ?? null,
 }));
 
 export const startDriverSessionSchema = z.object({

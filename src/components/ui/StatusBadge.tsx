@@ -71,6 +71,8 @@ export function StatusBadge({ status, className = '' }: { status: StatusType; cl
   const label =
     normalized === 'PENDING_COMPLETION'
       ? 'Menunggu Approval Nota'
+      : normalized === 'PENDING'
+      ? 'Menunggu Admin'
       : normalized.replace(/_/g, ' ');
 
   return (

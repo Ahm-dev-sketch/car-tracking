@@ -17,11 +17,17 @@ export const POST = withErrorHandling(
     const validated = manualAssignBookingSchema.parse(body);
 
     const ctx = getClientContext(req, user.id);
-    const booking = await manualAssignBooking(user.id, bookingId, validated.driverId, {
-      actorUserId: user.id,
-      ip: ctx.ip,
-      userAgent: ctx.userAgent,
-    });
+    const booking = await manualAssignBooking(
+      user.id,
+      bookingId,
+      validated.driverId,
+      {
+        actorUserId: user.id,
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+      },
+      validated.vehicleId
+    );
 
     return NextResponse.json({ data: booking });
   }

@@ -133,6 +133,17 @@ function AdminBookingsContent() {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
 
+  // Fleet Drivers & Available Vehicles for Assignment
+  const [fleetDrivers, setFleetDrivers] = useState<any[]>([]);
+  const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
+  const [selectedVehicleMap, setSelectedVehicleMap] = useState<Record<string, string>>({});
+
+  // Reject Pending Booking state
+  const [rejectingPendingBooking, setRejectingPendingBooking] = useState<AdminBooking | null>(null);
+  const [rejectPendingReason, setRejectPendingReason] = useState('');
+  const [isRejectingPending, setIsRejectingPending] = useState(false);
+  const [rejectPendingError, setRejectPendingError] = useState<string | null>(null);
+
   // Export Report Excel Modal
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -203,34 +214,55 @@ function AdminBookingsContent() {
   const handleOpenIntervention = async (b: AdminBooking) => {
     setInterventionBooking(b);
     setCandidates([]);
+    setFleetDrivers([]);
+    setAvailableVehicles([]);
+    setSelectedVehicleMap({});
     setInterventionError(null);
     setLoadingCandidates(true);
     try {
-      const res = await fetch(`/api/admin/dispatch/${b.id}/candidates`);
-      if (res.ok) {
-        const json = await res.json();
+      const [candRes, driverRes, vehicleRes] = await Promise.allSettled([
+        fetch(`/api/admin/dispatch/${b.id}/candidates`),
+        fetch(`/api/drivers?limit=50`),
+        fetch(`/api/vehicles?limit=50`),
+      ]);
+
+      if (candRes.status === 'fulfilled' && candRes.value.ok) {
+        const json = await candRes.value.json();
         setCandidates(json.data || []);
-      } else {
-        const err = await res.json();
-        setInterventionError(err.error?.message || 'Failed to load eligible candidates');
+      }
+
+      if (driverRes.status === 'fulfilled' && driverRes.value.ok) {
+        const json = await driverRes.value.json();
+        setFleetDrivers(json.data || []);
+      }
+
+      if (vehicleRes.status === 'fulfilled' && vehicleRes.value.ok) {
+        const json = await vehicleRes.value.json();
+        setAvailableVehicles(json.data || []);
       }
     } catch {
-      setInterventionError('Network error loading eligible candidates');
+      setInterventionError('Gagal memuat kandidat dan driver armada');
     } finally {
       setLoadingCandidates(false);
     }
   };
 
-  const handleManualAssign = async (driverId: string) => {
+  const handleManualAssign = async (driverId: string, vehicleId?: string) => {
     if (!interventionBooking) return;
     setAssigningCandidateId(driverId);
     setInterventionError(null);
 
     try {
+      const payload: { driverId: string; vehicleId?: string } = { driverId };
+      const chosenVehicle = vehicleId || selectedVehicleMap[driverId];
+      if (chosenVehicle) {
+        payload.vehicleId = chosenVehicle;
+      }
+
       const res = await fetch(`/api/admin/bookings/${interventionBooking.id}/manual-assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverId }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -238,12 +270,44 @@ function AdminBookingsContent() {
         fetchBookings(page);
       } else {
         const err = await res.json();
-        setInterventionError(err.error?.message || 'Failed to assign candidate driver');
+        setInterventionError(err.error?.message || 'Gagal menugaskan driver');
       }
     } catch {
-      setInterventionError('Network error assigning driver');
+      setInterventionError('Kesalahan jaringan saat menugaskan driver');
     } finally {
       setAssigningCandidateId(null);
+    }
+  };
+
+  const handleRejectPendingBooking = async () => {
+    if (!rejectingPendingBooking) return;
+    if (!rejectPendingReason.trim()) {
+      setRejectPendingError('Alasan penolakan pesanan wajib diisi');
+      return;
+    }
+
+    setIsRejectingPending(true);
+    setRejectPendingError(null);
+
+    try {
+      const res = await fetch(`/api/bookings/${rejectingPendingBooking.id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: rejectPendingReason.trim() }),
+      });
+
+      if (res.ok) {
+        setRejectingPendingBooking(null);
+        setRejectPendingReason('');
+        fetchBookings(page);
+      } else {
+        const err = await res.json();
+        setRejectPendingError(err.error?.message || 'Gagal menolak pesanan');
+      }
+    } catch {
+      setRejectPendingError('Terjadi kesalahan jaringan saat menolak pesanan');
+    } finally {
+      setIsRejectingPending(false);
     }
   };
 
@@ -470,7 +534,20 @@ function AdminBookingsContent() {
                 onClick={() => handleOpenIntervention(b)}
                 className="px-2.5 py-1 text-xs font-black bg-amber-400 hover:bg-amber-500 text-zinc-950 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
               >
-                Assign
+                Tugaskan Driver
+              </button>
+            )}
+            {b.status === 'PENDING' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectingPendingBooking(b);
+                  setRejectPendingReason('');
+                  setRejectPendingError(null);
+                }}
+                className="px-2.5 py-1 text-xs font-black bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+              >
+                Tolak
               </button>
             )}
             {b.status === 'PENDING_COMPLETION' && (
@@ -709,17 +786,34 @@ function AdminBookingsContent() {
                 )}
                 {(selectedBooking.status === 'ADMIN_INTERVENTION' ||
                   selectedBooking.status === 'PENDING') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const b = selectedBooking;
-                      setSelectedBooking(null);
-                      handleOpenIntervention(b);
-                    }}
-                    className="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-semibold cursor-pointer"
-                  >
-                    Candidate Drivers & Assign
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const b = selectedBooking;
+                        setSelectedBooking(null);
+                        handleOpenIntervention(b);
+                      }}
+                      className="px-3.5 py-2 bg-amber-400 hover:bg-amber-500 text-zinc-950 rounded text-xs font-black border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+                    >
+                      Tugaskan Driver
+                    </button>
+                    {selectedBooking.status === 'PENDING' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const b = selectedBooking;
+                          setSelectedBooking(null);
+                          setRejectingPendingBooking(b);
+                          setRejectPendingReason('');
+                          setRejectPendingError(null);
+                        }}
+                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-xs font-black border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+                      >
+                        Tolak Pesanan
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
               {[
@@ -942,9 +1036,9 @@ function AdminBookingsContent() {
         <Modal
           isOpen={Boolean(interventionBooking)}
           onClose={() => setInterventionBooking(null)}
-          title="Manual Driver Assignment"
-          description={`Intervention for booking #${interventionBooking.bookingNumber} (${interventionBooking.pickupLocation} → ${interventionBooking.destination})`}
-          maxWidth="xl"
+          title="Penugasan Driver & Armada Kendaraan"
+          description={`Penugasan untuk booking #${interventionBooking.bookingNumber} (${interventionBooking.pickupLocation} → ${interventionBooking.destination})`}
+          maxWidth="2xl"
         >
           <div className="space-y-4">
             {interventionError && (
@@ -954,89 +1048,245 @@ function AdminBookingsContent() {
             {loadingCandidates ? (
               <div className="py-12 text-center text-zinc-500 text-xs">
                 <Spinner size="md" className="mb-2" />
-                <p>Loading candidate drivers reporting GPS at this location...</p>
-              </div>
-            ) : candidates.length === 0 ? (
-              <div className="p-8 bg-zinc-50 border border-dashed border-zinc-300 rounded text-center text-xs text-zinc-500">
-                No active eligible drivers found online for this location.
+                <p>Memuat driver armada dan status GPS...</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                <span className="text-xs font-bold uppercase tracking-wider text-zinc-600 block">
-                  Candidate Drivers Ranked by Proximity ({candidates.length})
-                </span>
+              <div className="space-y-4">
+                {/* 1. Candidate drivers ranked by GPS proximity (if online) */}
+                {candidates.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Driver Online (Sinyal GPS Aktif Terdekat - {candidates.length})</span>
+                    </span>
 
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                  {candidates.map((c) => {
-                    const driverName = c.driverName || c.name || 'Driver';
-                    const plate = c.plateNumber || c.vehiclePlateNumber || '—';
-                    const cleanPhone = c.phone ? c.phone.replace(/\D/g, '') : '';
-                    const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
-                    const isAssigning = assigningCandidateId === c.driverId;
-                    const etaText = formatEta(c.etaSeconds, c.etaEstimated);
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {candidates.map((c) => {
+                        const driverName = c.driverName || c.name || 'Driver';
+                        const plate = c.plateNumber || c.vehiclePlateNumber || '—';
+                        const cleanPhone = c.phone ? c.phone.replace(/\D/g, '') : '';
+                        const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
+                        const isAssigning = assigningCandidateId === c.driverId;
+                        const etaText = formatEta(c.etaSeconds, c.etaEstimated);
 
-                    return (
-                      <div
-                        key={c.driverId}
-                        className="p-3 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs"
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-zinc-900">{driverName}</span>
-                            {c.phone && <span className="text-zinc-500">({c.phone})</span>}
-                            {etaText && (
-                              <span className="font-mono text-[10px] font-semibold text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-                                ETA: {etaText}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="text-zinc-600 flex items-center gap-2">
-                            <span className="font-mono font-semibold text-zinc-800">{plate}</span>
-                            {(c.vehicleBrand || c.vehicleModel) && (
-                              <span>
-                                • {c.vehicleBrand} {c.vehicleModel}
-                              </span>
-                            )}
-                            {c.seatingCapacity && <span>• {c.seatingCapacity} seats</span>}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {waUrl && (
-                            <a
-                              href={waUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2.5 py-1.5 border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded text-xs font-semibold inline-flex items-center gap-1"
-                            >
-                              <span>WhatsApp</span>
-                            </a>
-                          )}
-
-                          <button
-                            type="button"
-                            disabled={Boolean(assigningCandidateId)}
-                            onClick={() => handleManualAssign(c.driverId)}
-                            className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
+                        return (
+                          <div
+                            key={c.driverId}
+                            className="p-3 bg-white border-2 border-black rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs shadow-[2px_2px_0px_0px_#000]"
                           >
-                            {isAssigning ? <Spinner size="sm" /> : 'Assign'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-zinc-900">{driverName}</span>
+                                {c.phone && <span className="text-zinc-500">({c.phone})</span>}
+                                {etaText && (
+                                  <span className="font-mono text-[10px] font-semibold text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                    ETA: {etaText}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="text-zinc-600 flex items-center gap-2">
+                                <span className="font-mono font-semibold text-zinc-800">{plate}</span>
+                                {(c.vehicleBrand || c.vehicleModel) && (
+                                  <span>
+                                    • {c.vehicleBrand} {c.vehicleModel}
+                                  </span>
+                                )}
+                                {c.seatingCapacity && <span>• {c.seatingCapacity} seats</span>}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {waUrl && (
+                                <a
+                                  href={waUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1.5 border-2 border-emerald-600 text-emerald-800 hover:bg-emerald-50 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>WhatsApp</span>
+                                </a>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={Boolean(assigningCandidateId)}
+                                onClick={() => handleManualAssign(c.driverId)}
+                                className="px-3.5 py-1.5 bg-[#be123c] hover:bg-[#9f1239] disabled:opacity-50 text-white rounded-lg border-2 border-black text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000]"
+                              >
+                                {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Tugaskan Driver'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. All Available Registered Fleet Drivers */}
+                <div className="space-y-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                    <Icon name="users" className="size-3.5" />
+                    <span>Daftar Driver Armada KCIC ({fleetDrivers.length})</span>
+                  </span>
+
+                  {fleetDrivers.length === 0 ? (
+                    <div className="p-6 bg-zinc-50 border-2 border-dashed border-zinc-300 rounded-lg text-center text-xs text-zinc-500">
+                      Tidak ada data driver terdaftar.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                      {fleetDrivers
+                        .filter((d) => d.user?.isActive !== false && d.status !== 'ON_TRIP')
+                        .map((d) => {
+                          const isAssigning = assigningCandidateId === d.id;
+                          const hasVehicle = Boolean(d.currentVehicle);
+                          const chosenVehicle = selectedVehicleMap[d.id] || (d.currentVehicle?.id ?? '');
+
+                          return (
+                            <div
+                              key={d.id}
+                              className="p-3 bg-zinc-50 border-2 border-black rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-zinc-950">{d.user?.name || 'Driver'}</span>
+                                  {d.licenseNumber && (
+                                    <span className="text-[10px] font-mono text-zinc-500">SIM: {d.licenseNumber}</span>
+                                  )}
+                                  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    {d.status || 'AVAILABLE'}
+                                  </span>
+                                </div>
+                                <div className="text-zinc-600 font-mono text-[11px]">
+                                  {d.user?.phone || 'No phone'}
+                                </div>
+
+                                {hasVehicle ? (
+                                  <div className="flex items-center gap-1.5 pt-0.5">
+                                    <span className="font-mono font-bold text-zinc-900 bg-white px-2 py-0.5 rounded border border-black text-[11px]">
+                                      {d.currentVehicle.plateNumber}
+                                    </span>
+                                    <span className="text-[11px] text-zinc-600">
+                                      {d.currentVehicle.brand} {d.currentVehicle.model}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 pt-0.5">
+                                    <span className="text-[11px] text-zinc-500">Pilih Kendaraan:</span>
+                                    <select
+                                      value={chosenVehicle}
+                                      onChange={(e) =>
+                                        setSelectedVehicleMap((prev) => ({
+                                          ...prev,
+                                          [d.id]: e.target.value,
+                                        }))
+                                      }
+                                      className="px-2 py-1 text-xs border border-black rounded bg-white font-medium"
+                                    >
+                                      <option value="">-- Pilih Armada Tersedia --</option>
+                                      {availableVehicles.map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                          {v.plateNumber} ({v.brand} {v.model})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={Boolean(assigningCandidateId)}
+                                  onClick={() => handleManualAssign(d.id, chosenVehicle || undefined)}
+                                  className="px-3.5 py-1.5 bg-[#be123c] hover:bg-[#9f1239] disabled:opacity-50 text-white rounded-lg border-2 border-black text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000]"
+                                >
+                                  {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Tugaskan Driver'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-end pt-2 border-t border-zinc-100">
+            <div className="flex items-center justify-end pt-2 border-t border-zinc-200">
               <button
                 type="button"
                 onClick={() => setInterventionBooking(null)}
-                className="px-4 py-1.5 border border-zinc-300 hover:bg-zinc-50 text-zinc-700 rounded text-xs font-medium cursor-pointer"
+                className="px-4 py-1.5 border-2 border-black hover:bg-zinc-100 text-zinc-800 rounded-lg text-xs font-bold cursor-pointer"
               >
-                Close
+                Tutup
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Reject Pending Booking Modal */}
+      {rejectingPendingBooking && (
+        <Modal
+          isOpen={Boolean(rejectingPendingBooking)}
+          onClose={() => {
+            if (!isRejectingPending) {
+              setRejectingPendingBooking(null);
+              setRejectPendingReason('');
+              setRejectPendingError(null);
+            }
+          }}
+          title="Tolak Pesanan Perjalanan"
+          description={`Pemesanan #${rejectingPendingBooking.bookingNumber} oleh ${rejectingPendingBooking.user?.name || 'User'}`}
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            {rejectPendingError && (
+              <ErrorBanner message={rejectPendingError} onDismiss={() => setRejectPendingError(null)} />
+            )}
+
+            <div className="p-3 bg-amber-50 border-2 border-black rounded-lg text-xs font-medium text-amber-950">
+              Berikan alasan penolakan pemesanan perjalanan (misal: armada penuh, di luar jam dinas, atau keperluan tidak sesuai).
+            </div>
+
+            <div>
+              <label htmlFor="rejectPendingReason" className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                Alasan Penolakan <span className="text-[#be123c]">*</span>
+              </label>
+              <textarea
+                id="rejectPendingReason"
+                rows={3}
+                value={rejectPendingReason}
+                onChange={(e) => setRejectPendingReason(e.target.value)}
+                placeholder="Contoh: Seluruh armada Innova sedang digunakan dinas direksi pada jam tersebut."
+                className="w-full p-2.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectingPendingBooking(null);
+                  setRejectPendingReason('');
+                  setRejectPendingError(null);
+                }}
+                disabled={isRejectingPending}
+                className="px-3.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-700 hover:bg-zinc-100 cursor-pointer disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleRejectPendingBooking}
+                disabled={!rejectPendingReason.trim() || isRejectingPending}
+                className="px-4 py-1.5 text-xs font-black rounded-lg border-2 border-black bg-rose-600 text-white shadow-[2px_2px_0px_0px_#000] hover:bg-rose-700 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              >
+                {isRejectingPending ? <Spinner size="sm" /> : <Icon name="close" className="size-3.5" />}
+                <span>{isRejectingPending ? 'Memproses...' : 'Tolak Pesanan'}</span>
               </button>
             </div>
           </div>

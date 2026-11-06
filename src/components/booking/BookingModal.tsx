@@ -443,6 +443,7 @@ export function BookingModal({
 
   // If showing dispatch progress view
   if (submittedBooking) {
+    const isPending = submittedBooking.status === 'PENDING';
     const isAssigned = [
       'DRIVER_ASSIGNED',
       'DRIVER_EN_ROUTE',
@@ -451,7 +452,6 @@ export function BookingModal({
     ].includes(submittedBooking.status);
 
     const isSearching = [
-      'PENDING',
       'SEARCHING_DRIVER',
       'DRIVER_NOTIFIED',
     ].includes(submittedBooking.status);
@@ -465,11 +465,91 @@ export function BookingModal({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={isAssigned ? 'Pengemudi Dikonfirmasi' : 'Mencari Armada'}
+        title={
+          isAssigned
+            ? 'Pengemudi Dikonfirmasi'
+            : isPending
+            ? 'Permintaan Pemesanan Terkirim'
+            : 'Mencari Armada'
+        }
         description={`Booking Reference #${submittedBooking.bookingNumber || ''}`}
         maxWidth="lg"
       >
         <div className="space-y-5">
+          {/* PENDING ADMIN REVIEW & DRIVER ASSIGNMENT VIEW */}
+          {isPending && (
+            <div className="py-2 space-y-4">
+              <div className="rounded-xl border-[2.5px] border-black bg-amber-100 p-4 text-black shadow-[4px_4px_0px_0px_#000]">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-amber-400 text-black shadow-[2px_2px_0px_0px_#000]">
+                    <Icon name="calendar" className="size-5" />
+                  </span>
+                  <div>
+                    <h4 className="text-sm font-extrabold text-black">Menunggu Verifikasi & Penugasan Driver</h4>
+                    <p className="text-xs text-zinc-700 mt-0.5">
+                      Pemesanan Anda telah masuk ke portal Biro Umum / Admin Operasional KCIC. Admin akan memvalidasi jadwal serta menugaskan driver dan armada kendaraan.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Route Summary Preview */}
+              <div className="rounded-xl border-[2.5px] border-black bg-white p-4 text-left text-xs space-y-3 shadow-[4px_4px_0px_0px_#000]">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
+                  <span className="font-bold text-zinc-600">Tipe Layanan:</span>
+                  <span className="px-2 py-0.5 bg-rose-100 border border-rose-300 text-rose-900 rounded font-black text-[11px]">
+                    {submittedBooking.serviceType === 'STANDBY' ? 'Standby Operasional' : 'Drop Off Sekali Jalan'}
+                  </span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-emerald-400 text-[10px] font-black text-black">
+                    ●
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Titik Jemput</span>
+                    <p className="font-bold text-black truncate">{submittedBooking.pickupLocation}</p>
+                  </div>
+                </div>
+                <div className="border-t-2 border-dashed border-black/20" />
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-rose-400 text-[10px] font-black text-black">
+                    ■
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Tujuan</span>
+                    <p className="font-bold text-black truncate">{submittedBooking.destination}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-zinc-50 border-2 border-black rounded-xl text-xs text-zinc-600">
+                <p>
+                  Anda dapat memantau status persetujuan dan penugasan driver melalui menu <strong className="text-black">Pemesanan Saya</strong>. Notifikasi in-app akan dikirim saat driver telah ditugaskan.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 border-2 border-black rounded-lg bg-white text-zinc-800 text-xs font-bold hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    router.push('/user/bookings');
+                  }}
+                  className="px-4 py-2 border-2 border-black rounded-lg bg-[#be123c] text-white text-xs font-black hover:bg-[#9f1239] shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+                >
+                  Lihat Pemesanan Saya
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* GOJEK-STYLE RADAR SEARCHING VIEW */}
           {isSearching && (
             <div className="py-4 text-center space-y-5">

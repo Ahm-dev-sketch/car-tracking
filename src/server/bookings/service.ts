@@ -324,6 +324,7 @@ export async function transitionBooking(
       (to === BookingStatus.APPROVED ||
         to === BookingStatus.REJECTED ||
         to === BookingStatus.CANCELLED ||
+        to === BookingStatus.DRIVER_ASSIGNED ||
         to === BookingStatus.SEARCHING_DRIVER)) ||
     (from === BookingStatus.APPROVED &&
       (to === BookingStatus.DRIVER_ASSIGNED || to === BookingStatus.CANCELLED)) ||

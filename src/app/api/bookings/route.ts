@@ -5,7 +5,7 @@ import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { getClientContext } from '@/lib/request-context';
 import { createBookingSchema, bookingQuerySchema } from '@/lib/validation';
 import { createBooking, listBookings } from '@/server/bookings/service';
-import { dispatchBooking, dispatchSweep } from '@/server/dispatch/service';
+import { dispatchSweep } from '@/server/dispatch/service';
 import { logger } from '@/lib/logger';
 import { BookingStatus } from '@prisma/client';
 
@@ -51,25 +51,14 @@ export const POST = withRateLimit(
       user.id,
       {
         ...validated,
-        status: BookingStatus.SEARCHING_DRIVER,
+        status: BookingStatus.PENDING,
       },
       ctx
     );
 
-    const dispatchResult = await dispatchBooking(booking.id, {
-      actorUserId: user.id,
-      ip: ctx.ip,
-      userAgent: ctx.userAgent,
-    });
-
     return NextResponse.json(
       {
-        data: {
-          ...booking,
-          status: dispatchResult.booking.status,
-          dispatchState: dispatchResult.dispatchState,
-          alternatives: dispatchResult.alternatives ?? [],
-        },
+        data: booking,
       },
       { status: 201 }
     );

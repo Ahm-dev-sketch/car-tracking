@@ -1126,7 +1126,8 @@ export async function manualAssignBooking(
   adminId: string,
   bookingId: string,
   driverId: string,
-  ctx?: DispatchMutationContext
+  ctx?: DispatchMutationContext,
+  vehicleId?: string | null
 ) {
   const admin = await prisma.user.findUnique({
     where: { id: adminId },
@@ -1168,7 +1169,7 @@ export async function manualAssignBooking(
     }
 
     const { driver, vehicleId: targetVehicleId } = await lockAssignmentDriver(
-      tx, driverId, booking.vehicleId ?? booking.vehiclePreferenceId
+      tx, driverId, vehicleId ?? booking.vehicleId ?? booking.vehiclePreferenceId
     );
 
     if (!driver || !driver.user.isActive || driver.status === DriverStatus.ON_TRIP) {

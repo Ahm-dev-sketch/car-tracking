@@ -77,7 +77,18 @@ function AdminDriversContent() {
 
   // Assign Vehicle Modal
   const [assigningDriver, setAssigningDriver] = useState<DriverItem | null>(null);
-  const [availableVehicles, setAvailableVehicles] = useState<Array<{ id: string; plateNumber: string; brand: string; model: string }>>([]);
+  const [availableVehicles, setAvailableVehicles] = useState<
+    Array<{
+      id: string;
+      plateNumber: string;
+      brand: string;
+      model: string;
+      homeLocation?: { id: string; name: string; code: string } | null;
+      currentOperationalLocation?: { id: string; name: string; code: string } | null;
+    }>
+  >([]);
+  const [assignLocationFilter, setAssignLocationFilter] = useState('');
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
@@ -247,19 +258,29 @@ function AdminDriversContent() {
     }
   };
 
-  const handleOpenAssign = async (d: DriverItem) => {
-    setAssigningDriver(d);
-    setSelectedVehicleId('');
-    setAssignError(null);
+  const fetchAvailableVehicles = async (locId?: string) => {
+    setIsLoadingVehicles(true);
     try {
-      const res = await fetch('/api/vehicles?status=AVAILABLE&limit=50');
+      const url = `/api/vehicles?status=AVAILABLE&limit=50${locId ? `&locationId=${encodeURIComponent(locId)}` : ''}`;
+      const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
         setAvailableVehicles(json.data || json.vehicles || []);
       }
     } catch {
       // ignore
+    } finally {
+      setIsLoadingVehicles(false);
     }
+  };
+
+  const handleOpenAssign = async (d: DriverItem) => {
+    setAssigningDriver(d);
+    setSelectedVehicleId('');
+    setAssignError(null);
+    const initialLocation = locationFilter || '';
+    setAssignLocationFilter(initialLocation);
+    await fetchAvailableVehicles(initialLocation);
   };
 
   const handleAssignVehicle = async (e: React.FormEvent) => {
@@ -670,26 +691,60 @@ function AdminDriversContent() {
         isOpen={Boolean(assigningDriver)}
         onClose={() => setAssigningDriver(null)}
         title="Assign Vehicle to Driver"
-        description={assigningDriver ? assigningDriver.user.name : ''}
-        maxWidth="sm"
+        description={assigningDriver ? `${assigningDriver.user.name} (${assigningDriver.user.phone})` : ''}
+        maxWidth="md"
       >
         {assignError && <ErrorBanner message={assignError} className="mb-4" onDismiss={() => setAssignError(null)} />}
 
         <form onSubmit={handleAssignVehicle} className="space-y-4">
-          <FormField label="Available Vehicles" required>
+          <FormField label="Lokasi / Pool Armada">
             <select
-              required
-              value={selectedVehicleId}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
+              value={assignLocationFilter}
+              onChange={(e) => {
+                const locId = e.target.value;
+                setAssignLocationFilter(locId);
+                fetchAvailableVehicles(locId);
+                setSelectedVehicleId('');
+              }}
               className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
             >
-              <option value="">-- Choose Vehicle --</option>
-              {availableVehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.plateNumber} ({v.brand} {v.model})
+              <option value="">-- Semua Lokasi Pool --</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.code})
                 </option>
               ))}
             </select>
+          </FormField>
+
+          <FormField label="Available Vehicles" required>
+            {isLoadingVehicles ? (
+              <div className="flex items-center gap-2 py-2 text-xs text-zinc-500">
+                <Spinner size="sm" className="text-zinc-600" />
+                <span>Memuat kendaraan pool...</span>
+              </div>
+            ) : availableVehicles.length === 0 ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                Tidak ada kendaraan AVAILABLE {assignLocationFilter ? 'di lokasi pool ini' : ''}. Silakan pilih lokasi pool lain.
+              </div>
+            ) : (
+              <select
+                required
+                value={selectedVehicleId}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              >
+                <option value="">-- Pilih Kendaraan ({availableVehicles.length} tersedia) --</option>
+                {availableVehicles.map((v) => {
+                  const hub = v.currentOperationalLocation?.name || v.homeLocation?.name;
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {v.plateNumber} ({v.brand} {v.model}){hub ? ` — ${hub}` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
           </FormField>
 
           <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">

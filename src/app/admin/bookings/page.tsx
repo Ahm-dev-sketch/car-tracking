@@ -137,6 +137,8 @@ function AdminBookingsContent() {
   // Fleet Drivers & Available Vehicles for Assignment
   const [fleetDrivers, setFleetDrivers] = useState<any[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
+  const [vehicleLocationFilter, setVehicleLocationFilter] = useState('');
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
   const [selectedVehicleMap, setSelectedVehicleMap] = useState<Record<string, string>>({});
 
   // Reject Pending Booking state
@@ -211,6 +213,22 @@ function AdminBookingsContent() {
     });
   }, [statusFilter, locationFilter]);
 
+  const fetchAvailableVehicles = async (locId?: string) => {
+    setIsLoadingVehicles(true);
+    try {
+      const url = `/api/vehicles?status=AVAILABLE&limit=50${locId ? `&locationId=${encodeURIComponent(locId)}` : ''}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        setAvailableVehicles(json.data || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLoadingVehicles(false);
+    }
+  };
+
   // Open manual assign / candidates modal
   const handleOpenIntervention = async (b: AdminBooking) => {
     setInterventionBooking(b);
@@ -220,11 +238,16 @@ function AdminBookingsContent() {
     setSelectedVehicleMap({});
     setInterventionError(null);
     setLoadingCandidates(true);
+
+    const initialLocation = b.operationalLocation?.id || locationFilter || '';
+    setVehicleLocationFilter(initialLocation);
+
     try {
+      const vehicleUrl = `/api/vehicles?status=AVAILABLE&limit=50${initialLocation ? `&locationId=${encodeURIComponent(initialLocation)}` : ''}`;
       const [candRes, driverRes, vehicleRes] = await Promise.allSettled([
         fetch(`/api/admin/dispatch/${b.id}/candidates`),
         fetch(`/api/drivers?status=AVAILABLE&limit=50`),
-        fetch(`/api/vehicles?status=AVAILABLE&limit=50`),
+        fetch(vehicleUrl),
       ]);
 
       if (candRes.status === 'fulfilled' && candRes.value.ok) {
@@ -1242,10 +1265,34 @@ function AdminBookingsContent() {
 
                   return (
                     <div className="space-y-2">
-                      <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-emerald-500" />
-                        <span>Driver Online Standby ({onlineStandbyDrivers.length})</span>
-                      </span>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+                          <span className="size-2 rounded-full bg-emerald-500" />
+                          <span>Driver Online Standby ({onlineStandbyDrivers.length})</span>
+                        </span>
+
+                        {/* Location filter for pool vehicles */}
+                        <div className="flex items-center gap-1.5 bg-zinc-100 px-2 py-1 rounded-lg border border-zinc-200">
+                          <Icon name="pin" className="size-3 text-zinc-600" />
+                          <span className="text-[11px] font-bold text-zinc-700">Pool Kendaraan:</span>
+                          <select
+                            value={vehicleLocationFilter}
+                            onChange={(e) => {
+                              const newLoc = e.target.value;
+                              setVehicleLocationFilter(newLoc);
+                              fetchAvailableVehicles(newLoc);
+                            }}
+                            className="text-[11px] font-bold border border-zinc-300 rounded bg-white px-1.5 py-0.5 focus:outline-none"
+                          >
+                            <option value="">Semua Lokasi ({availableVehicles.length})</option>
+                            {locations.map((loc) => (
+                              <option key={loc.id} value={loc.id}>
+                                {loc.name} ({loc.code})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
 
                       <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                         {onlineStandbyDrivers.map((d) => {
@@ -1282,25 +1329,41 @@ function AdminBookingsContent() {
                                     </span>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-1.5 pt-0.5">
-                                    <span className="text-[11px] text-zinc-500">Pilih Kendaraan:</span>
-                                    <select
-                                      value={chosenVehicle}
-                                      onChange={(e) =>
-                                        setSelectedVehicleMap((prev) => ({
-                                          ...prev,
-                                          [d.id]: e.target.value,
-                                        }))
-                                      }
-                                      className="px-2 py-1 text-xs border border-black rounded bg-white font-medium"
-                                    >
-                                      <option value="">-- Pilih Armada Tersedia --</option>
-                                      {availableVehicles.map((v) => (
-                                        <option key={v.id} value={v.id}>
-                                          {v.plateNumber} ({v.brand} {v.model})
-                                        </option>
-                                      ))}
-                                    </select>
+                                  <div className="flex flex-col gap-1 pt-0.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-zinc-500 font-bold">Pilih Kendaraan:</span>
+                                      {isLoadingVehicles ? (
+                                        <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                          <Spinner size="sm" className="text-zinc-600" /> Memuat armada...
+                                        </span>
+                                      ) : (
+                                        <select
+                                          value={chosenVehicle}
+                                          onChange={(e) =>
+                                            setSelectedVehicleMap((prev) => ({
+                                              ...prev,
+                                              [d.id]: e.target.value,
+                                            }))
+                                          }
+                                          className="px-2 py-1 text-xs border border-black rounded bg-white font-medium"
+                                        >
+                                          <option value="">-- Pilih Armada ({availableVehicles.length} tersedia) --</option>
+                                          {availableVehicles.map((v) => {
+                                            const hub = v.currentOperationalLocation?.name || v.homeLocation?.name;
+                                            return (
+                                              <option key={v.id} value={v.id}>
+                                                {v.plateNumber} ({v.brand} {v.model}){hub ? ` — ${hub}` : ''}
+                                              </option>
+                                            );
+                                          })}
+                                        </select>
+                                      )}
+                                    </div>
+                                    {availableVehicles.length === 0 && !isLoadingVehicles && (
+                                      <span className="text-[10px] text-amber-700 font-medium">
+                                        Tidak ada kendaraan AVAILABLE {vehicleLocationFilter ? 'di lokasi ini' : ''}. Ubah filter pool di atas.
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                               </div>

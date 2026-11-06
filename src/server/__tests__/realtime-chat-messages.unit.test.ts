@@ -26,7 +26,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { GET, POST } from '@/app/api/chat/messages/route';
+import { GET, POST, PATCH } from '@/app/api/chat/messages/route';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -141,5 +141,42 @@ it('returns messages when both bookingId and tripId are provided without excludi
     expect.stringContaining('OR ($2::text IS NOT NULL AND trip_id = $2)'),
     'b-101',
     't-202'
+  );
+});
+
+it('rejects PATCH /api/chat/messages when neither bookingId nor tripId is supplied', async () => {
+  mocks.user.mockResolvedValue({ id: 'driver-1', name: 'Budi Driver', role: 'DRIVER' });
+  const req = new NextRequest('https://example.test/api/chat/messages', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+
+  const res = await PATCH(req, undefined);
+  expect(res.status).toBe(400);
+  const json = await res.json();
+  expect(json.error.code).toBe('INVALID_PARAMS');
+});
+
+it('marks messages as read via PATCH /api/chat/messages', async () => {
+  mocks.user.mockResolvedValue({ id: 'driver-1', name: 'Budi Driver', role: 'DRIVER' });
+  mocks.queryRawUnsafe.mockResolvedValue([]);
+
+  const req = new NextRequest('https://example.test/api/chat/messages', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId: 'b-101' }),
+  });
+
+  const res = await PATCH(req, undefined);
+  expect(res.status).toBe(200);
+  const json = await res.json();
+  expect(json.success).toBe(true);
+
+  expect(mocks.queryRawUnsafe).toHaveBeenCalledWith(
+    expect.stringContaining('UPDATE fleet_chat_messages'),
+    'driver-1',
+    'b-101',
+    null
   );
 });

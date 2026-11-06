@@ -195,3 +195,75 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   return NextResponse.json({ data: savedMessage }, { status: 201 });
 });
+
+export const PATCH = withErrorHandling(async (req: NextRequest) => {
+  const user = await getSessionUser();
+  const body = await req.json().catch(() => ({}));
+  const bookingId = body.bookingId;
+  const tripId = body.tripId;
+
+  if (!bookingId && !tripId) {
+    return NextResponse.json(
+      { error: { code: 'INVALID_PARAMS', message: 'bookingId atau tripId diperlukan' } },
+      { status: 400 }
+    );
+  }
+
+  // 1. Try Supabase update if configured
+  if (isSupabaseConfigured) {
+    try {
+      let query = supabase
+        .from('fleet_chat_messages')
+        .update({ is_read: true })
+        .neq('sender_id', user.id);
+
+      if (bookingId && tripId) {
+        query = query.or(`booking_id.eq.${bookingId},trip_id.eq.${tripId}`);
+      } else if (bookingId) {
+        query = query.eq('booking_id', bookingId);
+      } else if (tripId) {
+        query = query.eq('trip_id', tripId);
+      }
+
+      await query;
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Direct PostgreSQL update fallback via Prisma
+  try {
+    await prisma.$queryRawUnsafe(
+      `UPDATE fleet_chat_messages
+       SET is_read = true
+       WHERE sender_id != $1
+         AND (
+           ($2::text IS NOT NULL AND booking_id = $2)
+           OR ($3::text IS NOT NULL AND trip_id = $3)
+         )`,
+      user.id,
+      bookingId ?? null,
+      tripId ?? null
+    );
+  } catch {
+    // ignore
+  }
+
+  // Broadcast read event over channel
+  const channelName = bookingId
+    ? `chat:booking-${bookingId}`
+    : `chat:trip-${tripId}`;
+
+  try {
+    const channel = supabase.channel(channelName);
+    await channel.send({
+      type: 'broadcast',
+      event: 'messages-read',
+      payload: { readerId: user.id, bookingId, tripId },
+    });
+  } catch {
+    // ignore
+  }
+
+  return NextResponse.json({ success: true });
+});

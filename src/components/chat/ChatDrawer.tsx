@@ -60,6 +60,16 @@ export function ChatDrawer({
 
   const activeChips = currentUserRole === 'DRIVER' ? DRIVER_CHIPS : USER_CHIPS;
 
+  // Close on Escape key press
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Auto scroll to bottom on new message or when opened
   useEffect(() => {
     if (isOpen) {
@@ -83,8 +93,17 @@ export function ChatDrawer({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="flex h-full w-full max-w-md flex-col border-l-[3px] border-black bg-white shadow-[-8px_0px_0px_0px_#000] animate-in slide-in-from-right duration-250">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Chat dengan ${partnerName}`}
+    >
+      <div
+        className="flex w-full max-w-lg h-[620px] max-h-[88vh] flex-col rounded-2xl border-[3px] border-black bg-white shadow-[8px_8px_0px_0px_#000] animate-in zoom-in-95 duration-200 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b-[2.5px] border-black bg-zinc-50 p-4">
           <div className="flex items-center gap-3">
@@ -116,6 +135,7 @@ export function ChatDrawer({
             <button
               type="button"
               onClick={onClose}
+              title="Tutup Obrolan"
               className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-white text-zinc-700 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 transition cursor-pointer"
             >
               <Icon name="close" className="size-4" />
@@ -193,7 +213,16 @@ export function ChatDrawer({
                       }`}
                     >
                       <span>{formattedTime}</span>
-                      {isMe && <Icon name="check" className="size-3" />}
+                      {isMe && (
+                        <span
+                          title={m.is_read ? 'Sudah dibaca' : 'Terkirim'}
+                          className={`inline-flex items-center transition-colors ${
+                            m.is_read ? 'text-sky-300' : 'text-rose-200/60'
+                          }`}
+                        >
+                          <Icon name="checkCheck" className="size-3.5" />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -44,12 +44,26 @@ export function useRealtimeChat({
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
 
-  // Clear unread when chat opens
+  const markAsRead = useCallback(async () => {
+    if (!bookingId && !tripId) return;
+    try {
+      await fetch('/api/chat/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId, tripId }),
+      });
+    } catch {
+      // ignore
+    }
+  }, [bookingId, tripId]);
+
+  // Clear unread & mark messages as read when chat opens
   useEffect(() => {
     if (isOpen) {
       setUnreadCount(0);
+      void markAsRead();
     }
-  }, [isOpen]);
+  }, [isOpen, markAsRead]);
 
   // Load message history from API
   useEffect(() => {
@@ -137,9 +151,11 @@ export function useRealtimeChat({
       sounds.playMessageReceived();
       if (!isOpenRef.current) {
         setUnreadCount((c) => c + 1);
+      } else {
+        void markAsRead();
       }
     }
-  }, [currentUserId]);
+  }, [currentUserId, markAsRead]);
 
   // Real-time listener: Supabase WebSocket (Broadcast + Postgres Changes)
   useEffect(() => {
@@ -162,6 +178,17 @@ export function useRealtimeChat({
       appendMessage(payload);
     });
 
+    // Zero-latency read receipts broadcast
+    channel.on('broadcast', { event: 'messages-read' }, ({ payload }) => {
+      if (payload?.readerId && payload.readerId !== currentUserId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.sender_id === currentUserId ? { ...m, is_read: true } : m
+          )
+        );
+      }
+    });
+
     // 2. Database changes via Postgres Realtime Replication
     channel.on(
       'postgres_changes',
@@ -173,6 +200,26 @@ export function useRealtimeChat({
       },
       (payload) => {
         appendMessage(payload.new);
+      }
+    );
+
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'fleet_chat_messages',
+        filter: bookingId ? `booking_id=eq.${bookingId}` : tripId ? `trip_id=eq.${tripId}` : undefined,
+      },
+      (payload) => {
+        const updated = payload.new;
+        if (updated?.id) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === String(updated.id) ? { ...m, is_read: Boolean(updated.is_read) } : m
+            )
+          );
+        }
       }
     );
 
@@ -229,6 +276,9 @@ export function useRealtimeChat({
     error,
     unreadCount,
     sendMessage,
-    clearUnread: () => setUnreadCount(0),
+    clearUnread: () => {
+      setUnreadCount(0);
+      void markAsRead();
+    },
   };
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { FleetMap, VehicleMarkerData, RoutePoint } from '@/components/map';
 import { useRealtime } from '@/hooks/useRealtime';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -12,6 +13,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 import { Icon } from '@/components/ui/Icon';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
+import { TripCommunicationWidget } from '@/components/communication/TripCommunicationWidget';
 
 function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth radius in km
@@ -52,14 +54,16 @@ interface ActiveBookingInfo {
   } | null;
   driver?: {
     id: string;
-    user: {
+    user?: {
+      id?: string;
       name: string;
       phone: string;
-    };
+    } | null;
   } | null;
 }
 
 function UserTrackingContent() {
+  const { data: session } = useSession();
   const searchParams = useSearchParams();
   const initialVehicleId = searchParams.get('vehicleId');
 
@@ -429,6 +433,20 @@ function UserTrackingContent() {
                             <p className="text-xs text-zinc-600 font-mono font-bold mt-0.5">{selectedVehicle.driverPhone}</p>
                           )}
                         </div>
+                      </div>
+
+                      {/* In-App Real-time Chat & Voice Call (Gojek Style) */}
+                      <div className="pt-2 border-t-2 border-black/10">
+                        <TripCommunicationWidget
+                          bookingId={selectedBooking?.id}
+                          currentUserId={(session?.user as any)?.id || 'passenger-user'}
+                          currentUserName={session?.user?.name || 'Penumpang'}
+                          currentUserRole="USER"
+                          partnerId={selectedBooking?.driver?.user?.id || selectedBooking?.driver?.id}
+                          partnerName={selectedVehicle.driverName || 'Driver KCIC'}
+                          partnerRole="DRIVER"
+                          variant="buttons"
+                        />
                       </div>
 
                       {/* Contact Actions (WhatsApp & Call) */}

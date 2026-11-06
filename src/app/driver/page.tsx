@@ -18,6 +18,7 @@ import { FleetMap, VehicleMarkerData, RoutePoint } from '@/components/map';
 import { Icon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { fetchJson } from '@/lib/fetch-json';
+import { TripCommunicationWidget } from '@/components/communication/TripCommunicationWidget';
 
 interface ActiveTrip {
   id: string;
@@ -921,8 +922,23 @@ export default function DriverDashboardPage() {
                     </div>
                   </div>
 
+                  {/* In-App Real-time Chat & Voice Call (Gojek Style) */}
+                  <div className="pt-2 border-t-2 border-black/10">
+                    <TripCommunicationWidget
+                      bookingId={activeTrip.booking?.id}
+                      tripId={activeTrip.id}
+                      currentUserId={(session?.user as any)?.id || 'driver-user'}
+                      currentUserName={session?.user?.name || 'Driver KCIC'}
+                      currentUserRole="DRIVER"
+                      partnerId={activeTrip.booking?.user?.id}
+                      partnerName={activeTrip.booking?.user?.name || 'Penumpang'}
+                      partnerRole="USER"
+                      variant="buttons"
+                    />
+                  </div>
+
                   {/* Direct Contact Buttons (WhatsApp & Phone) */}
-                  {activeTrip.booking.user?.phone && (
+                  {activeTrip.booking?.user?.phone && (
                     <div className="flex items-center gap-2">
                       <a
                         href={`https://wa.me/${activeTrip.booking.user.phone.replace(/\D/g, '')}?text=${encodeURIComponent(

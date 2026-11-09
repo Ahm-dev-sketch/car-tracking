@@ -57,7 +57,13 @@ function LoginForm() {
         router.push('/user');
       }
     } catch (err: unknown) {
-      setError(err instanceof Error && err.message ? err.message : 'Authentication failed. Please try again.');
+      const msg = err instanceof Error && err.message ? err.message : 'Authentication failed. Please try again.';
+      // next-auth beta throws "Failed to construct 'URL'" when the server answers 429 (rate limit)
+      setError(
+        msg.includes('Failed to construct')
+          ? 'Too many attempts. Please wait a few minutes and try again.'
+          : msg
+      );
       setIsLoading(false);
     }
   };

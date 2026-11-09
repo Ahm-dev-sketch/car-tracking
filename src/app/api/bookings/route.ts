@@ -42,19 +42,15 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     return NextResponse.json(result);
   } catch (err: unknown) {
     console.error('[Driver Data Fetch Error] /api/bookings listBookings:', err);
-    if (isDriverWorkflow || user.role === 'DRIVER') {
-      // Graceful fallback: return empty list with totalPages=1 rather than 500
-      return NextResponse.json({
-        data: [],
-        pagination: {
-          page: query.page ?? 1,
-          limit: query.limit ?? 10,
-          total: 0,
-          totalPages: 1,
-        },
-      });
-    }
-    throw err;
+    return NextResponse.json({
+      data: [],
+      pagination: {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        total: 0,
+        totalPages: 1,
+      },
+    });
   }
 });
 

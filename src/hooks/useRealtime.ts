@@ -72,6 +72,21 @@ export function useRealtime({
 
     function connect() {
       if (disposed || !effectiveToken) return;
+
+      const isBrowser = typeof window !== 'undefined';
+      const isRemoteHost =
+        isBrowser &&
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1';
+      const isTargetLocal = wsUrl.includes('localhost') || wsUrl.includes('127.0.0.1');
+
+      if (isRemoteHost && isTargetLocal) {
+        // In production without an explicit WebSocket server configured, skip connecting
+        // to avoid browser console errors. The app uses HTTP polling & Supabase channels.
+        setConnectionState('closed');
+        return;
+      }
+
       setConnectionState(attempt === 0 ? 'connecting' : 'reconnecting');
       try {
         const ws = new WebSocket(wsUrl);
@@ -123,6 +138,9 @@ export function useRealtime({
           wsRef.current = null;
           setConnectionState('closed');
           if (event?.code === 4001) return;
+          if (attempt >= 3 && isTargetLocal) {
+            return;
+          }
           const delay = Math.min(30000, 1000 * Math.pow(1.5, attempt++));
           timer = setTimeout(connect, delay);
         };

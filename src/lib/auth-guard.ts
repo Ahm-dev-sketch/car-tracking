@@ -27,6 +27,7 @@ export async function getSessionUser(existingSession?: Session | null): Promise<
       role: { select: { code: true } },
     },
   });
+
   if (!user?.isActive || !user.role?.code) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Authentication required');
   }

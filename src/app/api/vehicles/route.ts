@@ -24,8 +24,21 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     sortOrder: searchParams.get('sortOrder') ?? undefined,
   });
 
-  const result = await listVehicles({ ...query, isAdmin, actor: user });
-  return NextResponse.json(result);
+  try {
+    const result = await listVehicles({ ...query, isAdmin, actor: user });
+    return NextResponse.json(result);
+  } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] /api/vehicles GET:', err);
+    return NextResponse.json({
+      data: [],
+      pagination: {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        total: 0,
+        totalPages: 1,
+      },
+    });
+  }
 });
 
 export const POST = withRateLimit(

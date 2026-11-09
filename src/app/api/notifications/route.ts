@@ -15,6 +15,19 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     limit: searchParams.get('limit') ?? undefined,
   });
 
-  const result = await listNotifications(user.id, query);
-  return NextResponse.json(result);
+  try {
+    const result = await listNotifications(user.id, query);
+    return NextResponse.json(result);
+  } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] /api/notifications GET:', err);
+    return NextResponse.json({
+      data: [],
+      pagination: {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        total: 0,
+        totalPages: 1,
+      },
+    });
+  }
 });

@@ -8,16 +8,21 @@ export const dynamic = 'force-dynamic';
 export const GET = withErrorHandling(async () => {
   await getSessionUser();
 
-  const locations = await prisma.location.findMany({
-    where: { isActive: true },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      isActive: true,
-    },
-    orderBy: { name: 'asc' },
-  });
+  try {
+    const locations = await prisma.location.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+      },
+      orderBy: { name: 'asc' },
+    });
 
-  return NextResponse.json({ data: locations });
+    return NextResponse.json({ data: locations });
+  } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] /api/locations GET:', err);
+    return NextResponse.json({ data: [] });
+  }
 });

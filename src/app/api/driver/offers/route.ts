@@ -12,9 +12,15 @@ export const GET = withErrorHandling(async () => {
   const user = await getSessionUser();
   requireRole(user, 'DRIVER');
 
-  const driver = await prisma.driver.findUnique({
-    where: { userId: user.id },
-  });
+  let driver = null;
+  try {
+    driver = await prisma.driver.findUnique({
+      where: { userId: user.id },
+    });
+  } catch (driverErr: unknown) {
+    console.error('[Driver Data Fetch Error] /api/driver/offers driver lookup:', driverErr);
+    return NextResponse.json({ data: [] });
+  }
 
   if (!driver) {
     console.error('[Driver Data Fetch Error] /api/driver/offers: Driver profile not found for user', user.id);

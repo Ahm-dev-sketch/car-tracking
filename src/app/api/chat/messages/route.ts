@@ -29,33 +29,10 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     );
   }
 
-  // 1. Try fetching via Supabase client if configured
-  if (isSupabaseConfigured) {
-    try {
-      let query = supabase
-        .from('fleet_chat_messages')
-        .select('*')
-        .order('created_at', { ascending: true })
-        .limit(100);
-
-      if (bookingId && tripId) {
-        query = query.or(`booking_id.eq.${bookingId},trip_id.eq.${tripId}`);
-      } else if (bookingId) {
-        query = query.eq('booking_id', bookingId);
-      } else if (tripId) {
-        query = query.eq('trip_id', tripId);
-      }
-
-      const { data, error } = await query;
-      if (!error && data) {
-        return NextResponse.json({ data });
-      }
-    } catch {
-      // Fallback to direct PostgreSQL via Prisma below
-    }
-  }
-
-  // 2. Direct PostgreSQL fallback via Prisma queryRaw
+  // Single source of truth: Prisma (server-side postgres role). The anon-key REST
+  // path was removed — with RLS deny-all it silently returned [] instead of falling
+  // through, emptying chat history.
+  // Direct PostgreSQL via Prisma queryRaw
   try {
     const messages = await prisma.$queryRawUnsafe<any[]>(
       `SELECT id, booking_id AS "bookingId", trip_id AS "tripId", sender_id AS "senderId", 

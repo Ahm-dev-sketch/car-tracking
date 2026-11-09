@@ -30,10 +30,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           else if (email === 'driver' || email === 'driver1') email = 'driver1@demo.test';
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-          include: { role: true },
-        });
+        let user = null;
+        try {
+          user = await prisma.user.findUnique({
+            where: { email },
+            include: { role: true },
+          });
+        } catch (dbErr) {
+          console.error('[auth] Database query error in authorize():', dbErr);
+          return null;
+        }
 
         if (!user || !user.isActive) {
           console.warn(`[auth] Sign-in failed: user "${email}" not found or inactive`);

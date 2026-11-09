@@ -1,10 +1,8 @@
-import pg from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
-  pool: pg.Pool | undefined;
 };
 
 function getConnectionString(): string {
@@ -49,30 +47,7 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
-  const isLocal =
-    connectionString.includes('localhost') ||
-    connectionString.includes('127.0.0.1');
-
-  // Configure pg.Pool with SSL support for remote PostgreSQL (Supabase / Neon / AWS RDS)
-  // and connection timeout to prevent serverless function hangs.
-  const pool =
-    globalForPrisma.pool ||
-    new pg.Pool({
-      connectionString,
-      ssl: isLocal ? false : { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10,
-    });
-
-  if (!globalForPrisma.pool) {
-    pool.on('error', (err) => {
-      console.error('[Prisma pg.Pool background error]:', err);
-    });
-    globalForPrisma.pool = pool;
-  }
-
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],

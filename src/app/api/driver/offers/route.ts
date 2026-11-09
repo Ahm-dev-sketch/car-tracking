@@ -9,8 +9,17 @@ import { logger } from '@/lib/logger';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async () => {
-  const user = await getSessionUser();
-  requireRole(user, 'DRIVER');
+  let user = null;
+  try {
+    user = await getSessionUser();
+    requireRole(user, 'DRIVER');
+  } catch (authErr: unknown) {
+    if (authErr instanceof ApiError && (authErr.status === 401 || authErr.status === 403)) {
+      throw authErr;
+    }
+    console.error('[Driver Data Fetch Error] /api/driver/offers auth lookup:', authErr);
+    return NextResponse.json({ data: [] });
+  }
 
   let driver = null;
   try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser } from '@/lib/auth-guard';
 import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { getClientContext } from '@/lib/request-context';
@@ -12,8 +12,6 @@ import { BookingStatus } from '@prisma/client';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
-  const user = await getSessionUser();
-
   const { searchParams } = new URL(req.url);
   const query = bookingQuerySchema.parse({
     page: searchParams.get('page') ?? undefined,
@@ -24,6 +22,23 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     startDate: searchParams.get('start_date') ?? searchParams.get('startDate') ?? undefined,
     endDate: searchParams.get('end_date') ?? searchParams.get('endDate') ?? undefined,
   });
+
+  let user = null;
+  try {
+    user = await getSessionUser();
+  } catch (authErr: unknown) {
+    if (authErr instanceof ApiError && authErr.status === 401) throw authErr;
+    console.error('[Driver Data Fetch Error] /api/bookings auth lookup:', authErr);
+    return NextResponse.json({
+      data: [],
+      pagination: {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        total: 0,
+        totalPages: 1,
+      },
+    });
+  }
 
   // Lazy sweep on read: advance expired offers before listing
   try {

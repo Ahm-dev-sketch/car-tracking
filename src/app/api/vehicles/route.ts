@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
 import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { getClientContext } from '@/lib/request-context';
@@ -9,9 +9,6 @@ import { listVehicles, createVehicle } from '@/server/vehicles/service';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
-  const user = await getSessionUser();
-  const isAdmin = user.role === 'ADMIN';
-
   const { searchParams } = new URL(req.url);
   const query = vehicleQuerySchema.parse({
     page: searchParams.get('page') ?? undefined,
@@ -24,8 +21,27 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     sortOrder: searchParams.get('sortOrder') ?? undefined,
   });
 
+  let user = null;
+  let isAdmin = false;
   try {
-    const result = await listVehicles({ ...query, isAdmin, actor: user });
+    user = await getSessionUser();
+    isAdmin = user.role === 'ADMIN';
+  } catch (authErr: unknown) {
+    if (authErr instanceof ApiError && authErr.status === 401) throw authErr;
+    console.error('[Driver Data Fetch Error] /api/vehicles auth lookup:', authErr);
+    return NextResponse.json({
+      data: [],
+      pagination: {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        total: 0,
+        totalPages: 1,
+      },
+    });
+  }
+
+  try {
+    const result = user ? await listVehicles({ ...query, isAdmin, actor: user }) : { data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 1 } };
     return NextResponse.json(result);
   } catch (err: unknown) {
     console.error('[Driver Data Fetch Error] /api/vehicles GET:', err);

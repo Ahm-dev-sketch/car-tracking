@@ -169,21 +169,30 @@ export default function DriverDashboardPage() {
   } | null>(null);
 
   const [telemetryWarning, setTelemetryWarning] = useState<string | null>(null);
+  const uploadBackoffUntil = useRef<number>(0);
 
-  // Batch flush handler for useGeolocation
+  // Batch flush handler for useGeolocation with backoff protection
   const handleLocationFlush = useCallback(async (batch: GeoPoint[]) => {
     if (batch.length === 0) return;
-    // Throw transport/HTTP failures so the hook retains unsent points for retry.
+    
+    // Check if in backoff period due to server error (e.g. 500)
+    const now = Date.now();
+    if (now < uploadBackoffUntil.current) {
+      return;
+    }
+
     try {
       const result = await fetchJson<{ data: { accepted: number; rejected: { reason: string }[] } }>('/api/tracking/locations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ points: batch }),
       });
-      // Invalid or stale fixes are not retryable; surface them without blocking fresh fixes.
+      uploadBackoffUntil.current = 0;
       setTelemetryWarning(result.data.rejected.length > 0 ? result.data.rejected[0].reason : null);
     } catch (error) {
-      setTelemetryWarning(error instanceof Error ? error.message : 'Location upload failed. Retrying.');
+      // Apply 20s backoff to avoid continuous request loops if server is encountering issues
+      uploadBackoffUntil.current = Date.now() + 20000;
+      setTelemetryWarning(error instanceof Error ? error.message : 'Location upload paused. Retrying in 20s.');
       throw error;
     }
   }, []);
@@ -195,6 +204,7 @@ export default function DriverDashboardPage() {
     movement,
     permissionDenied,
     error: geoError,
+    clearError: clearGeoError,
     lastUpdated,
     isStale,
     confidenceScore,
@@ -867,9 +877,27 @@ export default function DriverDashboardPage() {
       {!activeTrip && <IosInstallHint />}
 
 
-      {actionError && <ErrorBanner message={actionError} className="rounded-2xl! p-4! [&_button]:min-h-11 [&_button]:min-w-11" onDismiss={() => setActionError(null)} />}
-      {geoError && <ErrorBanner message={geoError} className="rounded-2xl! p-4!" />}
-      {telemetryWarning && <ErrorBanner message={`GPS upload warning: ${telemetryWarning}`} />}
+      {actionError && (
+        <ErrorBanner
+          message={actionError}
+          className="rounded-2xl! p-4! [&_button]:min-h-11 [&_button]:min-w-11"
+          onDismiss={() => setActionError(null)}
+        />
+      )}
+      {geoError && (
+        <ErrorBanner
+          message={geoError}
+          className="rounded-2xl! p-4!"
+          onDismiss={() => clearGeoError()}
+        />
+      )}
+      {telemetryWarning && (
+        <ErrorBanner
+          message={`GPS upload warning: ${telemetryWarning}`}
+          className="rounded-2xl! p-4!"
+          onDismiss={() => setTelemetryWarning(null)}
+        />
+      )}
       {isStartingTrip && <p role="status" aria-live="polite" className="flex items-center gap-3 text-sm font-bold text-emerald-950"><Spinner size="sm" />{startLabel} Please allow location access when prompted.</p>}
 
       {/* Permission Denied Banner with instructions */}

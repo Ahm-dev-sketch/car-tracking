@@ -249,14 +249,19 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
         }
 
         setPermissionDenied(err.code === 1);
-        setError(err.message);
-        setSignalStatus('red');
-        setMovement('GPS_LOST');
-        if (err.code === 1) stopTracking();
+        if (err.code === 1) {
+          setError(err.message);
+          stopTracking();
+        } else {
+          // Transient timeout (code 3) or position unavailable (code 2)
+          // Degrade signal gracefully without displaying a permanent blocking error banner
+          setSignalStatus(err.code === 3 ? 'amber' : 'red');
+          setMovement('GPS_LOST');
+        }
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 0,
+        maximumAge: 5000,
         timeout: 10000,
       }
       );
@@ -391,5 +396,6 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
     startTracking,
     stopTracking,
     flushBuffer,
+    clearError: () => setError(null),
   };
 }

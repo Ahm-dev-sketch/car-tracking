@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser } from '@/lib/auth-guard';
 import { encode } from 'next-auth/jwt';
 import { TRACKING_CONFIG } from '@/server/tracking/config';
@@ -10,12 +10,20 @@ import { TripStatus, DriverSessionStatus } from '@prisma/client';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async () => {
-  const user = await getSessionUser();
+  let user = null;
+  try {
+    user = await getSessionUser();
+  } catch (authErr: unknown) {
+    console.error('FATAL DB ERROR [GET /api/tracking/config auth]:', authErr);
+    if (authErr instanceof ApiError && authErr.status === 401) {
+      throw authErr;
+    }
+  }
 
   let activeTrip = null;
   let activeSession = null;
   let driverProfile = null;
-  if (user.role === 'DRIVER') {
+  if (user && user.role === 'DRIVER') {
     try {
       const driver = await prisma.driver.findUnique({
         where: { userId: user.id },
@@ -64,7 +72,7 @@ export const GET = withErrorHandling(async () => {
 
   let realtimeToken: string | null = null;
   const authSecret = process.env.AUTH_SECRET;
-  if (authSecret) {
+  if (authSecret && user) {
     try {
       realtimeToken = await encode({
         token: {
@@ -87,7 +95,7 @@ export const GET = withErrorHandling(async () => {
     dispatchConfig: DISPATCH_CONFIG,
     realtimeToken,
     sessionState: {
-      role: user.role,
+      role: user?.role ?? 'DRIVER',
       activeTrip,
       activeSession,
     },

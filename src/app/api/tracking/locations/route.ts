@@ -39,20 +39,29 @@ export const POST = withRateLimit(
       }
     }
 
-    const ingestResult = await ingestLocations(driver.id, parsedPoints);
+    try {
+      const ingestResult = await ingestLocations(driver.id, parsedPoints);
 
-    return NextResponse.json({
-      data: {
-        accepted: ingestResult.accepted,
-        rejected: [
-          ...rejected,
-          ...ingestResult.rejected.map((point) => ({
-            ...point,
-            index: originalIndexes[point.index],
-          })),
-        ].sort((a, b) => a.index - b.index),
-      },
-    });
+      return NextResponse.json({
+        data: {
+          accepted: ingestResult.accepted,
+          rejected: [
+            ...rejected,
+            ...ingestResult.rejected.map((point) => ({
+              ...point,
+              index: originalIndexes[point.index],
+            })),
+          ].sort((a, b) => a.index - b.index),
+        },
+      });
+    } catch (error: unknown) {
+      console.error('[Tracking Location Error]:', error);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : 'Database error while ingesting locations';
+      throw new ApiError(500, 'TRACKING_INGEST_ERROR', message);
+    }
   }),
   RATE_LIMIT_CONFIG.LOCATION_INGEST
 );

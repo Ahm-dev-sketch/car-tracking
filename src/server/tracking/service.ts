@@ -212,7 +212,6 @@ export async function ingestLocations(
         throw new ApiError(409, 'TRACKING_SESSION_CHANGED', 'Tracking session changed during upload. Refresh the driver dashboard.');
       }
       for (const p of accepted) {
-        await tx.$executeRawUnsafe('SELECT create_driver_location_partition($1::date)', p.recordedAt);
         await tx.driverLocation.create({
           data: {
             driverId,
@@ -270,7 +269,7 @@ export async function ingestLocations(
       });
 
       return movement;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     if (movement !== null) {
       await publishEvent({

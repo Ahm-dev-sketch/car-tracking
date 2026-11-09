@@ -56,7 +56,13 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   const validated = startTripSchema.parse(body);
 
   const ctx = getClientContext(req, user.id);
-  const trip = await startTrip(driver.id, validated, ctx);
-
-  return NextResponse.json({ data: trip }, { status: 201 });
+  try {
+    const trip = await startTrip(driver.id, validated, ctx);
+    return NextResponse.json({ data: trip }, { status: 201 });
+  } catch (err: unknown) {
+    console.error('[Start Trip Error]:', err);
+    if (err instanceof ApiError) throw err;
+    const message = err instanceof Error ? err.message : 'Failed to start trip';
+    throw new ApiError(500, 'START_TRIP_FAILED', message);
+  }
 });

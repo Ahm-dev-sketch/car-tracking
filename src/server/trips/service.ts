@@ -170,6 +170,12 @@ export async function startTrip(
       where: { status: TripStatus.ACTIVE, OR: [{ vehicleId }, { driverId }] },
     });
     if (activeTrip) {
+      if (booking && activeTrip.bookingId === booking.id) {
+        return tx.trip.findUniqueOrThrow({
+          where: { id: activeTrip.id },
+          include: tripMutationInclude,
+        });
+      }
       throw new ApiError(409, activeTrip.driverId === driverId ? 'DRIVER_BUSY' : 'VEHICLE_IN_USE', 'Driver or vehicle already has an active trip');
     }
     if (vehicle.status === VehicleStatus.IN_USE) {
@@ -226,7 +232,7 @@ export async function startTrip(
       data: { bookingId: booking?.id ?? null, vehicleId, driverId, startedAt: new Date(), startLat: input.startLat, startLng: input.startLng, status: TripStatus.ACTIVE },
       include: tripMutationInclude,
     });
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? trip.driver.userId,
@@ -326,7 +332,7 @@ async function closeTrip(
       data: { status, endedAt, endLat: input.endLat ?? undefined, endLng: input.endLng ?? undefined, distanceMeters: input.distanceMeters ?? undefined },
       include: tripMutationInclude,
     });
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 }
 
 export async function endTrip(
@@ -417,7 +423,7 @@ export async function arriveTrip(
       where: { id: trip.booking.id }, data: { status: BookingStatus.ARRIVED }, include: bookingMutationInclude,
     });
     return { trip: { ...trip, booking }, booking, changed: true };
-  });
+  }, { maxWait: 10000, timeout: 30000 });
   if (result.changed) {
     await logAuditEvent({
       actorUserId: ctx?.actorUserId ?? actor.id,

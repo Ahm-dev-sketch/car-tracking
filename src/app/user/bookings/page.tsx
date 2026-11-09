@@ -197,23 +197,46 @@ function UserBookingsContent() {
         body: formData,
       });
 
-      const json = await res.json();
-      if (!res.ok) {
-        setUploadError(json.error?.message || 'Gagal mengunggah nota dinas');
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch {
+        // Non-JSON response (e.g. gateway timeout or proxy HTML)
+      }
+
+      if (!res.ok || json?.success === false) {
+        const errorMsg =
+          json?.message ||
+          json?.error?.message ||
+          (res.status === 413
+            ? 'Ukuran berkas melebihi batas maksimal 10MB'
+            : res.status === 404
+            ? 'Data pesanan booking tidak ditemukan'
+            : res.status === 403
+            ? 'Akses ditolak: Anda tidak memiliki wewenang mengunggah nota dinas pada pesanan ini'
+            : res.status >= 500
+            ? `Terjadi kesalahan server (${res.status}): Gagal memproses penyimpanan nota dinas`
+            : `Gagal mengunggah nota dinas (${res.status}: ${res.statusText || 'Error'})`);
+        setUploadError(errorMsg);
         return;
       }
 
-      const updated = json.data;
-      setBookings((prev) =>
-        prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b))
-      );
-      if (selectedBooking && selectedBooking.id === updated.id) {
-        setSelectedBooking((prev) => (prev ? { ...prev, ...updated } : null));
+      const updated = json?.data;
+      if (updated) {
+        setBookings((prev) =>
+          prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b))
+        );
+        if (selectedBooking && selectedBooking.id === updated.id) {
+          setSelectedBooking((prev) => (prev ? { ...prev, ...updated } : null));
+        }
+      } else {
+        fetchBookings(page);
       }
       setUploadBooking(null);
       setUploadFile(null);
-    } catch {
-      setUploadError('Terjadi kesalahan jaringan saat mengunggah');
+    } catch (err: any) {
+      console.error('[Upload Nota Dinas UI Error]:', err);
+      setUploadError(err?.message || 'Terjadi kesalahan jaringan saat mengunggah nota dinas');
     } finally {
       setIsUploading(false);
     }
@@ -798,6 +821,7 @@ function UserBookingsContent() {
         <Modal
           isOpen={Boolean(uploadBooking)}
           onClose={() => {
+            if (isUploading) return;
             setUploadBooking(null);
             setUploadFile(null);
             setUploadError(null);
@@ -860,6 +884,7 @@ function UserBookingsContent() {
                 onClick={() => {
                   setUploadBooking(null);
                   setUploadFile(null);
+                  setUploadError(null);
                 }}
                 disabled={isUploading}
                 className="px-3.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-700 hover:bg-zinc-100 cursor-pointer"

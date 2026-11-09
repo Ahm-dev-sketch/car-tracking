@@ -23,8 +23,22 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     endDate: searchParams.get('end_date') ?? searchParams.get('endDate') ?? undefined,
   });
 
-  const result = await listTrips(user, query);
-  return NextResponse.json(result);
+  try {
+    const result = await listTrips(user, query);
+    return NextResponse.json(result);
+  } catch (error: unknown) {
+    if (error instanceof ApiError) throw error;
+    console.error('FATAL DB ERROR [GET /api/trips]:', error);
+    return NextResponse.json({
+      data: [],
+      meta: {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        total: 0,
+        totalPages: 0,
+      },
+    });
+  }
 });
 
 export const POST = withErrorHandling(async (req: NextRequest) => {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
 import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { getClientContext } from '@/lib/request-context';
@@ -24,8 +24,22 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     sortOrder: searchParams.get('sortOrder') ?? undefined,
   });
 
-  const result = await listDrivers(query);
-  return NextResponse.json(result);
+  try {
+    const result = await listDrivers(query);
+    return NextResponse.json(result);
+  } catch (error: unknown) {
+    if (error instanceof ApiError) throw error;
+    console.error('FATAL DB ERROR [GET /api/drivers]:', error);
+    return NextResponse.json({
+      data: [],
+      meta: {
+        page: query.page ?? 1,
+        limit: query.limit ?? 10,
+        total: 0,
+        totalPages: 0,
+      },
+    });
+  }
 });
 
 export const POST = withRateLimit(

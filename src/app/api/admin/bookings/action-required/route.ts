@@ -17,25 +17,30 @@ export const GET = withErrorHandling(async () => {
     // Non-blocking if background sweep fails
   }
 
-  const count = await prisma.booking.count({
-    where: {
-      OR: [
-        {
-          status: {
-            in: [
-              BookingStatus.PENDING,
-              BookingStatus.ADMIN_INTERVENTION,
-              BookingStatus.NO_DRIVER_AVAILABLE,
-            ],
+  let count = 0;
+  try {
+    count = await prisma.booking.count({
+      where: {
+        OR: [
+          {
+            status: {
+              in: [
+                BookingStatus.PENDING,
+                BookingStatus.ADMIN_INTERVENTION,
+                BookingStatus.NO_DRIVER_AVAILABLE,
+              ],
+            },
           },
-        },
-        {
-          status: BookingStatus.PENDING_COMPLETION,
-          rejectedReason: null,
-        },
-      ],
-    },
-  });
+          {
+            status: BookingStatus.PENDING_COMPLETION,
+            rejectedReason: null,
+          },
+        ],
+      },
+    });
+  } catch (err: unknown) {
+    console.error('FATAL DB ERROR [GET /api/admin/bookings/action-required]:', err);
+  }
 
   return NextResponse.json({ data: { count } });
 });

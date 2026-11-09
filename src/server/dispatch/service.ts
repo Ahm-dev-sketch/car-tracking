@@ -541,7 +541,7 @@ export async function createOffer(
     });
 
     return { ...createdOffer, booking: updatedBooking };
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? null,
@@ -856,7 +856,7 @@ export async function acceptOffer(
     });
 
     return { acceptedOffer, updatedBooking, driver, targetVehicleId };
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? result.driver.userId,
@@ -956,7 +956,7 @@ export async function rejectOffer(
     });
 
     return { updatedOffer, updatedBooking };
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? null,
@@ -1278,7 +1278,7 @@ export async function manualAssignBooking(
     });
 
     return { updatedBooking, driver, targetVehicleId };
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   await logAuditEvent({
     actorUserId: adminId,

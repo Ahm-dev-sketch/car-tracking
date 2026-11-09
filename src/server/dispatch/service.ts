@@ -1345,93 +1345,100 @@ export async function startDriverSession(
   input: { vehicleId?: string | null; startLat?: number | null; startLng?: number | null },
   ctx?: DispatchMutationContext
 ) {
-  const session = await prisma.$transaction(async (tx) => {
-    const { driver, vehicleId } = await lockAssignmentDriver(tx, driverId, input.vehicleId);
-    if (!driver) {
-      throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver not found');
-    }
-    if (!driver.user.isActive) {
-      throw new ApiError(403, 'FORBIDDEN', 'Driver account is inactive');
-    }
-    const activeTrip = await tx.trip.findFirst({ where: { status: TripStatus.ACTIVE, OR: [{ driverId }, ...(vehicleId ? [{ vehicleId }] : [])] } });
-    if (driver.status === DriverStatus.ON_TRIP || activeTrip) {
-      throw new ApiError(409, 'DRIVER_BUSY', 'Cannot start an idle session while a trip is active');
-    }
-    const existing = await tx.driverSession.findFirst({
-      where: { driverId, status: DriverSessionStatus.ACTIVE },
-    });
-    if (existing) {
-      throw new ApiError(409, 'SESSION_ALREADY_ACTIVE', 'Driver already has an active session');
-    }
-
-    if (!vehicleId) {
-      throw new ApiError(400, 'VEHICLE_REQUIRED_FOR_TRACKING', 'Select a vehicle by license plate before going online.');
-    }
-    const otherSession = await tx.driverSession.findFirst({
-      where: { vehicleId, status: DriverSessionStatus.ACTIVE, driverId: { not: driverId } },
-    });
-    if (otherSession) {
-      throw new ApiError(409, 'VEHICLE_ALREADY_ASSIGNED', 'Another driver is already online with this vehicle.');
-    }
-    if (vehicleId) {
-      const locked = await tx.$queryRawUnsafe<Array<{ id: string; status: VehicleStatus }>>(
-        'SELECT id, status FROM vehicles WHERE id = $1 FOR UPDATE', vehicleId
-      );
-      if (!locked.length) {
-        throw new ApiError(404, 'VEHICLE_NOT_FOUND', 'Vehicle not found');
+  const session = await prisma.$transaction(
+    async (tx) => {
+      const { driver, vehicleId } = await lockAssignmentDriver(tx, driverId, input.vehicleId);
+      if (!driver) {
+        throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver not found');
       }
-      if (locked[0].status !== VehicleStatus.AVAILABLE && locked[0].status !== VehicleStatus.RESERVED) {
-        throw new ApiError(409, 'VEHICLE_UNAVAILABLE', 'Vehicle is unavailable');
+      if (!driver.user.isActive) {
+        throw new ApiError(403, 'FORBIDDEN', 'Driver account is inactive');
       }
-      await assertAssignmentVehicle(tx, vehicleId, driverId, 0);
-    }
+      const activeTrip = await tx.trip.findFirst({ where: { status: TripStatus.ACTIVE, OR: [{ driverId }, ...(vehicleId ? [{ vehicleId }] : [])] } });
+      if (driver.status === DriverStatus.ON_TRIP || activeTrip) {
+        throw new ApiError(409, 'DRIVER_BUSY', 'Cannot start an idle session while a trip is active');
+      }
+      const existing = await tx.driverSession.findFirst({
+        where: { driverId, status: DriverSessionStatus.ACTIVE },
+      });
+      if (existing) {
+        throw new ApiError(409, 'SESSION_ALREADY_ACTIVE', 'Driver already has an active session');
+      }
 
-    await ensureVehicleAssignment(tx, driverId, vehicleId);
-    await tx.vehicle.updateMany({ where: { currentDriverId: driverId, id: { not: vehicleId } }, data: { currentDriverId: null } });
-    await tx.driver.updateMany({ where: { currentVehicleId: vehicleId, id: { not: driverId } }, data: { currentVehicleId: null } });
-    await tx.driver.update({ where: { id: driverId }, data: { status: DriverStatus.AVAILABLE, currentVehicleId: vehicleId } });
-    await tx.vehicle.update({ where: { id: vehicleId }, data: { currentDriverId: driverId } });
+      if (!vehicleId) {
+        throw new ApiError(400, 'VEHICLE_REQUIRED_FOR_TRACKING', 'Select a vehicle by license plate before going online.');
+      }
+      const otherSession = await tx.driverSession.findFirst({
+        where: { vehicleId, status: DriverSessionStatus.ACTIVE, driverId: { not: driverId } },
+      });
+      if (otherSession) {
+        throw new ApiError(409, 'VEHICLE_ALREADY_ASSIGNED', 'Another driver is already online with this vehicle.');
+      }
+      if (vehicleId) {
+        const locked = await tx.$queryRawUnsafe<Array<{ id: string; status: VehicleStatus }>>(
+          'SELECT id, status FROM vehicles WHERE id = $1 FOR UPDATE', vehicleId
+        );
+        if (!locked.length) {
+          throw new ApiError(404, 'VEHICLE_NOT_FOUND', 'Vehicle not found');
+        }
+        if (locked[0].status !== VehicleStatus.AVAILABLE && locked[0].status !== VehicleStatus.RESERVED) {
+          throw new ApiError(409, 'VEHICLE_UNAVAILABLE', 'Vehicle is unavailable');
+        }
+        await assertAssignmentVehicle(tx, vehicleId, driverId, 0);
+      }
 
-    if (vehicleId && input.startLat !== null && input.startLat !== undefined && input.startLng !== null && input.startLng !== undefined) {
-      const now = new Date();
-      await tx.vehicleLocation.upsert({
-        where: { vehicleId },
-        create: {
-          vehicleId,
+      await ensureVehicleAssignment(tx, driverId, vehicleId);
+      await tx.vehicle.updateMany({ where: { currentDriverId: driverId, id: { not: vehicleId } }, data: { currentDriverId: null } });
+      await tx.driver.updateMany({ where: { currentVehicleId: vehicleId, id: { not: driverId } }, data: { currentVehicleId: null } });
+      await tx.driver.update({ where: { id: driverId }, data: { status: DriverStatus.AVAILABLE, currentVehicleId: vehicleId } });
+      await tx.vehicle.update({ where: { id: vehicleId }, data: { currentDriverId: driverId } });
+
+      if (vehicleId && input.startLat !== null && input.startLat !== undefined && input.startLng !== null && input.startLng !== undefined) {
+        try {
+          const now = new Date();
+          await tx.vehicleLocation.upsert({
+            where: { vehicleId },
+            create: {
+              vehicleId,
+              driverId,
+              lat: input.startLat,
+              lng: input.startLng,
+              accuracyM: 20,
+              movement: MovementStatus.STOPPED,
+              recordedAt: now,
+              receivedAt: now,
+            },
+            update: {
+              driverId,
+              lat: input.startLat,
+              lng: input.startLng,
+              accuracyM: 20,
+              movement: MovementStatus.STOPPED,
+              recordedAt: now,
+              receivedAt: now,
+            },
+          });
+        } catch (locErr) {
+          console.warn('[startDriverSession] Non-blocking initial location upsert error:', locErr);
+        }
+      }
+
+      return tx.driverSession.create({
+        data: {
           driverId,
-          lat: input.startLat,
-          lng: input.startLng,
-          accuracyM: 20,
-          movement: MovementStatus.STOPPED,
-          recordedAt: now,
-          receivedAt: now,
+          vehicleId: vehicleId ?? null,
+          status: DriverSessionStatus.ACTIVE,
+          startLat: input.startLat ?? null,
+          startLng: input.startLng ?? null,
         },
-        update: {
-          driverId,
-          lat: input.startLat,
-          lng: input.startLng,
-          accuracyM: 20,
-          movement: MovementStatus.STOPPED,
-          recordedAt: now,
-          receivedAt: now,
+        include: {
+          vehicle: true,
+          driver: { include: { user: { select: publicUserSelect } } },
         },
       });
-    }
-
-    return tx.driverSession.create({
-      data: {
-        driverId,
-        vehicleId: vehicleId ?? null,
-        status: DriverSessionStatus.ACTIVE,
-        startLat: input.startLat ?? null,
-        startLng: input.startLng ?? null,
-      },
-      include: {
-        vehicle: true,
-        driver: { include: { user: { select: publicUserSelect } } },
-      },
-    });
-  });
+    },
+    { maxWait: 10000, timeout: 30000 }
+  );
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? session.driver.userId,
@@ -1454,53 +1461,56 @@ export async function endDriverSession(
   driverId: string,
   ctx?: DispatchMutationContext
 ) {
-  const { session, ended, offers } = await prisma.$transaction(async (tx) => {
-    // Driver-only lock: never acquire booking or vehicle locks in this transaction.
-    await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', driverId);
-    const activeTrip = await tx.trip.findFirst({ where: { driverId, status: TripStatus.ACTIVE } });
-    if (activeTrip) {
-      throw new ApiError(409, 'DRIVER_BUSY', 'Abort or end the active trip before going offline');
-    }
-    const session = await tx.driverSession.findFirst({
-      where: { driverId, status: DriverSessionStatus.ACTIVE },
-      include: { driver: true },
-    });
-    if (!session) {
-      throw new ApiError(404, 'NO_ACTIVE_SESSION', 'No active session found for driver');
-    }
-    const ended = await tx.driverSession.update({
-      where: { id: session.id },
-      data: { status: DriverSessionStatus.ENDED, endedAt: new Date() },
-    });
-    await tx.vehicleAssignment.updateMany({
-      where: { unassignedAt: null, OR: [{ driverId }, ...(session.vehicleId ? [{ vehicleId: session.vehicleId }] : [])] },
-      data: { unassignedAt: new Date(), reason: 'Driver session ended; released to pool' },
-    });
-    await tx.driver.update({ where: { id: driverId }, data: { status: DriverStatus.OFFLINE, currentVehicleId: null } });
-    if (session.vehicleId) {
-      await tx.vehicle.updateMany({
-        where: { id: session.vehicleId, currentDriverId: driverId },
-        data: { currentDriverId: null },
+  const { session, ended, offers } = await prisma.$transaction(
+    async (tx) => {
+      // Driver-only lock: never acquire booking or vehicle locks in this transaction.
+      await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', driverId);
+      const activeTrip = await tx.trip.findFirst({ where: { driverId, status: TripStatus.ACTIVE } });
+      if (activeTrip) {
+        throw new ApiError(409, 'DRIVER_BUSY', 'Abort or end the active trip before going offline');
+      }
+      const session = await tx.driverSession.findFirst({
+        where: { driverId, status: DriverSessionStatus.ACTIVE },
+        include: { driver: true },
       });
-    }
-    await tx.vehicleLocation.updateMany({ where: { driverId }, data: { movement: MovementStatus.OFFLINE } });
-    if (session.vehicleId) {
-      await tx.vehicleLocation.updateMany({
-        where: { vehicleId: session.vehicleId },
-        data: {
-          movement: MovementStatus.OFFLINE,
-          speedMps: 0,
-          recordedAt: new Date(),
-          receivedAt: new Date(),
-        },
+      if (!session) {
+        throw new ApiError(404, 'NO_ACTIVE_SESSION', 'No active session found for driver');
+      }
+      const ended = await tx.driverSession.update({
+        where: { id: session.id },
+        data: { status: DriverSessionStatus.ENDED, endedAt: new Date() },
       });
-    }
-    const offers = await tx.bookingOffer.findMany({
-      where: { driverId, status: OfferStatus.SENT },
-      select: { id: true, bookingId: true },
-    });
-    return { session, ended, offers };
-  });
+      await tx.vehicleAssignment.updateMany({
+        where: { unassignedAt: null, OR: [{ driverId }, ...(session.vehicleId ? [{ vehicleId: session.vehicleId }] : [])] },
+        data: { unassignedAt: new Date(), reason: 'Driver session ended; released to pool' },
+      });
+      await tx.driver.update({ where: { id: driverId }, data: { status: DriverStatus.OFFLINE, currentVehicleId: null } });
+      if (session.vehicleId) {
+        await tx.vehicle.updateMany({
+          where: { id: session.vehicleId, currentDriverId: driverId },
+          data: { currentDriverId: null },
+        });
+      }
+      await tx.vehicleLocation.updateMany({ where: { driverId }, data: { movement: MovementStatus.OFFLINE } });
+      if (session.vehicleId) {
+        await tx.vehicleLocation.updateMany({
+          where: { vehicleId: session.vehicleId },
+          data: {
+            movement: MovementStatus.OFFLINE,
+            speedMps: 0,
+            recordedAt: new Date(),
+            receivedAt: new Date(),
+          },
+        });
+      }
+      const offers = await tx.bookingOffer.findMany({
+        where: { driverId, status: OfferStatus.SENT },
+        select: { id: true, bookingId: true },
+      });
+      return { session, ended, offers };
+    },
+    { maxWait: 10000, timeout: 30000 }
+  );
 
   // Release the driver lock before touching bookings; include expired SENT offers too.
   for (const offer of offers) {

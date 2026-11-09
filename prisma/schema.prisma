@@ -171,6 +171,8 @@ model Vehicle {
 
   @@index([status])
   @@index([seatingCapacity])
+  @@index([currentLocationId])
+  @@index([homeLocationId])
   @@map("vehicles")
 }
 
@@ -271,6 +273,8 @@ model Booking {
   @@index([userId])
   @@index([vehicleId, departureAt, expectedReturnAt])
   @@index([operationalLocationId])
+  @@index([driverId])
+  @@index([vehiclePreferenceId])
   @@map("bookings")
 }
 
@@ -313,6 +317,7 @@ model Trip {
 
   @@index([vehicleId, startedAt(sort: Desc)])
   @@index([driverId, startedAt(sort: Desc)])
+  @@index([bookingId])
   @@map("trips")
 }
 
@@ -332,6 +337,8 @@ model VehicleLocation {
   receivedAt DateTime       @default(now()) @map("received_at")
   movement   MovementStatus @default(OFFLINE)
 
+  @@index([driverId])
+  @@index([tripId])
   @@map("vehicle_locations")
 }
 
@@ -353,6 +360,8 @@ model DriverLocation {
 
   @@id([id, recordedAt])
   @@index([driverId, recordedAt(sort: Desc)])
+  @@index([tripId])
+  @@index([vehicleId])
   @@map("driver_locations")
 }
 
@@ -395,5 +404,6 @@ model DriverSession {
   createdAt DateTime            @default(now()) @map("created_at")
 
   @@index([driverId, status])
+  @@index([vehicleId])
   @@map("driver_sessions")
 }

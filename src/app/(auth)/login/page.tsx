@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Spinner } from '@/components/ui/Spinner';
@@ -10,7 +10,6 @@ import { VehicleTracking3D } from '@/components/ui/VehicleTracking3D';
 import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl');
 
@@ -21,42 +20,61 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[login] submit start', { email, callbackUrl });
     setError(null);
     setIsLoading(true);
 
     try {
-      const res = await signIn('credentials', {
-        redirect: false,
-        email: email.trim().toLowerCase(),
-        password,
-      });
+      // Timeout guard: a hung signIn() must not leave the button frozen forever
+      const res = await Promise.race([
+        signIn('credentials', {
+          redirect: false,
+          email: email.trim().toLowerCase(),
+          password,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Login request timed out. Check your connection and try again.')),
+            20000
+          )
+        ),
+      ]);
+      console.log('[login] auth response received', res);
 
       if (!res || res.error) {
         setError('Invalid email or password');
-        setIsLoading(false);
         return;
       }
 
       // Reset install dismissal state so the prompt is ready to offer on new session
       resetInstallDismissal();
 
-      // Fetch user role to route appropriately
-      const meRes = await fetch('/api/me');
-      if (meRes.ok) {
-        const { user } = await meRes.json();
-        if (callbackUrl && !callbackUrl.startsWith('/login')) {
-          router.push(callbackUrl);
-        } else if (user?.role === 'ADMIN') {
-          router.push('/admin');
-        } else if (user?.role === 'DRIVER') {
-          router.push('/driver');
-        } else {
-          router.push('/user');
+      // Resolve target by role
+      let target = '/user';
+      try {
+        const meRes = await fetch('/api/me');
+        if (meRes.ok) {
+          const { user } = await meRes.json();
+          if (user?.role === 'ADMIN') target = '/admin';
+          else if (user?.role === 'DRIVER') target = '/driver';
         }
-      } else {
-        router.push('/user');
+      } catch (meErr) {
+        console.error('[login] /api/me failed, using default target', meErr);
       }
+
+      // searchParams.get() already decodes; only accept same-origin paths (no open redirect)
+      const safeCallback =
+        callbackUrl && callbackUrl.startsWith('/') && !callbackUrl.startsWith('//') && !callbackUrl.startsWith('/login')
+          ? callbackUrl
+          : null;
+
+      const destination = safeCallback || target;
+      console.log('[login] redirecting to', destination);
+      // Hard redirect: guarantees the fresh auth cookie is sent on the next request,
+      // so middleware cannot miss the session (router.push could race it)
+      window.location.href = destination;
     } catch (err: unknown) {
+      console.error('Login Error:', err);
       const msg = err instanceof Error && err.message ? err.message : 'Authentication failed. Please try again.';
       // next-auth beta throws "Failed to construct 'URL'" when the server answers 429 (rate limit)
       setError(
@@ -64,6 +82,8 @@ function LoginForm() {
           ? 'Too many attempts. Please wait a few minutes and try again.'
           : msg
       );
+    } finally {
+      // Never leave the form stuck in "Signing in..."
       setIsLoading(false);
     }
   };

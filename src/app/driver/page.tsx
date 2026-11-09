@@ -456,18 +456,37 @@ export default function DriverDashboardPage() {
         stopTracking();
         setActiveSession(null);
         setOffers([]);
+        setActionError(null);
       } else {
-        const coords = await getCurrentPosition();
-        const json = await fetchJson<{ data: DriverSession }>('/api/driver/sessions', {
+        let coords: { lat?: number; lng?: number } | null = null;
+        try {
+          coords = await getCurrentPosition();
+        } catch {
+          // GPS can take time or be rejected; fallback to currentPosition without blocking going online
+          coords = currentPosition ? { lat: currentPosition.lat, lng: currentPosition.lng } : null;
+        }
+
+        const targetVehicleId = selectedVehicle?.id || activeSession?.vehicleId || undefined;
+        const res = await fetchJson<{ data?: DriverSession; success?: boolean }>('/api/driver/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vehicleId: selectedVehicle?.id || undefined, startLat: coords.lat, startLng: coords.lng }),
+          body: JSON.stringify({
+            vehicleId: targetVehicleId,
+            startLat: coords?.lat ?? null,
+            startLng: coords?.lng ?? null,
+          }),
         });
-        setActiveSession(json.data);
-        startTracking();
-        void fetchOffers();
+
+        const newSession = res?.data || (res as unknown as DriverSession);
+        if (newSession) {
+          setActiveSession(newSession);
+          setActionError(null);
+          startTracking();
+          void fetchOffers();
+        }
       }
     } catch (error) {
+      console.error('[Driver Session Error] handleToggleOnline:', error);
       setActionError(error instanceof Error ? error.message : 'Unable to change online status.');
       await loadDashboardData();
     } finally {
@@ -673,10 +692,14 @@ export default function DriverDashboardPage() {
             type="button"
             disabled={isTogglingOnline || isStartingTrip || isLoading || Boolean(activeTrip)}
             onClick={handleToggleOnline}
-            className={`${isOnline ? 'button-secondary' : 'button-primary'} min-h-12 w-full disabled:cursor-not-allowed sm:w-auto`}
+            className={`${
+              isOnline
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-black shadow-[3px_3px_0px_0px_#000]'
+                : 'button-primary'
+            } min-h-12 w-full disabled:cursor-not-allowed sm:w-auto font-black flex items-center justify-center gap-2 px-5 rounded-xl transition cursor-pointer`}
           >
-            {isTogglingOnline ? <Spinner size="sm" /> : <Icon name={isOnline ? 'close' : 'signal'} />}
-            {isOnline ? 'Go offline' : 'Go online'}
+            {isTogglingOnline ? <Spinner size="sm" /> : <Icon name={isOnline ? 'check' : 'signal'} />}
+            {isOnline ? 'Online (Go offline)' : 'Go online'}
           </button>
           <p className="text-xs font-semibold leading-relaxed text-zinc-600">{activeTrip ? 'Finish your trip before changing availability.' : isOnline ? 'Location sharing is on.' : 'Share your location to receive offers.'}</p>
         </div>

@@ -5,6 +5,7 @@ import { AuthProvider } from '@/components/providers/AuthProvider';
 import { NetworkStatus } from '@/components/providers/NetworkStatus';
 import { InstallPrompt } from '@/components/providers/InstallPrompt';
 import { ServiceWorkerRegister } from '@/components/providers/ServiceWorkerRegister';
+import { LaunchSplash } from '@/components/providers/LaunchSplash';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -25,6 +26,10 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? 'https://car-tracking-one.vercel.app'
+  ),
+  // plain string: offline layout sets a standalone full title ('Offline | Vehicle Tracking')
   title: 'KCIC Fleet · Live Tracking',
   description: 'Sistem pelacakan armada kendaraan dan driver operasional KCIC',
   manifest: '/manifest.webmanifest',
@@ -36,6 +41,19 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icons/icon-192.png',
     apple: '/icons/apple-touch-icon.png',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'KCIC Fleet',
+    title: 'KCIC Fleet · Live Tracking',
+    description: 'Sistem pelacakan armada kendaraan dan driver operasional KCIC',
+    locale: 'id_ID',
+    url: '/',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'KCIC Fleet · Live Tracking',
+    description: 'Sistem pelacakan armada kendaraan dan driver operasional KCIC',
   },
 };
 
@@ -56,6 +74,7 @@ export default function RootLayout({
 
       </head>
       <body className="min-h-dvh flex flex-col text-zinc-900 font-sans">
+        <LaunchSplash />
         <ServiceWorkerRegister />
         <AuthProvider>
           <NetworkStatus />

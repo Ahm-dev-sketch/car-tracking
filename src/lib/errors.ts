@@ -59,6 +59,7 @@ export function withErrorHandling<T = any>(
       }
 
       const message = err instanceof Error ? err.message : 'Internal server error';
+      console.error('[Driver Data Fetch Error]:', err);
       logger.error({
         msg: 'Unhandled error in API route',
         error: message,

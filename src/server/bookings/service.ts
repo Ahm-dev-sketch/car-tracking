@@ -424,6 +424,14 @@ export async function transitionBooking(
 
   if (to === BookingStatus.COMPLETED) {
     if (from === BookingStatus.PENDING_COMPLETION) {
+      if (!booking.notaDinasUrl || !booking.notaDinasUrl.trim()) {
+        throw new ApiError(
+          400,
+          'NOTA_DINAS_REQUIRED',
+          'Dokumen Nota Dinas belum diunggah. Dokumen Nota Dinas wajib diunggah oleh pemesan atau pengemudi sebelum pesanan dapat disetujui / diselesaikan.'
+        );
+      }
+
       const completed = await prisma.booking.update({
         where: { id: bookingId },
         data: { status: BookingStatus.COMPLETED, rejectedReason: null },

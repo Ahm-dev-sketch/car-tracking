@@ -16,43 +16,49 @@ export const GET = withErrorHandling(async () => {
   let activeSession = null;
   let driverProfile = null;
   if (user.role === 'DRIVER') {
-    const driver = await prisma.driver.findUnique({
-      where: { userId: user.id },
-    });
-    driverProfile = driver;
-    if (driver) {
-      activeTrip = await prisma.trip.findFirst({
-        where: { driverId: driver.id, status: TripStatus.ACTIVE },
-        include: {
-          vehicle: { select: { id: true, plateNumber: true, brand: true, model: true } },
-          booking: {
-            select: {
-              id: true,
-              bookingNumber: true,
-              pickupLocation: true,
-              destination: true,
-              status: true,
-              passengerCount: true,
-              pickupLat: true,
-              pickupLng: true,
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  phone: true,
+    try {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: user.id },
+      });
+      driverProfile = driver;
+      if (driver) {
+        activeTrip = await prisma.trip.findFirst({
+          where: { driverId: driver.id, status: TripStatus.ACTIVE },
+          include: {
+            vehicle: { select: { id: true, plateNumber: true, brand: true, model: true } },
+            booking: {
+              select: {
+                id: true,
+                bookingNumber: true,
+                pickupLocation: true,
+                destination: true,
+                status: true,
+                passengerCount: true,
+                pickupLat: true,
+                pickupLng: true,
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                  },
                 },
               },
             },
           },
-        },
-      });
+        });
 
-      activeSession = await prisma.driverSession.findFirst({
-        where: { driverId: driver.id, status: DriverSessionStatus.ACTIVE },
-        include: {
-          vehicle: { select: { id: true, plateNumber: true, brand: true, model: true } },
-        },
-      });
+        activeSession = await prisma.driverSession.findFirst({
+          where: { driverId: driver.id, status: DriverSessionStatus.ACTIVE },
+          include: {
+            vehicle: { select: { id: true, plateNumber: true, brand: true, model: true } },
+          },
+        });
+      }
+    } catch (driverErr: unknown) {
+      console.error('[Driver Data Fetch Error] /api/tracking/config driver session lookup:', driverErr);
+      activeTrip = null;
+      activeSession = null;
     }
   }
 

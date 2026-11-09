@@ -88,6 +88,7 @@ function DriverVehicleContent() {
           setCurrentVehicle(null);
         }
       } catch (cause) {
+        console.error('[Driver Data Fetch Error] /driver/vehicle loadDriverVehicle:', cause);
         setError(cause instanceof Error ? cause.message : 'Failed to load vehicle assignment');
       } finally {
         setIsLoading(false);

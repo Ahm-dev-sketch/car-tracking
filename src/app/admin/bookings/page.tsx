@@ -604,7 +604,7 @@ function AdminBookingsContent() {
                     Edit Alasan
                   </button>
                 </div>
-              ) : (
+              ) : b.notaDinasUrl ? (
                 <>
                   <button
                     type="button"
@@ -628,6 +628,10 @@ function AdminBookingsContent() {
                     <span>Tolak Nota Dinas</span>
                   </button>
                 </>
+              ) : (
+                <span className="px-2.5 py-1 text-[11px] font-bold bg-amber-100 text-amber-900 rounded-lg border border-amber-300" title="Dokumen Nota Dinas belum diunggah oleh pemesan atau pengemudi">
+                  Menunggu Nota Dinas
+                </span>
               )
             )}
             <button
@@ -846,7 +850,7 @@ function AdminBookingsContent() {
                         Ubah Alasan
                       </button>
                     </div>
-                  ) : (
+                  ) : selectedBooking.notaDinasUrl ? (
                     <>
                       <button
                         type="button"
@@ -874,6 +878,12 @@ function AdminBookingsContent() {
                         <span>Tolak Nota Dinas</span>
                       </button>
                     </>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1.5 bg-amber-100 text-amber-900 text-xs font-bold rounded-lg border border-amber-300">
+                        Nota Dinas Belum Diunggah
+                      </span>
+                    </div>
                   )
                 )}
                 {(selectedBooking.status === 'ADMIN_INTERVENTION' ||

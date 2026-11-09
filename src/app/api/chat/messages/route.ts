@@ -50,6 +50,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     );
     return NextResponse.json({ data: messages });
   } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] /api/chat/messages GET:', err);
     // If table doesn't exist yet, return empty list gracefully
     return NextResponse.json({ data: [] });
   }

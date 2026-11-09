@@ -303,25 +303,43 @@ export default function DriverDashboardPage() {
   const loadDashboardData = useCallback(async () => {
     const version = ++dashboardRequest.current;
     try {
-      const config = await fetchJson<DashboardConfig>('/api/tracking/config');
+      let config: DashboardConfig | null = null;
+      try {
+        config = await fetchJson<DashboardConfig>('/api/tracking/config');
+      } catch (cfgErr) {
+        console.error('[Driver Data Fetch Error] client /api/tracking/config:', cfgErr);
+      }
+
       if (version !== dashboardRequest.current) return;
-      if (config.realtimeToken) setRealtimeToken(config.realtimeToken);
-      if (config.config?.tripIntervalSec) setTripIntervalSec(config.config.tripIntervalSec);
-      setActiveTrip(config.sessionState.activeTrip);
-      setActiveSession(config.sessionState.activeSession);
+      if (config) {
+        if (config.realtimeToken) setRealtimeToken(config.realtimeToken);
+        if (config.config?.tripIntervalSec) setTripIntervalSec(config.config.tripIntervalSec);
+        setActiveTrip(config.sessionState?.activeTrip || null);
+        setActiveSession(config.sessionState?.activeSession || null);
+      }
 
       // Filter on the server before pagination; history must not hide a pending pickup.
       const bookings: AssignedBooking[] = [];
       let page = 1;
       let totalPages = 1;
-      do {
-        const result = await fetchJson<{ data: AssignedBooking[]; pagination: { totalPages: number } }>(`/api/bookings?workflow=driver&limit=100&page=${page}`);
-        if (version !== dashboardRequest.current) return;
-        bookings.push(...result.data);
-        totalPages = result.pagination.totalPages;
-        page += 1;
-      } while (page <= totalPages);
-      setAssignedBookings(bookings);
+      try {
+        do {
+          const result = await fetchJson<{ data: AssignedBooking[]; pagination: { totalPages: number } }>(
+            `/api/bookings?workflow=driver&limit=100&page=${page}`
+          );
+          if (version !== dashboardRequest.current) return;
+          if (Array.isArray(result?.data)) {
+            bookings.push(...result.data);
+          }
+          totalPages = result?.pagination?.totalPages ?? 1;
+          page += 1;
+        } while (page <= totalPages);
+        setAssignedBookings(bookings);
+      } catch (bookErr) {
+        console.error('[Driver Data Fetch Error] client /api/bookings:', bookErr);
+        setAssignedBookings([]);
+      }
+
       try {
         const poolParams = new URLSearchParams({ status: 'AVAILABLE', limit: '30' });
         if (selectedLocationId) poolParams.set('locationId', selectedLocationId);
@@ -331,17 +349,21 @@ export default function DriverDashboardPage() {
           fetchJson<{ data: LocationOption[] }>('/api/locations'),
         ]);
         if (version === dashboardRequest.current) {
-          setPoolVehicles(poolRes.data || []);
-          if (locsRes.data) setLocations(locsRes.data);
+          setPoolVehicles(poolRes?.data || []);
+          if (locsRes?.data) setLocations(locsRes.data);
         }
-      } catch {
-        // Pool vehicle list non-fatal
+      } catch (poolErr) {
+        console.error('[Driver Data Fetch Error] client pool vehicles/locations:', poolErr);
       }
-      await fetchOffers();
+
+      try {
+        await fetchOffers();
+      } catch (offerErr) {
+        console.error('[Driver Data Fetch Error] client fetchOffers:', offerErr);
+      }
     } catch (error) {
-      if (version === dashboardRequest.current) {
-        setActionError(error instanceof Error ? error.message : 'Unable to refresh the driver dashboard.');
-      }
+      console.error('[Driver Data Fetch Error] loadDashboardData unhandled:', error);
+      // Do not flash red "Internal server error" alert banner on background dashboard refresh
     } finally {
       if (version === dashboardRequest.current) setIsLoading(false);
     }

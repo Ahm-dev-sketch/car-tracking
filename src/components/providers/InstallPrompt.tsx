@@ -32,23 +32,48 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
     globalDeferredPrompt = event as BeforeInstallPromptEvent;
+    // If browser fires beforeinstallprompt, the app is not currently installed (or was uninstalled).
+    try {
+      localStorage.removeItem('fleettrack_app_installed');
+    } catch {
+      // ignore
+    }
     notifySubscribers();
   });
 
   window.addEventListener('appinstalled', () => {
     globalDeferredPrompt = null;
-    localStorage.setItem('fleettrack_app_installed', '1');
+    try {
+      localStorage.setItem('fleettrack_app_installed', '1');
+    } catch {
+      // ignore
+    }
     notifySubscribers();
   });
 }
 
 export function isAppStandalone(): boolean {
   if (typeof window === 'undefined') return false;
-  return (
+  // True standalone mode check (app opened as installed PWA window)
+  const isStandalone =
     window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as StandaloneNavigator).standalone === true ||
-    localStorage.getItem('fleettrack_app_installed') === '1'
-  );
+    (navigator as StandaloneNavigator).standalone === true;
+
+  if (isStandalone) {
+    return true;
+  }
+
+  // If running inside browser tab and beforeinstallprompt is ready, app is not installed
+  if (globalDeferredPrompt) {
+    try {
+      localStorage.removeItem('fleettrack_app_installed');
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+
+  return false;
 }
 
 /**
@@ -62,6 +87,9 @@ export function resetInstallDismissal() {
     sessionStorage.removeItem('fleettrack_ios_dismissed_at');
     localStorage.removeItem('fleettrack_install_dismissed');
     localStorage.removeItem('fleettrack_ios_install_dismissed');
+    if (!window.matchMedia('(display-mode: standalone)').matches) {
+      localStorage.removeItem('fleettrack_app_installed');
+    }
     window.dispatchEvent(new CustomEvent('fleettrack:reset-install'));
   } catch {
     // ignore storage restrictions

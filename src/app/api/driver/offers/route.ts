@@ -17,19 +17,26 @@ export const GET = withErrorHandling(async () => {
   });
 
   if (!driver) {
-    throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver profile not found');
+    console.error('[Driver Data Fetch Error] /api/driver/offers: Driver profile not found for user', user.id);
+    return NextResponse.json({ data: [] });
   }
 
   // Lazy sweep on read: advance expired offers before listing
   try {
     await dispatchSweep();
   } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] lazy dispatch sweep in driver offers:', err);
     logger.warn({
       msg: 'Lazy dispatch sweep failed in driver offers read',
       error: err instanceof Error ? err.message : String(err),
     });
   }
 
-  const offers = await getDriverOffers(driver.id);
-  return NextResponse.json({ data: offers });
+  try {
+    const offers = await getDriverOffers(driver.id);
+    return NextResponse.json({ data: offers });
+  } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] /api/driver/offers getDriverOffers:', err);
+    return NextResponse.json({ data: [] });
+  }
 });

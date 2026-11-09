@@ -29,14 +29,33 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   try {
     await dispatchSweep();
   } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] lazy dispatch sweep in bookings read:', err);
     logger.warn({
       msg: 'Lazy dispatch sweep failed in bookings read',
       error: err instanceof Error ? err.message : String(err),
     });
   }
 
-  const result = await listBookings(user, { ...query, driverWorkflow: searchParams.get('workflow') === 'driver' });
-  return NextResponse.json(result);
+  const isDriverWorkflow = searchParams.get('workflow') === 'driver';
+  try {
+    const result = await listBookings(user, { ...query, driverWorkflow: isDriverWorkflow });
+    return NextResponse.json(result);
+  } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] /api/bookings listBookings:', err);
+    if (isDriverWorkflow || user.role === 'DRIVER') {
+      // Graceful fallback: return empty list with totalPages=1 rather than 500
+      return NextResponse.json({
+        data: [],
+        pagination: {
+          page: query.page ?? 1,
+          limit: query.limit ?? 10,
+          total: 0,
+          totalPages: 1,
+        },
+      });
+    }
+    throw err;
+  }
 });
 
 export const POST = withRateLimit(

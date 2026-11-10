@@ -23,7 +23,10 @@ const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 export function useWebRTCCall({
@@ -49,6 +52,7 @@ export function useWebRTCCall({
   const pendingOfferRef = useRef<any>(null);
   const callDurationRef = useRef<number>(0);
   const callStatusRef = useRef<CallStatus>('idle');
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
 
   // Keep ref synchronized
   callStatusRef.current = callStatus;
@@ -79,11 +83,14 @@ export function useWebRTCCall({
     if (pcRef.current) {
       pcRef.current.onicecandidate = null;
       pcRef.current.ontrack = null;
+      pcRef.current.oniceconnectionstatechange = null;
+      pcRef.current.onconnectionstatechange = null;
       pcRef.current.close();
       pcRef.current = null;
     }
 
     pendingOfferRef.current = null;
+    pendingCandidatesRef.current = [];
     setRemoteStream(null);
     setIsMuted(false);
   }, []);
@@ -100,6 +107,22 @@ export function useWebRTCCall({
       });
     }, 1000);
   }, []);
+
+  // Helper to drain buffered candidates received before remoteDescription
+  const drainPendingIceCandidates = async (pc: RTCPeerConnection) => {
+    if (pendingCandidatesRef.current.length > 0) {
+      console.log(`[WebRTC ICE]: Flushing ${pendingCandidatesRef.current.length} buffered candidates`);
+      const candidates = [...pendingCandidatesRef.current];
+      pendingCandidatesRef.current = [];
+      for (const cand of candidates) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (err) {
+          console.warn('[WebRTC ICE]: Error adding buffered candidate:', err);
+        }
+      }
+    }
+  };
 
   // Initialize RTCPeerConnection
   const getOrCreatePeerConnection = useCallback(() => {
@@ -120,13 +143,27 @@ export function useWebRTCCall({
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log('[ICE State]:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        console.log('[WebRTC Audio]: ICE media connectivity fully established');
+      } else if (pc.iceConnectionState === 'failed') {
+        console.warn('[WebRTC Audio]: ICE connection failed in production');
+      }
+    };
+
     pc.ontrack = (event) => {
+      console.log('[WebRTC ontrack]: Received remote track', event.track.kind, event.streams);
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
+      } else {
+        const inboundStream = new MediaStream([event.track]);
+        setRemoteStream(inboundStream);
       }
     };
 
     pc.onconnectionstatechange = () => {
+      console.log('[WebRTC Connection State]:', pc.connectionState);
       if (pc.connectionState === 'connected') {
         sounds.stopAll();
         setCallStatus('connected');
@@ -234,6 +271,7 @@ export function useWebRTCCall({
 
       if (pendingOfferRef.current) {
         await pc.setRemoteDescription(new RTCSessionDescription(pendingOfferRef.current));
+        await drainPendingIceCandidates(pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
@@ -391,6 +429,7 @@ export function useWebRTCCall({
       try {
         if (payload.answer && pcRef.current) {
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
+          await drainPendingIceCandidates(pcRef.current);
         }
         setCallStatus('connected');
         startTimer();
@@ -453,6 +492,8 @@ export function useWebRTCCall({
       try {
         if (pcRef.current && pcRef.current.remoteDescription && payload.candidate) {
           await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        } else if (payload.candidate) {
+          pendingCandidatesRef.current.push(payload.candidate);
         }
       } catch (err) {
         console.error('Failed to add ICE candidate:', err);

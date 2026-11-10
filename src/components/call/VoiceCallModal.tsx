@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { CallStatus } from '@/hooks/useWebRTCCall';
 
@@ -38,16 +38,65 @@ export function VoiceCallModal({
   onToggleMute,
 }: VoiceCallModalProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [isSinkIdSupported, setIsSinkIdSupported] = useState(true);
 
-  // Bind remote stream to audio element
   useEffect(() => {
-    if (audioRef.current && remoteStream) {
-      audioRef.current.srcObject = remoteStream;
-      audioRef.current.play().catch(() => {
-        // Autoplay may need user gesture
-      });
+    setIsSinkIdSupported('setSinkId' in HTMLMediaElement.prototype);
+  }, []);
+
+  // Reset speaker state when call terminates
+  useEffect(() => {
+    if (callStatus === 'idle' || callStatus === 'ended') {
+      setIsSpeakerOn(false);
     }
-  }, [remoteStream]);
+  }, [callStatus]);
+
+  // Bind remote stream to audio element with safe Autoplay Policy handling
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (audioEl && remoteStream) {
+      if (audioEl.srcObject !== remoteStream) {
+        audioEl.srcObject = remoteStream;
+      }
+      audioEl
+        .play()
+        .then(() => {
+          console.log('[WebRTC Audio]: Remote audio playing successfully in production');
+        })
+        .catch((err) => {
+          console.warn('[WebRTC Audio] Autoplay tertahan:', err);
+        });
+    }
+  }, [remoteStream, callStatus]);
+
+  // Toggle speakerphone / loudspeaker output
+  const toggleSpeaker = async () => {
+    if (!audioRef.current || !('setSinkId' in HTMLMediaElement.prototype)) {
+      console.warn('[WebRTC Audio] setSinkId tidak didukung di browser ini');
+      setIsSpeakerOn((prev: boolean) => !prev);
+      return;
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioOutputs = devices.filter((d) => d.kind === 'audiooutput');
+      // Cari device speaker eksternal / default loudspeaker jika tersedia
+      const targetDeviceId =
+        !isSpeakerOn && audioOutputs.length > 1
+          ? audioOutputs.find((d) => d.label.toLowerCase().includes('speaker'))?.deviceId ||
+            audioOutputs[1].deviceId
+          : '';
+      await (audioRef.current as any).setSinkId(targetDeviceId);
+      setIsSpeakerOn(!isSpeakerOn);
+    } catch (error) {
+      console.error('[Speaker Toggle Error]:', error);
+    }
+  };
+
+  const handleAccept = () => {
+    audioRef.current?.play().catch(() => {});
+    onAccept();
+  };
 
   if (callStatus === 'idle') return null;
 
@@ -131,7 +180,7 @@ export function VoiceCallModal({
 
               <button
                 type="button"
-                onClick={onAccept}
+                onClick={handleAccept}
                 className="flex flex-col items-center gap-1.5 cursor-pointer group"
               >
                 <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-black bg-emerald-500 text-black shadow-[3px_3px_0px_0px_#000] group-hover:bg-emerald-400 transition animate-pulse">
@@ -141,25 +190,54 @@ export function VoiceCallModal({
               </button>
             </>
           ) : (
-            /* Calling or Connected: Show Mute and Hang up */
+            /* Calling or Connected: Show Mute, Speaker, and Hang up */
             <>
               {callStatus === 'connected' && (
-                <button
-                  type="button"
-                  onClick={onToggleMute}
-                  className="flex flex-col items-center gap-1.5 cursor-pointer group"
-                >
-                  <span
-                    className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] transition ${
-                      isMuted ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                    }`}
+                <>
+                  <button
+                    type="button"
+                    onClick={onToggleMute}
+                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
+                    title={isMuted ? 'Aktifkan Mikrofon' : 'Bisukan Mikrofon'}
                   >
-                    <Icon name={isMuted ? 'micOff' : 'mic'} className="size-5" />
-                  </span>
-                  <span className="text-[11px] font-bold text-zinc-700">
-                    {isMuted ? 'Buka Mic' : 'Mute'}
-                  </span>
-                </button>
+                    <span
+                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] transition ${
+                        isMuted ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                      }`}
+                    >
+                      <Icon name={isMuted ? 'micOff' : 'mic'} className="size-5" />
+                    </span>
+                    <span className="text-[11px] font-bold text-zinc-700">
+                      {isMuted ? 'Unmute' : 'Mute'}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={toggleSpeaker}
+                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
+                    title={
+                      isSinkIdSupported
+                        ? isSpeakerOn
+                          ? 'Matikan Loudspeaker'
+                          : 'Aktifkan Loudspeaker'
+                        : 'Output audio dikelola sistem perangkat'
+                    }
+                  >
+                    <span
+                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] transition ${
+                        isSpeakerOn
+                          ? 'bg-emerald-400 text-zinc-950 shadow-[3px_3px_0px_0px_#000]'
+                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                      }`}
+                    >
+                      <Icon name={isSpeakerOn ? 'speaker' : 'speakerOff'} className="size-5" />
+                    </span>
+                    <span className="text-[11px] font-bold text-zinc-700">
+                      {isSpeakerOn ? 'Speaker On' : 'Speaker Off'}
+                    </span>
+                  </button>
+                </>
               )}
 
               <button

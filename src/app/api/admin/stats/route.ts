@@ -21,14 +21,8 @@ export const GET = withErrorHandling(async () => {
         success: false,
         error: { code: 'STATS_FETCH_FAILED', message },
         message,
-        data: {
-          vehicles: { total: 0, available: 0, reserved: 0, inUse: 0, maintenance: 0, inactive: 0 },
-          drivers: { online: 0, busy: 0, offline: 0 },
-          bookings: { active: 0, searching: 0, completedToday: 0, actionRequired: 0 },
-          byLocation: [],
-        },
       },
-      { status: 200 }
+      { status: 503 }
     );
   }
 });

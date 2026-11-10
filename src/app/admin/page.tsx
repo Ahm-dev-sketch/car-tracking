@@ -66,15 +66,19 @@ export default function AdminOverviewPage() {
 
       if (statsRes.ok) {
         const json = await statsRes.json();
-        setStats(json.data || null);
+        if (json.success !== false && json.data) {
+          setStats(json.data);
+        }
       }
 
       if (tripsRes.ok) {
         const atJson = await tripsRes.json();
-        setActiveTripsList(atJson.data || []);
+        if (Array.isArray(atJson.data)) {
+          setActiveTripsList(atJson.data);
+        }
       }
     } catch {
-      // ignore
+      // ignore network errors silently without wiping out existing state
     } finally {
       if (isInitial) setIsLoading(false);
     }
@@ -94,7 +98,7 @@ export default function AdminOverviewPage() {
       if (document.visibilityState === 'visible') {
         void loadStats(false);
       }
-    }, 5000);
+    }, 20000);
 
     return () => {
       clearInterval(interval);

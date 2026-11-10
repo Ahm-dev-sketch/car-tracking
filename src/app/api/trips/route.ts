@@ -10,30 +10,36 @@ import { ApiError } from '@/lib/errors';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
-  const user = await getSessionUser();
-
-  const { searchParams } = new URL(req.url);
-  const query = tripQuerySchema.parse({
-    page: searchParams.get('page') ?? undefined,
-    limit: searchParams.get('limit') ?? undefined,
-    status: searchParams.get('status') ?? undefined,
-    vehicleId: searchParams.get('vehicle_id') ?? searchParams.get('vehicleId') ?? undefined,
-    driverId: searchParams.get('driver_id') ?? searchParams.get('driverId') ?? undefined,
-    startDate: searchParams.get('start_date') ?? searchParams.get('startDate') ?? undefined,
-    endDate: searchParams.get('end_date') ?? searchParams.get('endDate') ?? undefined,
-  });
-
+  let queryLimit = 10;
+  let queryPage = 1;
   try {
+    const user = await getSessionUser();
+
+    const { searchParams } = new URL(req.url);
+    const query = tripQuerySchema.parse({
+      page: searchParams.get('page') ?? undefined,
+      limit: searchParams.get('limit') ?? undefined,
+      status: searchParams.get('status') ?? undefined,
+      vehicleId: searchParams.get('vehicle_id') ?? searchParams.get('vehicleId') ?? undefined,
+      driverId: searchParams.get('driver_id') ?? searchParams.get('driverId') ?? undefined,
+      startDate: searchParams.get('start_date') ?? searchParams.get('startDate') ?? undefined,
+      endDate: searchParams.get('end_date') ?? searchParams.get('endDate') ?? undefined,
+    });
+    queryLimit = query.limit ?? 10;
+    queryPage = query.page ?? 1;
+
     const result = await listTrips(user, query);
     return NextResponse.json(result);
   } catch (error: unknown) {
-    if (error instanceof ApiError) throw error;
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      throw error;
+    }
     console.error('FATAL DB ERROR [GET /api/trips]:', error);
     return NextResponse.json({
       data: [],
       meta: {
-        page: query.page ?? 1,
-        limit: query.limit ?? 10,
+        page: queryPage,
+        limit: queryLimit,
         total: 0,
         totalPages: 0,
       },

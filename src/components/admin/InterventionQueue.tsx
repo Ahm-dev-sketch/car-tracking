@@ -57,8 +57,8 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const fetchInterventions = async () => {
-    setLoadingBookings(true);
+  const fetchInterventions = async (isInitial = false) => {
+    if (isInitial) setLoadingBookings(true);
     try {
       const res = await fetch('/api/bookings?status=ADMIN_INTERVENTION&limit=20');
       if (res.ok) {
@@ -75,13 +75,13 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
     } catch {
       // ignore
     } finally {
-      setLoadingBookings(false);
+      if (isInitial) setLoadingBookings(false);
     }
   };
 
   useEffect(() => {
-    fetchInterventions();
-    const interval = setInterval(fetchInterventions, 15000);
+    fetchInterventions(true);
+    const interval = setInterval(() => fetchInterventions(false), 20000);
     return () => clearInterval(interval);
   }, []);
 

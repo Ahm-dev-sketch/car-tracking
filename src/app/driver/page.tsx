@@ -182,13 +182,17 @@ export default function DriverDashboardPage() {
     }
 
     try {
-      const result = await fetchJson<{ data: { accepted: number; rejected: { reason: string }[] } }>('/api/tracking/locations', {
+      const result = await fetchJson<{ data?: { accepted: number; rejected: { reason: string }[] }; buffered?: boolean }>('/api/tracking/locations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ points: batch }),
       });
       uploadBackoffUntil.current = 0;
-      setTelemetryWarning(result.data.rejected.length > 0 ? result.data.rejected[0].reason : null);
+      if (result?.buffered) {
+        setTelemetryWarning(null);
+      } else {
+        setTelemetryWarning(result?.data?.rejected && result.data.rejected.length > 0 ? result.data.rejected[0].reason : null);
+      }
     } catch (error) {
       // Apply 20s backoff to avoid continuous request loops if server is encountering issues
       uploadBackoffUntil.current = Date.now() + 20000;

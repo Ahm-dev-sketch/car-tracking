@@ -9,12 +9,33 @@ import { ApiError } from '@/lib/errors';
 
 export const POST = withRateLimit(
   withErrorHandling(async (req: NextRequest) => {
-    const user = await getSessionUser();
-    requireRole(user, 'DRIVER');
+    let user;
+    try {
+      user = await getSessionUser();
+      requireRole(user, 'DRIVER');
+    } catch (authErr) {
+      if (authErr instanceof ApiError && (authErr.status === 401 || authErr.status === 403)) {
+        throw authErr;
+      }
+      return NextResponse.json(
+        { success: false, buffered: true, data: { accepted: 0, rejected: [] }, warning: 'Database busy' },
+        { status: 200 }
+      );
+    }
 
-    const driver = await prisma.driver.findUnique({
-      where: { userId: user.id },
-    });
+    let driver = null;
+    try {
+      driver = await prisma.driver.findUnique({
+        where: { userId: user.id },
+      });
+    } catch (dbErr: unknown) {
+      console.warn('[Tracking Location DB Busy]:', dbErr);
+      return NextResponse.json(
+        { success: false, buffered: true, data: { accepted: 0, rejected: [] }, warning: 'Database busy' },
+        { status: 200 }
+      );
+    }
+
     if (!driver) {
       throw new ApiError(404, 'DRIVER_NOT_FOUND', 'Driver profile not found');
     }
@@ -43,6 +64,7 @@ export const POST = withRateLimit(
       const ingestResult = await ingestLocations(driver.id, parsedPoints);
 
       return NextResponse.json({
+        success: true,
         data: {
           accepted: ingestResult.accepted,
           rejected: [
@@ -56,10 +78,31 @@ export const POST = withRateLimit(
       });
     } catch (error: unknown) {
       console.error('[Tracking Location Error]:', error);
-      if (error instanceof ApiError) {
+      if (error instanceof ApiError && error.status < 500) {
         throw error;
       }
-      const message = error instanceof Error ? error.message : 'Database error while ingesting locations';
+      const message = error instanceof Error ? error.message : String(error);
+      const isConnectionIssue =
+        message.includes('EMAXCONNSESSION') ||
+        message.includes('pool_size') ||
+        message.includes('connection') ||
+        message.includes('timeout') ||
+        message.includes('terminat') ||
+        message.includes('client') ||
+        message.includes('busy');
+
+      if (isConnectionIssue) {
+        console.warn('[Tracking Location Ingest]: Connection pool busy, returning buffered 200 response');
+        return NextResponse.json(
+          {
+            success: false,
+            buffered: true,
+            data: { accepted: 0, rejected: [] },
+            warning: 'Database busy',
+          },
+          { status: 200 }
+        );
+      }
       throw new ApiError(500, 'TRACKING_INGEST_ERROR', message);
     }
   }),

@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  pgPool: pg.Pool | undefined;
 };
 
 function getConnectionString(): string {
@@ -48,22 +49,33 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
-  // Managed pg.Pool with conservative connection caps to prevent connection exhaustion on Supabase/Vercel
-  const pool = new pg.Pool({
-    connectionString,
-    max: process.env.NODE_ENV === 'production' ? 5 : 10,
-    connectionTimeoutMillis: 10000,
-    idleTimeoutMillis: 30000,
-  });
+  const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
 
-  const adapter = new PrismaPg(pool);
+  // Singleton pg.Pool attached to globalThis across warm serverless invocations
+  if (!globalForPrisma.pgPool) {
+    const pool = new pg.Pool({
+      connectionString,
+      // In serverless, limiting pool size to 1 per lambda container prevents connection pool exhaustion
+      max: isServerless ? 1 : 5,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 10000,
+    });
+
+    pool.on('error', (err) => {
+      console.warn('[Prisma pg.Pool]: Unexpected error on idle client:', err.message);
+    });
+
+    globalForPrisma.pgPool = pool;
+  }
+
+  const adapter = new PrismaPg(globalForPrisma.pgPool);
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 }
 
-// ponytail: lazy proxy connects via Hyperdrive on CF Workers or DATABASE_URL on Node
+// Global database client singleton stored on globalThis across all environments (including production serverless)
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
   get(_target, prop) {
     if (!globalForPrisma.prisma) {
@@ -75,7 +87,7 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
   },
 });
 
-if (process.env.NODE_ENV !== 'production' && !globalForPrisma.prisma && (process.env.DATABASE_URL || process.env.POSTGRES_URL)) {
+// Eager initialization on globalThis if connection string is present
+if (!globalForPrisma.prisma && (process.env.DATABASE_URL || process.env.POSTGRES_URL)) {
   globalForPrisma.prisma = createPrismaClient();
 }
-

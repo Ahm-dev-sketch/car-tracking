@@ -64,7 +64,8 @@ Set the following environment variables in the Vercel Project Settings (**Settin
 | `AUTH_SECRET` | 32+ character random string (e.g. `openssl rand -hex 32`) | Secret for signing Auth.js JWT session cookies |
 | `AUTH_TRUST_HOST` | `true` | Allows Auth.js to trust reverse proxy headers (`x-forwarded-host`) on Vercel |
 | `NEXTAUTH_URL` | `https://car-tracking-one.vercel.app` (or custom domain) | Canonical URL for NextAuth callbacks and CSRF validation |
-| `DATABASE_URL` | Pooled PostgreSQL connection string (`?pgbouncer=true` or pooler port 6543) | Database connection pool |
+| `DATABASE_URL` | `postgres://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1` | Supabase Transaction Mode Pooler (port 6543) for runtime queries |
+| `DIRECT_URL` | `postgres://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres` | Supabase Direct/Session connection (port 5432) for Prisma CLI migrations |
 | `REALTIME_INTERNAL_TOKEN` | 32+ character secret token | Inter-service and realtime webhook auth |
 
 ### Cloudflare Workers Configuration

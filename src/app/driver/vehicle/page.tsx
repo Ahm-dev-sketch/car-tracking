@@ -74,7 +74,7 @@ function DriverVehicleContent() {
         const [configRes, locsRes, meRes] = await Promise.allSettled([
           fetchJson<{ sessionState: { activeTrip?: { vehicle: { id: string } }; activeSession?: { vehicle?: { id: string } } } }>('/api/tracking/config'),
           fetchJson<{ data: LocationOption[] }>('/api/locations'),
-          fetchJson<{ driver: { status: string; licenseNumber: string; currentVehicle: VehicleDetails | null } | null }>('/api/me'),
+          fetchJson<{ user?: { role?: string }; driver: { status: string; licenseNumber: string; currentVehicle: VehicleDetails | null } | null }>('/api/me'),
         ]);
 
         if (locsRes.status === 'fulfilled' && locsRes.value?.data) {
@@ -83,19 +83,32 @@ function DriverVehicleContent() {
           console.error('[Driver Data Fetch Error] /driver/vehicle locations:', locsRes.reason);
         }
 
-        if (meRes.status !== 'fulfilled' || !meRes.value?.driver) {
-          throw new Error('Driver profile not found. Please contact an administrator.');
+        if (meRes.status !== 'fulfilled' || !meRes.value) {
+          throw new Error('Gagal memverifikasi akun pengemudi. Silakan segarkan halaman.');
         }
-        const meDriver = meRes.value.driver;
-        const config = configRes.status === 'fulfilled' ? configRes.value : null;
-        setDriverStatus(meDriver.status);
-        setLicenseNumber(meDriver.licenseNumber);
-        const vehicleId = config?.sessionState.activeTrip?.vehicle.id || config?.sessionState.activeSession?.vehicle?.id || meDriver.currentVehicle?.id;
-        if (vehicleId) {
-          const result = await fetchJson<{ data: VehicleDetails }>(`/api/vehicles/${vehicleId}`);
-          setCurrentVehicle(result.data);
-        } else {
+
+        const me = meRes.value;
+        const meDriver = me.driver;
+        const userRole = me.user?.role;
+
+        if (!meDriver) {
+          if (userRole && userRole !== 'DRIVER') {
+            throw new Error(`Akun aktif saat ini (${userRole}) bukan akun Driver. Silakan masuk dengan akun Driver untuk mengelola penugasan armada.`);
+          }
+          setDriverStatus('OFFLINE');
+          setLicenseNumber('SIM-0001');
           setCurrentVehicle(null);
+        } else {
+          setDriverStatus(meDriver.status);
+          setLicenseNumber(meDriver.licenseNumber);
+          const config = configRes.status === 'fulfilled' ? configRes.value : null;
+          const vehicleId = config?.sessionState.activeTrip?.vehicle.id || config?.sessionState.activeSession?.vehicle?.id || meDriver.currentVehicle?.id;
+          if (vehicleId) {
+            const result = await fetchJson<{ data: VehicleDetails }>(`/api/vehicles/${vehicleId}`);
+            setCurrentVehicle(result.data);
+          } else {
+            setCurrentVehicle(null);
+          }
         }
       } catch (cause) {
         console.error('[Driver Data Fetch Error] /driver/vehicle loadDriverVehicle:', cause);

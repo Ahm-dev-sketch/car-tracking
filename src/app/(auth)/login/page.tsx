@@ -61,7 +61,7 @@ function LoginForm() {
         if (res?.error === 'MissingCSRF' || res?.error === 'CSRFError') {
           setError('Sesi autentikasi telah diperbarui. Silakan coba masuk kembali.');
         } else if (res?.error === 'CredentialsSignin') {
-          setError('Email atau password salah');
+          setError('Email atau password salah. Jika ingin mencoba, Anda dapat mengklik tombol Akun Demo di atas.');
         } else {
           setError(res?.error ? `Gagal masuk: ${res.error}` : 'Email atau password salah');
         }

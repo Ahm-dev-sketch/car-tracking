@@ -157,3 +157,4 @@ it('logs COMPLETED call and formats duration in system message', async () => {
   expect(json.data.status).toBe('COMPLETED');
   expect(json.data.message).toBe('📞 Panggilan Suara Berakhir (02:45)');
 });
+

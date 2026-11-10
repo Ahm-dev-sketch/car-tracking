@@ -1,16 +1,14 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { encode } from 'next-auth/jwt';
-import { skipCSRFCheck } from '@auth/core';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  skipCSRFCheck,
+  trustHost: true,
   useSecureCookies: process.env.NODE_ENV === 'production',
   session: { strategy: 'jwt' },
-  secret: process.env.AUTH_SECRET,
-  trustHost: true,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
       name: 'Credentials',
@@ -88,7 +86,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token && session.user) {
         session.user.id = (token.userId as string) ?? (token.sub as string);
         session.user.role = token.role as string;
-        if (process.env.AUTH_SECRET) {
+        const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+        if (authSecret) {
           try {
             (session as unknown as { token?: string }).token = await encode({
               token: {
@@ -97,7 +96,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 role: session.user.role,
                 exp: Math.floor(Date.now() / 1000) + 3600 * 24,
               },
-              secret: process.env.AUTH_SECRET,
+              secret: authSecret,
               salt: 'authjs.session-token',
             });
           } catch {

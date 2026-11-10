@@ -9,7 +9,11 @@ export default async function proxy(req: NextRequest) {
   // bounces every authenticated navigation back to /login.
   const isHttps =
     req.nextUrl.protocol === 'https:' || req.headers.get('x-forwarded-proto') === 'https';
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET, secureCookie: isHttps });
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    secureCookie: isHttps,
+  });
   const isLoggedIn = Boolean(token?.sub);
 
   const { pathname } = req.nextUrl;

@@ -56,6 +56,18 @@ Hyperdrive accelerates database queries by maintaining pooled connections and ca
 
 ## 4. Production Secrets Configuration
 
+### Vercel Deployment Environment Variables
+Set the following environment variables in the Vercel Project Settings (**Settings** -> **Environment Variables**):
+
+| Variable | Recommended Value / Format | Purpose |
+| :--- | :--- | :--- |
+| `AUTH_SECRET` | 32+ character random string (e.g. `openssl rand -hex 32`) | Secret for signing Auth.js JWT session cookies |
+| `AUTH_TRUST_HOST` | `true` | Allows Auth.js to trust reverse proxy headers (`x-forwarded-host`) on Vercel |
+| `NEXTAUTH_URL` | `https://car-tracking-one.vercel.app` (or custom domain) | Canonical URL for NextAuth callbacks and CSRF validation |
+| `DATABASE_URL` | Pooled PostgreSQL connection string (`?pgbouncer=true` or pooler port 6543) | Database connection pool |
+| `REALTIME_INTERNAL_TOKEN` | 32+ character secret token | Inter-service and realtime webhook auth |
+
+### Cloudflare Workers Configuration
 Set required secrets on Cloudflare Workers using Wrangler:
 
 ```bash

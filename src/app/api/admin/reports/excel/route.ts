@@ -378,7 +378,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       distanceKm !== '-' ? Number(distanceKm) : '-', // 15. Jarak
       notaStatus, // 16. Status Nota
       hasPhoto
-        ? ''
+        ? (fullNotaUrl ? { text: ' ', hyperlink: fullNotaUrl } : '')
         : isPdf
         ? { text: `[Dokumen PDF] ${b.notaDinasFilename || 'Buka PDF'}`, hyperlink: fullNotaUrl }
         : fullNotaUrl

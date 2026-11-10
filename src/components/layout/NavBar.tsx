@@ -65,7 +65,7 @@ export function NavBar() {
         const response = await fetch('/api/admin/bookings/action-required');
         if (response.ok) {
           const json = await response.json();
-          if (!cancelled && typeof json.data?.count === 'number') {
+          if (!cancelled && typeof json.data?.count === 'number' && !json.warning) {
             setPendingActionCount(json.data.count);
           }
         }
@@ -74,7 +74,7 @@ export function NavBar() {
       }
     };
     void loadPendingCount();
-    const interval = setInterval(loadPendingCount, 15000);
+    const interval = setInterval(loadPendingCount, 25000);
     const onBookingChanged = () => { void loadPendingCount(); };
     window.addEventListener('bookings:changed', onBookingChanged);
 
@@ -83,7 +83,7 @@ export function NavBar() {
       clearInterval(interval);
       window.removeEventListener('bookings:changed', onBookingChanged);
     };
-  }, [session?.user, role, pathname]);
+  }, [session?.user, role]);
 
   const markNotificationRead = async (id: string) => {
     try {

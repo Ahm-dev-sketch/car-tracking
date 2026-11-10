@@ -141,11 +141,13 @@ function AdminDriversContent() {
       const res = await fetch(`/api/drivers?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        const list: DriverItem[] = json.data || [];
-        setDrivers(list);
-        setTotalRecords(json.pagination?.total ?? list.length);
-        setTotalPages(json.pagination?.totalPages ?? 1);
-        setPage(targetPage);
+        if (!json.warning) {
+          const list: DriverItem[] = json.data || [];
+          setDrivers(list);
+          setTotalRecords(json.pagination?.total ?? list.length);
+          setTotalPages(json.pagination?.totalPages ?? 1);
+          setPage(targetPage);
+        }
       } else if (!isSilent) {
         const err = await res.json();
         setApiError(err.error?.message || 'Failed to load drivers');
@@ -169,25 +171,14 @@ function AdminDriversContent() {
   // Keep driver statuses, assigned vehicles, and availability live without manual page refresh
   useEffect(() => {
     const isInteracting = isAddOpen || editingDriver || assigningDriver || unassigningDriver || deactivatingDriver;
-    const handleFocus = () => {
-      if (document.visibilityState === 'visible' && !isInteracting) {
-        void fetchDrivers(page, true);
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleFocus);
-
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible' && !isInteracting) {
         void fetchDrivers(page, true);
       }
-    }, 5000);
+    }, 20000);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, [page, isAddOpen, editingDriver, assigningDriver, unassigningDriver, deactivatingDriver, search, statusFilter, locationFilter]);
 

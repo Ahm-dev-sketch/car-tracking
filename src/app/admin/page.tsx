@@ -66,14 +66,14 @@ export default function AdminOverviewPage() {
 
       if (statsRes.ok) {
         const json = await statsRes.json();
-        if (json.success !== false && json.data) {
+        if (json.success && json.data && !json.warning) {
           setStats(json.data);
         }
       }
 
       if (tripsRes.ok) {
         const atJson = await tripsRes.json();
-        if (Array.isArray(atJson.data)) {
+        if (Array.isArray(atJson.data) && !atJson.warning) {
           setActiveTripsList(atJson.data);
         }
       }
@@ -86,14 +86,6 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     loadStats(true);
-    const handleFocus = () => {
-      if (document.visibilityState === 'visible') {
-        void loadStats(false);
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleFocus);
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         void loadStats(false);
@@ -102,8 +94,6 @@ export default function AdminOverviewPage() {
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, []);
 

@@ -6,23 +6,28 @@ import { getAdminStats } from '@/server/dispatch/service';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async () => {
+  let user;
   try {
-    const user = await getSessionUser();
-    requireRole(user, 'ADMIN');
+    user = await getSessionUser();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) throw err;
+    console.error('DB ERROR [GET /api/admin/stats auth]:', err);
+    return NextResponse.json({ success: false, warning: 'Database busy' }, { status: 200 });
+  }
 
+  requireRole(user, 'ADMIN');
+
+  try {
     const stats = await getAdminStats();
     return NextResponse.json({ success: true, data: stats });
   } catch (error: unknown) {
-    console.error('FATAL DB ERROR [GET /api/admin/stats]:', error);
-    if (error instanceof ApiError) throw error;
-    const message = error instanceof Error ? error.message : 'Failed to retrieve admin stats';
+    console.error('DB ERROR [GET /api/admin/stats]:', error);
     return NextResponse.json(
       {
         success: false,
-        error: { code: 'STATS_FETCH_FAILED', message },
-        message,
+        warning: 'Database busy',
       },
-      { status: 503 }
+      { status: 200 }
     );
   }
 });

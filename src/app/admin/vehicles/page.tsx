@@ -143,11 +143,13 @@ function AdminVehiclesContent() {
       const res = await fetch(`/api/vehicles?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        const list = json.data || json.vehicles || [];
-        setVehicles(list);
-        setTotalRecords(json.pagination?.total ?? list.length);
-        setTotalPages(json.pagination?.totalPages ?? 1);
-        setPage(targetPage);
+        if (!json.warning) {
+          const list = json.data || json.vehicles || [];
+          setVehicles(list);
+          setTotalRecords(json.pagination?.total ?? list.length);
+          setTotalPages(json.pagination?.totalPages ?? 1);
+          setPage(targetPage);
+        }
       } else if (!isSilent) {
         const err = await res.json();
         setApiError(err.error?.message || 'Failed to load vehicles');
@@ -171,25 +173,14 @@ function AdminVehiclesContent() {
   // Keep vehicle pool live without manual refresh
   useEffect(() => {
     const isInteracting = isModalOpen || deactivatingVehicle || assigningVehicle;
-    const handleFocus = () => {
-      if (document.visibilityState === 'visible' && !isInteracting) {
-        void fetchVehicles(page, true);
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    document.addEventListener('visibilitychange', handleFocus);
-
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible' && !isInteracting) {
         void fetchVehicles(page, true);
       }
-    }, 5000);
+    }, 20000);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, [page, isModalOpen, deactivatingVehicle, assigningVehicle, search, statusFilter, locationFilter]);
 

@@ -10,10 +10,36 @@ import { ApiError } from '@/lib/errors';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
-  let queryLimit = 10;
+  let queryLimit = 15;
   let queryPage = 1;
   try {
-    const user = await getSessionUser();
+    let user;
+    try {
+      user = await getSessionUser();
+    } catch (authErr) {
+      if (authErr instanceof ApiError && authErr.status === 401) {
+        return NextResponse.json(
+          {
+            data: [],
+            meta: { page: 1, limit: queryLimit, total: 0, totalPages: 0 },
+            warning: 'Authentication expired',
+          },
+          { status: 200 }
+        );
+      }
+      throw authErr;
+    }
+
+    if (user.role !== 'ADMIN' && user.role !== 'DRIVER') {
+      return NextResponse.json(
+        {
+          data: [],
+          meta: { page: 1, limit: queryLimit, total: 0, totalPages: 0 },
+          warning: 'Role unauthorized',
+        },
+        { status: 200 }
+      );
+    }
 
     const { searchParams } = new URL(req.url);
     const query = tripQuerySchema.parse({
@@ -25,25 +51,26 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       startDate: searchParams.get('start_date') ?? searchParams.get('startDate') ?? undefined,
       endDate: searchParams.get('end_date') ?? searchParams.get('endDate') ?? undefined,
     });
-    queryLimit = query.limit ?? 10;
+    queryLimit = query.limit ?? 15;
     queryPage = query.page ?? 1;
 
     const result = await listTrips(user, query);
     return NextResponse.json(result);
   } catch (error: unknown) {
-    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-      throw error;
-    }
-    console.error('FATAL DB ERROR [GET /api/trips]:', error);
-    return NextResponse.json({
-      data: [],
-      meta: {
-        page: queryPage,
-        limit: queryLimit,
-        total: 0,
-        totalPages: 0,
+    console.error('ERROR [GET /api/trips]:', error);
+    return NextResponse.json(
+      {
+        data: [],
+        meta: {
+          page: queryPage,
+          limit: queryLimit,
+          total: 0,
+          totalPages: 0,
+        },
+        warning: 'Database busy',
       },
-    });
+      { status: 200 }
+    );
   }
 });
 

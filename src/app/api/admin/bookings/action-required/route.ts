@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
 import { prisma } from '@/lib/prisma';
 import { dispatchSweep } from '@/server/dispatch/service';
@@ -8,7 +8,15 @@ import { BookingStatus } from '@prisma/client';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(async () => {
-  const user = await getSessionUser();
+  let user;
+  try {
+    user = await getSessionUser();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) throw err;
+    console.error('DB ERROR [GET /api/admin/bookings/action-required auth]:', err);
+    return NextResponse.json({ data: { count: 0 }, warning: 'Database busy' }, { status: 200 });
+  }
+
   requireRole(user, 'ADMIN');
 
   try {
@@ -40,6 +48,7 @@ export const GET = withErrorHandling(async () => {
     });
   } catch (err: unknown) {
     console.error('FATAL DB ERROR [GET /api/admin/bookings/action-required]:', err);
+    return NextResponse.json({ data: { count: 0 }, warning: 'Database busy' }, { status: 200 });
   }
 
   return NextResponse.json({ data: { count } });

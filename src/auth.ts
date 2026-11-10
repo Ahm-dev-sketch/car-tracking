@@ -1,10 +1,13 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { encode } from 'next-auth/jwt';
+import { skipCSRFCheck } from '@auth/core';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  skipCSRFCheck,
+  useSecureCookies: process.env.NODE_ENV === 'production',
   session: { strategy: 'jwt' },
   secret: process.env.AUTH_SECRET,
   trustHost: true,

@@ -12,11 +12,27 @@ import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
 function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl');
+  const errorParam = searchParams.get('error');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Clean up any stale ?error=... query param from browser bar on load
+  React.useEffect(() => {
+    if (errorParam) {
+      if (errorParam === 'MissingCSRF' || errorParam === 'CSRFError') {
+        setError('Sesi autentikasi telah disegarkan. Silakan coba masuk kembali.');
+      }
+      try {
+        const cleanUrl = callbackUrl ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}` : '/login';
+        window.history.replaceState({}, '', cleanUrl);
+      } catch {
+        // ignore
+      }
+    }
+  }, [errorParam, callbackUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +58,13 @@ function LoginForm() {
       console.log('[login] auth response received', res);
 
       if (!res || res.error) {
-        setError('Invalid email or password');
+        if (res?.error === 'MissingCSRF' || res?.error === 'CSRFError') {
+          setError('Sesi autentikasi telah diperbarui. Silakan coba masuk kembali.');
+        } else if (res?.error === 'CredentialsSignin') {
+          setError('Email atau password salah');
+        } else {
+          setError(res?.error ? `Gagal masuk: ${res.error}` : 'Email atau password salah');
+        }
         return;
       }
 

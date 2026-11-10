@@ -114,29 +114,31 @@ function UserTrackingContent() {
       if (res.ok) {
         const json = await res.json();
         if (signal.aborted) return;
-        const rows: TrackingRow[] = json.data || [];
-        const mapped: VehicleMarkerData[] = rows
-          .filter((r) => r.location && r.location.lat !== undefined && r.location.lng !== undefined)
-          .map((r) => ({
-            vehicleId: r.vehicleId,
-            plateNumber: r.plateNumber,
-            brand: r.brand,
-            model: r.model,
-            status: r.status,
-            driverName: r.driver?.name || null,
-            driverPhone: r.driver?.phone || null,
-            lat: r.location.lat,
-            lng: r.location.lng,
-            accuracyM: r.location.accuracyM ?? 10,
-            speedMps: r.location.speedMps,
-            headingDeg: r.location.headingDeg,
-            recordedAt: r.location.recordedAt,
-            movement: r.location.movement || 'STOPPED',
-          }));
-        setLiveVehicles(mapped);
-        setSelectedVehicleId((current) =>
-          mapped.some((v) => v.vehicleId === current) ? current : mapped[0]?.vehicleId ?? null
-        );
+        if (!json.warning) {
+          const rows: TrackingRow[] = json.data || [];
+          const mapped: VehicleMarkerData[] = rows
+            .filter((r) => r.location && r.location.lat !== undefined && r.location.lng !== undefined)
+            .map((r) => ({
+              vehicleId: r.vehicleId,
+              plateNumber: r.plateNumber,
+              brand: r.brand,
+              model: r.model,
+              status: r.status,
+              driverName: r.driver?.name || null,
+              driverPhone: r.driver?.phone || null,
+              lat: r.location.lat,
+              lng: r.location.lng,
+              accuracyM: r.location.accuracyM ?? 10,
+              speedMps: r.location.speedMps,
+              headingDeg: r.location.headingDeg,
+              recordedAt: r.location.recordedAt,
+              movement: r.location.movement || 'STOPPED',
+            }));
+          setLiveVehicles(mapped);
+          setSelectedVehicleId((current) =>
+            mapped.some((v) => v.vehicleId === current) ? current : mapped[0]?.vehicleId ?? null
+          );
+        }
       } else if (res.status === 401 || res.status === 403) {
         setLiveVehicles([]);
         setSelectedVehicleId(null);

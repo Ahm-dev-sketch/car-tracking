@@ -401,7 +401,11 @@ export async function getLiveTracking(
   actor: AuthenticatedUser,
   locationId?: string
 ) {
-  await markStale();
+  try {
+    await markStale();
+  } catch (staleErr) {
+    console.warn('[getLiveTracking] markStale non-blocking error:', staleErr);
+  }
 
   const isAdmin = actor.role === 'ADMIN';
 

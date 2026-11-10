@@ -80,10 +80,11 @@ function AdminFleetMapContent() {
       if (res.ok) {
         const json = await res.json();
         if (signal.aborted) return;
-        const rows: TrackingRow[] = json.data || [];
-        const mapped: VehicleMarkerData[] = rows
-          .filter((r) => r.location && r.location.lat !== undefined && r.location.lng !== undefined)
-          .map((r) => ({
+        if (!json.warning) {
+          const rows: TrackingRow[] = json.data || [];
+          const mapped: VehicleMarkerData[] = rows
+            .filter((r) => r.location && r.location.lat !== undefined && r.location.lng !== undefined)
+            .map((r) => ({
             vehicleId: r.vehicleId,
             plateNumber: r.plateNumber,
             brand: r.brand,
@@ -185,6 +186,7 @@ function AdminFleetMapContent() {
         setSelectedVehicleId((current) =>
           mapped.some((v) => v.vehicleId === current) ? current : mapped[0]?.vehicleId ?? null
         );
+        }
       } else if (res.status === 401 || res.status === 403) {
         setVehicles([]);
         setSelectedVehicleId(null);

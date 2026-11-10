@@ -66,14 +66,15 @@ export default function AdminOverviewPage() {
 
       if (statsRes.ok) {
         const json = await statsRes.json();
-        if (json.success && json.data && !json.warning) {
+        if (json.data) {
+          // Only update stats if we got real data (not a DB-busy fallback without data)
           setStats(json.data);
         }
       }
 
       if (tripsRes.ok) {
         const atJson = await tripsRes.json();
-        if (Array.isArray(atJson.data) && !atJson.warning) {
+        if (Array.isArray(atJson.data)) {
           setActiveTripsList(atJson.data);
         }
       }
@@ -217,7 +218,7 @@ export default function AdminOverviewPage() {
               </span>
             </div>
             <div className={`metric-value mt-4 text-4xl font-black ${metric.valColor}`}>
-              {isLoading || !stats ? <Spinner size="md" /> : metric.value}
+              {isLoading ? <Spinner size="md" /> : (metric.value ?? '—')}
             </div>
             <p className="mt-2 text-xs font-semibold text-zinc-600">{metric.caption}</p>
           </div>
@@ -257,7 +258,7 @@ export default function AdminOverviewPage() {
             <div key={metric.label} className="min-w-0 border-t-2 border-black/10 py-4">
               <dt className={`min-h-10 text-xs font-bold leading-relaxed ${metric.attention ? 'text-amber-800' : 'text-zinc-600'}`}>{metric.label}</dt>
               <dd className={`mt-1 text-2xl font-black tracking-tight tabular-nums ${metric.attention ? 'text-amber-800' : 'text-zinc-950'}`}>
-                {isLoading || !stats ? <Spinner size="sm" /> : metric.value}
+                {isLoading ? <Spinner size="sm" /> : (metric.value ?? '—')}
               </dd>
               <dd className={`mt-1 text-xs font-medium ${metric.attention ? 'text-amber-800' : 'text-zinc-500'}`}>{metric.caption}</dd>
             </div>
@@ -331,9 +332,9 @@ export default function AdminOverviewPage() {
           <span className="rounded-md border-2 border-black bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-900 shadow-[1px_1px_0px_0px_#000]">{stats?.byLocation.length || 0} operational hubs</span>
         </div>
 
-        {isLoading || !stats ? (
+        {isLoading ? (
           <div role="status" className="flex items-center justify-center gap-3 py-12 text-sm font-bold text-zinc-600"><Spinner size="md" />Loading operational locations...</div>
-        ) : stats.byLocation.length === 0 ? (
+        ) : !stats || stats.byLocation.length === 0 ? (
           <div className="rounded-2xl border-2 border-black bg-zinc-50 px-5 py-10 text-center shadow-[3px_3px_0px_0px_#000]">
             <Icon name="pin" className="mx-auto mb-4 h-6 w-6 text-rose-800" />
             <p className="text-base font-black text-zinc-900">No operational locations configured.</p>

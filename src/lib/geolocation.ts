@@ -24,7 +24,10 @@ export function getGeolocation(): Geolocation {
   return navigator.geolocation;
 }
 
-export function requestCurrentPosition(): Promise<GeolocationPosition> {
+export function requestCurrentPosition(
+  options: PositionOptions = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+  watchdogMs?: number
+): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -38,17 +41,54 @@ export function requestCurrentPosition(): Promise<GeolocationPosition> {
     try {
       const geolocation = getGeolocation();
       // The native timeout may not include time spent waiting for permission.
-      timer = setTimeout(() => fail({ code: 3 }), 15000);
-      geolocation.getCurrentPosition((position) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        resolve(position);
-      }, fail, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      const effectiveTimeout = watchdogMs ?? (typeof options.timeout === 'number' ? options.timeout : 15000);
+      timer = setTimeout(() => fail({ code: 3 }), effectiveTimeout);
+      geolocation.getCurrentPosition(
+        (position) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(position);
+        },
+        fail,
+        options
+      );
     } catch (cause) {
       fail(cause);
     }
   });
+}
+
+export async function requestPositionWithFallback(
+  options?: { timeoutMs?: number; allowCached?: boolean }
+): Promise<GeolocationPosition> {
+  const allowCached = options?.allowCached ?? true;
+  // 1. Fast attempt with relaxed maximumAge (30s) so recent mobile GPS fix returns immediately (<50ms)
+  try {
+    return await requestCurrentPosition(
+      {
+        enableHighAccuracy: true,
+        timeout: options?.timeoutMs ?? 10000,
+        maximumAge: allowCached ? 30000 : 0,
+      },
+      (options?.timeoutMs ?? 10000) + 1000
+    );
+  } catch (err: unknown) {
+    const code = err && typeof err === 'object' && 'code' in err ? (err as { code: unknown }).code : undefined;
+    // If permission was denied (code 1), don't retry - rethrow immediately
+    if (code === 1) {
+      throw err;
+    }
+    // If high accuracy timed out (code 3) or position unavailable (code 2), fallback to fast network location
+    return await requestCurrentPosition(
+      {
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 120000,
+      },
+      9000
+    );
+  }
 }
 
 export function createLocationBuffer<T>(getOnFlush: () => ((points: T[]) => Promise<void> | void) | undefined) {

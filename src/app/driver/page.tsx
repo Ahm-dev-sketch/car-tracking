@@ -469,11 +469,15 @@ export default function DriverDashboardPage() {
         setActionError(null);
       } else {
         let coords: { lat?: number; lng?: number } | null = null;
-        try {
-          coords = await getCurrentPosition();
-        } catch {
-          // GPS can take time or be rejected; fallback to currentPosition without blocking going online
-          coords = currentPosition ? { lat: currentPosition.lat, lng: currentPosition.lng } : null;
+        if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {
+          coords = { lat: currentPosition.lat, lng: currentPosition.lng };
+        } else {
+          try {
+            coords = await getCurrentPosition({ allowCached: true });
+          } catch {
+            // GPS can take time or be rejected; fallback to currentPosition without blocking going online
+            coords = currentPosition ? { lat: currentPosition.lat, lng: currentPosition.lng } : null;
+          }
         }
 
         const targetVehicleId = selectedVehicle?.id || activeSession?.vehicleId || undefined;
@@ -586,7 +590,14 @@ export default function DriverDashboardPage() {
     setStartPhase('gps');
     let submitted = false;
     try {
-      const coords = await getCurrentPosition();
+      // Fast path: if currentPosition is already known, use it immediately without waiting for a new GPS lock
+      let coords: { lat: number; lng: number } | null = null;
+      if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {
+        coords = { lat: currentPosition.lat, lng: currentPosition.lng };
+      } else {
+        const pos = await getCurrentPosition({ allowCached: true });
+        coords = { lat: pos.lat, lng: pos.lng };
+      }
       setStartPhase('request');
       submitted = true;
       const json = await fetchJson<{ data: ActiveTrip }>('/api/trips', {

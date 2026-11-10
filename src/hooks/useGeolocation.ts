@@ -6,6 +6,7 @@ import {
   getGeolocation,
   normalizeGeolocationError,
   requestCurrentPosition,
+  requestPositionWithFallback,
 } from '@/lib/geolocation';
 import { GpsJitterFilter, calculateConfidenceScore } from '@/lib/gps-filter';
 
@@ -58,10 +59,20 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
     bufferRef.current ??= createLocationBuffer<GeoPoint>(() => onFlushRef.current);
   }, [onFlush]);
 
-  const getCurrentPosition = useCallback(async (): Promise<GeoPoint> => {
+  const getCurrentPosition = useCallback(async (opts?: { allowCached?: boolean; maxAgeMs?: number }): Promise<GeoPoint> => {
+    const allowCached = opts?.allowCached ?? true;
+    const maxAgeMs = opts?.maxAgeMs ?? 45000;
+    // 1. FAST CACHED RETURN: If we already have a recent location from watchPosition or prior fetch, return immediately!
+    if (allowCached && latestPositionRef.current) {
+      const age = Date.now() - new Date(latestPositionRef.current.recordedAt).getTime();
+      if (age >= 0 && age < maxAgeMs) {
+        return latestPositionRef.current;
+      }
+    }
+
     const generation = ++requestGenerationRef.current;
     try {
-      const pos = await requestCurrentPosition();
+      const pos = await requestPositionWithFallback({ timeoutMs: 12000, allowCached });
       const accuracy = Math.round(pos.coords.accuracy);
       const rawPoint: GeoPoint = {
         lat: pos.coords.latitude,
@@ -98,6 +109,10 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
       }
       return point;
     } catch (cause) {
+      // 2. SAFETY FALLBACK: If fresh satellite fix timed out, but we have ANY recorded position, return it
+      if (latestPositionRef.current) {
+        return latestPositionRef.current;
+      }
       const err = normalizeGeolocationError(cause);
       if (generation === requestGenerationRef.current) {
         setPermissionDenied(err.code === 1);

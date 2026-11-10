@@ -81,7 +81,11 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
 
   useEffect(() => {
     fetchInterventions(true);
-    const interval = setInterval(() => fetchInterventions(false), 20000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchInterventions(false);
+      }
+    }, 20000);
     return () => clearInterval(interval);
   }, []);
 

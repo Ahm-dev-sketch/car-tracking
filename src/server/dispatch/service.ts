@@ -611,17 +611,20 @@ export async function dispatchBooking(
 
   // If vehicle preference was specified but unavailable
   if (preferenceUnavailableReason) {
-    const updated = await prisma.$transaction(async (tx) => {
-      await lockSearchingBooking(tx, bookingId);
-      return tx.booking.update({
-        where: { id: bookingId },
-        data: {
-          status: BookingStatus.NO_DRIVER_AVAILABLE,
-          rejectedReason: preferenceUnavailableReason,
-        },
-        include: { operationalLocation: true },
-      });
-    });
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        await lockSearchingBooking(tx, bookingId);
+        return tx.booking.update({
+          where: { id: bookingId },
+          data: {
+            status: BookingStatus.NO_DRIVER_AVAILABLE,
+            rejectedReason: preferenceUnavailableReason,
+          },
+          include: { operationalLocation: true },
+        });
+      },
+      { maxWait: 15000, timeout: 20000 }
+    );
 
     await logAuditEvent({
       actorUserId: ctx?.actorUserId ?? null,
@@ -645,14 +648,17 @@ export async function dispatchBooking(
   }
 
   if (candidates.length === 0) {
-    const updated = await prisma.$transaction(async (tx) => {
-      await lockSearchingBooking(tx, bookingId);
-      return tx.booking.update({
-        where: { id: bookingId },
-        data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
-        include: { operationalLocation: true },
-      });
-    });
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        await lockSearchingBooking(tx, bookingId);
+        return tx.booking.update({
+          where: { id: bookingId },
+          data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
+          include: { operationalLocation: true },
+        });
+      },
+      { maxWait: 15000, timeout: 20000 }
+    );
 
     await logAuditEvent({
       actorUserId: ctx?.actorUserId ?? null,
@@ -1006,25 +1012,28 @@ export async function dispatchSweep() {
 
   for (const offer of expiredOffers) {
     try {
-      const expired = await prisma.$transaction(async (tx) => {
-        await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', offer.bookingId);
-        const driverOffersCount = await tx.bookingOffer.count({
-          where: { bookingId: offer.bookingId, driverId: offer.driverId },
-        });
-        const cooldownUntil = computeDriverCooldown(driverOffersCount, now);
+      const expired = await prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', offer.bookingId);
+          const driverOffersCount = await tx.bookingOffer.count({
+            where: { bookingId: offer.bookingId, driverId: offer.driverId },
+          });
+          const cooldownUntil = computeDriverCooldown(driverOffersCount, now);
 
-        const changed = await tx.bookingOffer.updateMany({
-          where: { id: offer.id, status: OfferStatus.SENT, expiresAt: { lte: now } },
-          data: { status: OfferStatus.EXPIRED, respondedAt: now, cooldownUntil },
-        });
-        if (!changed.count) return false;
+          const changed = await tx.bookingOffer.updateMany({
+            where: { id: offer.id, status: OfferStatus.SENT, expiresAt: { lte: now } },
+            data: { status: OfferStatus.EXPIRED, respondedAt: now, cooldownUntil },
+          });
+          if (!changed.count) return false;
 
-        await tx.booking.updateMany({
-          where: { id: offer.bookingId, status: BookingStatus.DRIVER_NOTIFIED },
-          data: { status: BookingStatus.SEARCHING_DRIVER },
-        });
-        return true;
-      });
+          await tx.booking.updateMany({
+            where: { id: offer.bookingId, status: BookingStatus.DRIVER_NOTIFIED },
+            data: { status: BookingStatus.SEARCHING_DRIVER },
+          });
+          return true;
+        },
+        { maxWait: 15000, timeout: 20000 }
+      );
       if (!expired) continue;
 
       await logAuditEvent({
@@ -1061,13 +1070,16 @@ export async function dispatchSweep() {
 
       if (isTimedOut || isMaxAttempts) {
         // Escalate to ADMIN_INTERVENTION
-        await prisma.$transaction(async (tx) => {
-          await lockSearchingBooking(tx, booking.id);
-          await tx.booking.update({
-            where: { id: booking.id },
-            data: { status: BookingStatus.ADMIN_INTERVENTION },
-          });
-        });
+        await prisma.$transaction(
+          async (tx) => {
+            await lockSearchingBooking(tx, booking.id);
+            await tx.booking.update({
+              where: { id: booking.id },
+              data: { status: BookingStatus.ADMIN_INTERVENTION },
+            });
+          },
+          { maxWait: 15000, timeout: 20000 }
+        );
 
         await logAuditEvent({
           actorUserId: null,
@@ -1097,13 +1109,16 @@ export async function dispatchSweep() {
       } else {
         // If 0 total attempts, mark NO_DRIVER_AVAILABLE
         if (booking.offers.length === 0) {
-          await prisma.$transaction(async (tx) => {
-            await lockSearchingBooking(tx, booking.id);
-            await tx.booking.update({
-              where: { id: booking.id },
-              data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
-            });
-          });
+          await prisma.$transaction(
+            async (tx) => {
+              await lockSearchingBooking(tx, booking.id);
+              await tx.booking.update({
+                where: { id: booking.id },
+                data: { status: BookingStatus.NO_DRIVER_AVAILABLE },
+              });
+            },
+            { maxWait: 15000, timeout: 20000 }
+          );
 
           await logAuditEvent({
             actorUserId: null,
@@ -1514,19 +1529,22 @@ export async function endDriverSession(
 
   // Release the driver lock before touching bookings; include expired SENT offers too.
   for (const offer of offers) {
-    await prisma.$transaction(async (tx) => {
-      await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', offer.bookingId);
-      const cancelled = await tx.bookingOffer.updateMany({
-        where: { id: offer.id, driverId, status: OfferStatus.SENT },
-        data: { status: OfferStatus.CANCELLED, respondedAt: new Date() },
-      });
-      if (cancelled.count) {
-        await tx.booking.updateMany({
-          where: { id: offer.bookingId, status: BookingStatus.DRIVER_NOTIFIED },
-          data: { status: BookingStatus.SEARCHING_DRIVER },
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRawUnsafe('SELECT id FROM bookings WHERE id = $1 FOR UPDATE', offer.bookingId);
+        const cancelled = await tx.bookingOffer.updateMany({
+          where: { id: offer.id, driverId, status: OfferStatus.SENT },
+          data: { status: OfferStatus.CANCELLED, respondedAt: new Date() },
         });
-      }
-    });
+        if (cancelled.count) {
+          await tx.booking.updateMany({
+            where: { id: offer.bookingId, status: BookingStatus.DRIVER_NOTIFIED },
+            data: { status: BookingStatus.SEARCHING_DRIVER },
+          });
+        }
+      },
+      { maxWait: 15000, timeout: 20000 }
+    );
   }
 
   await logAuditEvent({

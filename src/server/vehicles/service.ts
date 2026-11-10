@@ -384,6 +384,9 @@ export async function updateVehicle(
 
     const vehicle = await tx.vehicle.update({ where: { id }, data });
     return { vehicle, existing };
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   await logAuditEvent({
@@ -460,6 +463,9 @@ export async function deleteVehicle(
       },
     });
     return { vehicle, existing };
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   await logAuditEvent({

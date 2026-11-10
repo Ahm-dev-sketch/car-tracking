@@ -266,6 +266,7 @@ export function BookingModal({
     const terminalStatuses = ['COMPLETED', 'CANCELLED', 'REJECTED', 'NO_DRIVER_AVAILABLE'];
 
     const poll = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         const res = await fetch(`/api/bookings/${bookingId}`);
         if (res.ok) {
@@ -285,7 +286,7 @@ export function BookingModal({
       }
     };
 
-    pollIntervalRef.current = setInterval(poll, 3000);
+    pollIntervalRef.current = setInterval(poll, 5000); // 5s interval with visibility protection
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };

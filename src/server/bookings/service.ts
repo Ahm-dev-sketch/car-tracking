@@ -195,50 +195,56 @@ export async function createBooking(
 
   while (retries > 0) {
     try {
-      created = await prisma.$transaction(async (tx) => {
-        if (input.vehicleId) {
-          await assertVehicleAvailableForWindow(
-            tx,
-            input.vehicleId,
-            input.departureAt,
-            input.expectedReturnAt,
-            undefined,
-            true // include pending to prevent concurrent overlapping submissions
-          );
+      created = await prisma.$transaction(
+        async (tx) => {
+          if (input.vehicleId) {
+            await assertVehicleAvailableForWindow(
+              tx,
+              input.vehicleId,
+              input.departureAt,
+              input.expectedReturnAt,
+              undefined,
+              true // include pending to prevent concurrent overlapping submissions
+            );
+          }
+
+          const bookingNumber = await generateBookingNumber(tx, year);
+
+          return tx.booking.create({
+            data: {
+              bookingNumber,
+              userId,
+              vehicleId: input.vehicleId ?? null,
+              operationalLocationId: operationalLocationId!,
+              vehiclePreferenceId: input.vehiclePreferenceId ?? null,
+              pickupLat: input.pickupLat ?? null,
+              pickupLng: input.pickupLng ?? null,
+              destinationLat: input.destinationLat ?? null,
+              destinationLng: input.destinationLng ?? null,
+              pickupLocation: input.pickupLocation,
+              destination: input.destination,
+              departureAt: input.departureAt,
+              expectedReturnAt: input.expectedReturnAt,
+              passengerCount: input.passengerCount,
+              purpose: input.purpose,
+              notes: input.notes ?? null,
+              serviceType: input.serviceType ?? 'DROP_OFF',
+              notaDinasUrl: input.notaDinasUrl ?? null,
+              notaDinasFilename: input.notaDinasFilename ?? null,
+              status: input.status ?? BookingStatus.PENDING,
+            },
+            include: {
+              user: { select: { id: true, name: true, email: true, phone: true } },
+              vehicle: true,
+              operationalLocation: true,
+            },
+          });
+        },
+        {
+          maxWait: 15000,
+          timeout: 20000,
         }
-
-        const bookingNumber = await generateBookingNumber(tx, year);
-
-        return tx.booking.create({
-          data: {
-            bookingNumber,
-            userId,
-            vehicleId: input.vehicleId ?? null,
-            operationalLocationId: operationalLocationId!,
-            vehiclePreferenceId: input.vehiclePreferenceId ?? null,
-            pickupLat: input.pickupLat ?? null,
-            pickupLng: input.pickupLng ?? null,
-            destinationLat: input.destinationLat ?? null,
-            destinationLng: input.destinationLng ?? null,
-            pickupLocation: input.pickupLocation,
-            destination: input.destination,
-            departureAt: input.departureAt,
-            expectedReturnAt: input.expectedReturnAt,
-            passengerCount: input.passengerCount,
-            purpose: input.purpose,
-            notes: input.notes ?? null,
-            serviceType: input.serviceType ?? 'DROP_OFF',
-            notaDinasUrl: input.notaDinasUrl ?? null,
-            notaDinasFilename: input.notaDinasFilename ?? null,
-            status: input.status ?? BookingStatus.PENDING,
-          },
-          include: {
-            user: { select: { id: true, name: true, email: true, phone: true } },
-            vehicle: true,
-            operationalLocation: true,
-          },
-        });
-      });
+      );
       break;
     } catch (err: unknown) {
       if (
@@ -793,6 +799,9 @@ export async function transitionBooking(
     }
 
     throw new ApiError(400, 'UNHANDLED_TRANSITION', 'Unhandled status transition');
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   // 4. Audit logging

@@ -398,13 +398,17 @@ export default function DriverDashboardPage() {
       refreshing = true;
       try { await loadDashboardData(); } finally { refreshing = false; }
     };
-    void refresh();
+    // Stagger initial load so dashboard and offers don't hit pool at exact same millisecond
+    const initialTimer = setTimeout(() => {
+      void refresh();
+    }, 150);
     const interval = setInterval(() => { void refresh(); }, 15000);
     const offerInterval = setInterval(() => {
       if (!actionInFlight.current && document.visibilityState !== 'hidden') void fetchOffers();
-    }, 3000);
+    }, 12000); // Throttled to 12s to prevent serverless connection pool exhaustion
     document.addEventListener('visibilitychange', refresh);
     return () => {
+      clearTimeout(initialTimer);
       dashboardRequest.current += 1;
       vehicleSearchRequest.current += 1;
       clearInterval(interval);

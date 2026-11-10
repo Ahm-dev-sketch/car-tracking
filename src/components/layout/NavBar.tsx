@@ -39,6 +39,7 @@ export function NavBar() {
     if (!session?.user) return;
     let cancelled = false;
     const loadNotifications = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         const response = await fetch('/api/notifications?limit=8');
         if (response.ok) {
@@ -49,9 +50,13 @@ export function NavBar() {
         // Keep the last notifications visible during a connection interruption.
       }
     };
-    void loadNotifications();
-    const interval = setInterval(loadNotifications, 15000);
-    return () => { cancelled = true; clearInterval(interval); };
+    const initialTimer = setTimeout(() => {
+      void loadNotifications();
+    }, 300);
+    const interval = setInterval(() => {
+      void loadNotifications();
+    }, 15000);
+    return () => { cancelled = true; clearTimeout(initialTimer); clearInterval(interval); };
   }, [session?.user]);
 
   useEffect(() => {
@@ -61,6 +66,7 @@ export function NavBar() {
     }
     let cancelled = false;
     const loadPendingCount = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         const response = await fetch('/api/admin/bookings/action-required');
         if (response.ok) {
@@ -73,13 +79,18 @@ export function NavBar() {
         // Keep previous count on connection interruption.
       }
     };
-    void loadPendingCount();
-    const interval = setInterval(loadPendingCount, 25000);
+    const initialTimer = setTimeout(() => {
+      void loadPendingCount();
+    }, 600);
+    const interval = setInterval(() => {
+      void loadPendingCount();
+    }, 25000);
     const onBookingChanged = () => { void loadPendingCount(); };
     window.addEventListener('bookings:changed', onBookingChanged);
 
     return () => {
       cancelled = true;
+      clearTimeout(initialTimer);
       clearInterval(interval);
       window.removeEventListener('bookings:changed', onBookingChanged);
     };

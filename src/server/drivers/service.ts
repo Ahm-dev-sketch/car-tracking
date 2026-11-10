@@ -102,6 +102,9 @@ export async function createDriver(
         },
       },
     });
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   await logAuditEvent({
@@ -282,6 +285,9 @@ export async function updateDriver(
       },
     });
     return { existing, updated };
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   await logAuditEvent({
@@ -366,6 +372,9 @@ export async function deactivateDriver(
       },
     });
     return { result, driver };
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   await logAuditEvent({

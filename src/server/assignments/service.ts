@@ -157,6 +157,9 @@ export async function assignVehicle(
       });
 
       return assignment;
+    }, {
+      maxWait: 15000,
+      timeout: 20000,
     });
 
     await logAuditEvent({
@@ -290,6 +293,9 @@ export async function unassignVehicle(
     });
 
     return closed;
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   await logAuditEvent({

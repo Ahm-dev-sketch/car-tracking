@@ -121,6 +121,9 @@ export async function updateUser(
         updatedAt: true,
       },
     });
+  }, {
+    maxWait: 15000,
+    timeout: 20000,
   });
 
   await logAuditEvent({

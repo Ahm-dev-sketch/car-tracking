@@ -57,12 +57,12 @@ function createPrismaClient(): PrismaClient {
       connectionString,
       // In serverless, limiting pool size to 1 per lambda container prevents connection pool exhaustion
       max: isServerless ? 1 : 5,
-      connectionTimeoutMillis: 15000, // Increased to 15s to prevent pool connection timeouts during cold starts or polling
-      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 20000, // 20s timeout tolerance for serverless cold-starts & connection queues
+      idleTimeoutMillis: 15000,
     });
 
     pool.on('error', (err) => {
-      console.warn('[Prisma pg.Pool]: Unexpected error on idle client:', err.message);
+      console.warn('[Prisma pg.Pool] Unexpected error on idle client:', err.message);
     });
 
     globalForPrisma.pgPool = pool;

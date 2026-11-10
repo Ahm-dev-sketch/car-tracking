@@ -57,7 +57,7 @@ function createPrismaClient(): PrismaClient {
       connectionString,
       // In serverless, limiting pool size to 1 per lambda container prevents connection pool exhaustion
       max: isServerless ? 1 : 5,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 15000, // Increased to 15s to prevent pool connection timeouts during cold starts or polling
       idleTimeoutMillis: 10000,
     });
 

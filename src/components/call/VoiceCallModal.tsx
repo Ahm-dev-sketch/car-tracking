@@ -55,10 +55,14 @@ export function VoiceCallModal({
   // Bind remote stream to audio element with safe Autoplay Policy handling
   useEffect(() => {
     const audioEl = audioRef.current;
-    if (audioEl && remoteStream) {
-      if (audioEl.srcObject !== remoteStream) {
-        audioEl.srcObject = remoteStream;
-      }
+    if (!audioEl || !remoteStream) return;
+
+    if (audioEl.srcObject !== remoteStream) {
+      audioEl.srcObject = remoteStream;
+    }
+    audioEl.muted = false;
+
+    const attemptPlay = () => {
       audioEl
         .play()
         .then(() => {
@@ -67,7 +71,23 @@ export function VoiceCallModal({
         .catch((err) => {
           console.warn('[WebRTC Audio] Autoplay tertahan:', err);
         });
-    }
+    };
+
+    attemptPlay();
+
+    const onTrackEvent = () => attemptPlay();
+    remoteStream.addEventListener('addtrack', onTrackEvent);
+    remoteStream.getAudioTracks().forEach((track) => {
+      track.enabled = true;
+      track.addEventListener('unmute', onTrackEvent);
+    });
+
+    return () => {
+      remoteStream.removeEventListener('addtrack', onTrackEvent);
+      remoteStream.getAudioTracks().forEach((track) => {
+        track.removeEventListener('unmute', onTrackEvent);
+      });
+    };
   }, [remoteStream, callStatus]);
 
   // Toggle speakerphone / loudspeaker output
@@ -94,7 +114,12 @@ export function VoiceCallModal({
   };
 
   const handleAccept = () => {
-    audioRef.current?.play().catch(() => {});
+    if (audioRef.current) {
+      audioRef.current.muted = false;
+      audioRef.current.play().catch((err) => {
+        console.warn('[WebRTC Audio] Play unlock on accept failed:', err);
+      });
+    }
     onAccept();
   };
 
@@ -103,7 +128,7 @@ export function VoiceCallModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
       {/* Hidden audio element for WebRTC audio playback */}
-      <audio ref={audioRef} autoPlay playsInline />
+      <audio ref={audioRef} autoPlay playsInline muted={false} />
 
       <div className="w-full max-w-sm rounded-2xl border-[3px] border-black bg-white p-6 text-center text-black shadow-[6px_6px_0px_0px_#000] animate-in fade-in zoom-in-95 duration-150">
         {/* Caller Avatar / Animation */}

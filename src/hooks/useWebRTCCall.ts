@@ -18,6 +18,7 @@ interface UseWebRTCCallProps {
   currentUserId: string;
   currentUserName: string;
   currentUserRole?: string;
+  remoteAudioRef?: React.RefObject<HTMLAudioElement | null>;
   onLogCall?: (entry: CallLogEntry, partnerId?: string | null) => void;
 }
 
@@ -26,7 +27,8 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -36,6 +38,7 @@ export function useWebRTCCall({
   currentUserId,
   currentUserName,
   currentUserRole = 'USER',
+  remoteAudioRef,
   onLogCall,
 }: UseWebRTCCallProps) {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
@@ -50,6 +53,7 @@ export function useWebRTCCall({
   const localStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const ringingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const disconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
   const pendingOfferRef = useRef<any>(null);
   const callDurationRef = useRef<number>(0);
@@ -70,6 +74,11 @@ export function useWebRTCCall({
     if (ringingTimeoutRef.current) {
       clearTimeout(ringingTimeoutRef.current);
       ringingTimeoutRef.current = null;
+    }
+
+    if (disconnectTimeoutRef.current) {
+      clearTimeout(disconnectTimeoutRef.current);
+      disconnectTimeoutRef.current = null;
     }
 
     if (timerRef.current) {
@@ -145,41 +154,79 @@ export function useWebRTCCall({
       }
     };
 
+    const clearDisconnectGracePeriod = () => {
+      if (disconnectTimeoutRef.current) {
+        console.log('[WebRTC]: Connection recovered, cancelling disconnect grace period.');
+        clearTimeout(disconnectTimeoutRef.current);
+        disconnectTimeoutRef.current = null;
+      }
+    };
+
+    const handleConnectionDisconnected = () => {
+      if (disconnectTimeoutRef.current) return;
+      console.warn('[WebRTC]: Connection temporarily disconnected, granting 10s grace period for re-routing...');
+      disconnectTimeoutRef.current = setTimeout(() => {
+        console.warn('[WebRTC]: Connection failed to reconnect within 10s grace period. Ending call.');
+        endCall();
+      }, 10000);
+    };
+
     pc.oniceconnectionstatechange = () => {
       console.log('[ICE State]:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        clearDisconnectGracePeriod();
+        if (ringingTimeoutRef.current) {
+          clearTimeout(ringingTimeoutRef.current);
+          ringingTimeoutRef.current = null;
+        }
         console.log('[WebRTC Audio]: ICE media connectivity fully established');
+      } else if (pc.iceConnectionState === 'disconnected') {
+        handleConnectionDisconnected();
       } else if (pc.iceConnectionState === 'failed') {
-        console.warn('[WebRTC Audio]: ICE connection failed in production');
+        clearDisconnectGracePeriod();
+        console.warn('[WebRTC Audio]: ICE connection permanently failed in production');
+        endCall();
       }
     };
 
     pc.ontrack = (event) => {
       console.log('[WebRTC ontrack]: Received remote track', event.track.kind, event.streams);
-      if (event.streams && event.streams[0]) {
-        setRemoteStream(event.streams[0]);
-      } else {
-        const inboundStream = new MediaStream([event.track]);
-        setRemoteStream(inboundStream);
+      const stream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
+      setRemoteStream(stream);
+
+      if (remoteAudioRef?.current) {
+        remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.play().catch((err) => {
+          console.warn('[WebRTC] Autoplay blocked, awaiting user gesture:', err);
+        });
       }
     };
 
     pc.onconnectionstatechange = () => {
       console.log('[WebRTC Connection State]:', pc.connectionState);
       if (pc.connectionState === 'connected') {
+        clearDisconnectGracePeriod();
         sounds.stopAll();
+        if (ringingTimeoutRef.current) {
+          clearTimeout(ringingTimeoutRef.current);
+          ringingTimeoutRef.current = null;
+        }
         setCallStatus('connected');
         if (!timerRef.current) {
           startTimer();
         }
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      } else if (pc.connectionState === 'disconnected') {
+        handleConnectionDisconnected();
+      } else if (pc.connectionState === 'failed') {
+        clearDisconnectGracePeriod();
+        console.warn('[WebRTC]: PeerConnection permanently failed');
         endCall();
       }
     };
 
     pcRef.current = pc;
     return pc;
-  }, [currentUserId, startTimer]);
+  }, [currentUserId, remoteAudioRef, startTimer]);
 
   // Acquire microphone stream
   const getLocalAudioStream = async () => {
@@ -593,14 +640,19 @@ export function useWebRTCCall({
     // ICE Candidate
     channel.on('broadcast', { event: 'webrtc-ice' }, async ({ payload }) => {
       if (payload.fromUserId === currentUserId) return;
-      try {
-        if (pcRef.current && pcRef.current.remoteDescription && payload.candidate) {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
-        } else if (payload.candidate) {
+      if (!payload.candidate) return;
+
+      const pc = pcRef.current;
+      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        } catch (err) {
+          console.warn('[WebRTC ICE]: Error adding immediate candidate, queuing:', err);
           pendingCandidatesRef.current.push(payload.candidate);
         }
-      } catch (err) {
-        console.error('Failed to add ICE candidate:', err);
+      } else {
+        console.log('[WebRTC ICE]: Remote description not yet set, buffering candidate to queue');
+        pendingCandidatesRef.current.push(payload.candidate);
       }
     });
 

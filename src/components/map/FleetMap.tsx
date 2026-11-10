@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { MovementBadge } from '@/components/ui/MovementBadge';
@@ -71,9 +71,10 @@ function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }
   return null;
 }
 
-function createVehicleIcon(status: string, movement: string, isSelected: boolean) {
+function createVehicleIcon(status: string, movement: string, isSelected: boolean, accuracyM?: number) {
   const visual = getVehicleConditionVisual(status, movement);
   const isMoving = movement?.toUpperCase() === 'MOVING';
+  const isEstimated = typeof accuracyM === 'number' && accuracyM > 100;
 
   const pulseHtml = (isMoving || isSelected)
     ? `<span class="absolute -inset-1.5 rounded-full ${visual.pulseColor} opacity-75 animate-ping"></span>`
@@ -83,6 +84,10 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
     ? 'border-2 border-black ring-2 ring-white scale-110 shadow-lg'
     : 'border-2 border-white shadow-md';
 
+  const badgeHtml = isEstimated
+    ? `<span class="absolute -top-2 -right-3.5 px-1 py-0.2 bg-amber-300 text-amber-950 border border-black rounded text-[9px] font-black shadow-[1px_1px_0px_0px_#000] z-20 pointer-events-none whitespace-nowrap" title="Akurasi Estimasi: ±${Math.round(accuracyM)}m">±${Math.round(accuracyM)}m</span>`
+    : '';
+
   return L.divIcon({
     className: 'vehicle-div-icon',
     html: `
@@ -91,6 +96,7 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
         <svg class="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           ${visual.iconSvg}
         </svg>
+        ${badgeHtml}
       </div>
     `,
     iconSize: [32, 32],
@@ -154,26 +160,36 @@ export default function FleetMap({
           if (isNaN(v.lat) || isNaN(v.lng)) return null;
           const isSelected = v.vehicleId === selectedVehicleId;
           const visual = getVehicleConditionVisual(v.status, v.movement);
-          const icon = createVehicleIcon(v.status, v.movement, isSelected);
+          const icon = createVehicleIcon(v.status, v.movement, isSelected, v.accuracyM);
           const rawPhone = v.driverPhone ? v.driverPhone.replace(/\D/g, '') : '';
           const waUrl = rawPhone ? `https://wa.me/${rawPhone}` : null;
           const isMoving = v.movement === 'MOVING';
 
           return (
             <React.Fragment key={v.vehicleId}>
-              {/* Radar Perimeter & GPS Accuracy Circle */}
-              {v.accuracyM && v.accuracyM > 0 && v.accuracyM <= 500 && (
+              {/* GPS Accuracy Radius Circle */}
+              {typeof v.accuracyM === 'number' && v.accuracyM > 0 && (
                 <Circle
                   center={[v.lat, v.lng]}
-                  radius={Math.max(v.accuracyM || 15, 25)}
+                  radius={Math.max(v.accuracyM, 5)}
                   pathOptions={{
-                    color: visual.radarColor,
-                    fillColor: visual.radarColor,
-                    fillOpacity: isSelected ? 0.35 : (isMoving ? 0.25 : 0.12),
-                    weight: isSelected ? 2.5 : 1.5,
-                    dashArray: v.status === 'MAINTENANCE' || v.status === 'INACTIVE' ? '4, 4' : undefined,
+                    color: '#2563eb',
+                    fillColor: '#3b82f6',
+                    fillOpacity: isSelected ? 0.22 : 0.16,
+                    weight: isSelected ? 1.5 : 1,
+                    opacity: 0.7,
                   }}
-                />
+                >
+                  <Tooltip direction="center" permanent={false} opacity={0.92}>
+                    <span className="font-sans text-xs font-bold text-zinc-900">
+                      {v.accuracyM > 100
+                        ? `⚠️ Akurasi Estimasi: ±${Math.round(v.accuracyM)} m (Wi-Fi/Seluler)`
+                        : v.accuracyM < 20
+                        ? `✓ Akurasi Tinggi: ±${Math.round(v.accuracyM)} m (Satelit Lock)`
+                        : `Akurasi: ±${Math.round(v.accuracyM)} m`}
+                    </span>
+                  </Tooltip>
+                </Circle>
               )}
 
               {/* Vehicle Marker */}
@@ -186,6 +202,13 @@ export default function FleetMap({
                   click: () => onSelectVehicle?.(v),
                 }}
               >
+                {v.accuracyM > 100 && (
+                  <Tooltip direction="top" offset={[0, -20]} permanent opacity={0.95}>
+                    <span className="font-sans text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-600 px-1.5 py-0.5 rounded shadow-xs">
+                      ⚠️ Akurasi Estimasi: ±{Math.round(v.accuracyM)} m
+                    </span>
+                  </Tooltip>
+                )}
                 <Popup className="custom-leaflet-popup">
                   <div className="p-1 min-w-[210px] text-zinc-900 font-sans">
                     <div className="flex items-center justify-between gap-2 border-b border-zinc-200 pb-2 mb-2">
@@ -238,6 +261,16 @@ export default function FleetMap({
                         <span className="text-zinc-500">Accuracy:</span>
                         <GPSBadge accuracyM={v.accuracyM} showDetails={true} />
                       </div>
+                      {typeof v.accuracyM === 'number' && v.accuracyM > 100 && (
+                        <div className="rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                          ⚠️ Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(v.accuracyM)} m)
+                        </div>
+                      )}
+                      {typeof v.accuracyM === 'number' && v.accuracyM < 20 && (
+                        <div className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-900">
+                          ✓ Akurasi tinggi (satelit GPS terkunci)
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between gap-1">
                         <span className="text-zinc-500">Updated:</span>

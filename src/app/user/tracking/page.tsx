@@ -484,6 +484,11 @@ function UserTrackingContent() {
                         <div className="mt-0.5">
                           <GPSBadge accuracyM={selectedVehicle.accuracyM} />
                         </div>
+                        {typeof selectedVehicle.accuracyM === 'number' && selectedVehicle.accuracyM > 100 && (
+                          <div className="mt-1 rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                            ⚠️ Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(selectedVehicle.accuracyM)} m)
+                          </div>
+                        )}
                       </div>
                     </div>
 

@@ -190,4 +190,83 @@ describe('GET /api/admin/reports/excel', () => {
       hyperlink: expect.stringContaining('/uploads/nota-dinas/dokumen-nota.pdf'),
     });
   });
+
+  it('fetches remote Supabase Storage photos and embeds them as clickable images', async () => {
+    mocks.auth.mockResolvedValue({ user: { id: 'admin-1' } });
+    mocks.user.mockResolvedValue({
+      id: 'admin-1',
+      name: 'Admin KCIC',
+      email: 'admin@kcic.co.id',
+      isActive: true,
+      role: { code: 'ADMIN' },
+    });
+
+    // 1x1 transparent PNG buffer
+    const mockPngBuffer = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+      'base64'
+    );
+
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(mockPngBuffer.buffer),
+    } as any);
+
+    try {
+      mocks.bookingFindMany.mockResolvedValue([
+        {
+          id: 'booking-remote',
+          bookingNumber: 'KCIC-2026-REMOTE',
+          serviceType: ServiceType.DROP_OFF,
+          status: BookingStatus.COMPLETED,
+          departureAt: new Date('2026-03-10T08:00:00Z'),
+          expectedReturnAt: new Date('2026-03-10T11:00:00Z'),
+          pickupLocation: 'Stasiun Halim',
+          destination: 'Kantor Pusat KCIC',
+          purpose: 'Inspeksi Jalur',
+          notes: null,
+          notaDinasUrl:
+            'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/public/nota-dinas/KCIC-2026-REMOTE/nota-remote.png',
+          notaDinasFilename: 'Screenshot (25).png',
+          rejectedReason: null,
+          user: {
+            id: 'user-1',
+            name: 'Budi Santoso',
+            email: 'budi@kcic.co.id',
+            phone: '08123456789',
+          },
+          driver: null,
+          vehicle: null,
+          operationalLocation: null,
+          trips: [],
+        },
+      ]);
+
+      const req = new NextRequest('http://localhost:3000/api/admin/reports/excel');
+      const res = await GET(req, undefined as any);
+
+      expect(res.status).toBe(200);
+
+      const arrayBuffer = await res.arrayBuffer();
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+
+      const worksheet = workbook.getWorksheet('Laporan Perjalanan');
+      expect(worksheet).toBeDefined();
+
+      // Row height should be expanded to 80 for embedded photo
+      expect(worksheet?.getRow(8).height).toBe(80);
+
+      // Embedded image should be present
+      const images = worksheet?.getImages();
+      expect(images && images.length).toBeGreaterThan(0);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/public/nota-dinas/KCIC-2026-REMOTE/nota-remote.png',
+        expect.any(Object)
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

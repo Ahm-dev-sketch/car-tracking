@@ -198,3 +198,4 @@ export async function uploadFileToStorage(
       'Kredensial Supabase Storage (NEXT_PUBLIC_SUPABASE_URL & SUPABASE_SERVICE_ROLE_KEY) belum diset dan sistem file serverless bersifat read-only. Silakan konfigurasikan Environment Variables di Vercel.',
   };
 }
+

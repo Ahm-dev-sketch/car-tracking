@@ -251,7 +251,72 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     worksheet.getColumn(colNumber).width = h.width;
   });
 
-  // 4. Data Rows
+  // 4. Pre-fetch Nota Dinas photos in parallel (supporting both Supabase Storage remote URLs and local files)
+  const photoMap = new Map<string, { buffer: Buffer; extension: 'png' | 'jpeg' }>();
+
+  await Promise.all(
+    bookings.map(async (b) => {
+      if (!b.notaDinasUrl) return;
+
+      const isPdf =
+        Boolean(b.notaDinasUrl && b.notaDinasUrl.toLowerCase().endsWith('.pdf')) ||
+        Boolean(b.notaDinasFilename && b.notaDinasFilename.toLowerCase().endsWith('.pdf'));
+
+      if (isPdf) return;
+
+      const fullNotaUrl = b.notaDinasUrl.startsWith('http')
+        ? b.notaDinasUrl
+        : `${baseUrl}${b.notaDinasUrl}`;
+
+      try {
+        let rawBuf: Buffer | null = null;
+
+        // Try HTTP/HTTPS fetch (e.g. Supabase Storage remote URL)
+        if (fullNotaUrl && (fullNotaUrl.startsWith('http://') || fullNotaUrl.startsWith('https://'))) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          try {
+            const resp = await fetch(fullNotaUrl, { signal: controller.signal });
+            if (resp.ok) {
+              const arrayBuffer = await resp.arrayBuffer();
+              rawBuf = Buffer.from(arrayBuffer);
+            }
+          } catch {
+            // fallback to disk or ignore
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        }
+
+        // Try local disk read if not retrieved remotely
+        if (!rawBuf) {
+          const cleanPath = b.notaDinasUrl.replace(/^\//, '');
+          const diskPath = path.join(process.cwd(), 'public', cleanPath);
+          if (fs.existsSync(diskPath)) {
+            rawBuf = await fs.promises.readFile(diskPath);
+          }
+        }
+
+        if (rawBuf && rawBuf.length > 0) {
+          try {
+            const resized = await sharp(rawBuf)
+              .resize({ width: 220, height: 110, fit: 'inside', withoutEnlargement: true })
+              .png()
+              .toBuffer();
+            photoMap.set(b.id, { buffer: resized, extension: 'png' });
+          } catch {
+            // Fallback to raw buffer
+            const isPng = rawBuf[0] === 0x89 && rawBuf[1] === 0x50;
+            photoMap.set(b.id, { buffer: rawBuf, extension: isPng ? 'png' : 'jpeg' });
+          }
+        }
+      } catch (err) {
+        console.warn(`[Excel Export] Failed to fetch photo for booking ${b.bookingNumber}:`, err);
+      }
+    })
+  );
+
+  // 5. Data Rows
   for (let index = 0; index < bookings.length; index++) {
     const b = bookings[index];
     const rowNumber = headerRowNumber + 1 + index;
@@ -280,28 +345,11 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       ? (b.notaDinasUrl.startsWith('http') ? b.notaDinasUrl : `${baseUrl}${b.notaDinasUrl}`)
       : null;
 
-    let hasPhoto = false;
-    let photoBuffer: Buffer | null = null;
+    const photoData = photoMap.get(b.id) || null;
+    const hasPhoto = Boolean(photoData);
     const isPdf =
       Boolean(b.notaDinasUrl && b.notaDinasUrl.toLowerCase().endsWith('.pdf')) ||
       Boolean(b.notaDinasFilename && b.notaDinasFilename.toLowerCase().endsWith('.pdf'));
-
-    if (b.notaDinasUrl && !isPdf) {
-      try {
-        const cleanPath = b.notaDinasUrl.replace(/^\//, '');
-        const diskPath = path.join(process.cwd(), 'public', cleanPath);
-        if (fs.existsSync(diskPath)) {
-          const rawBuf = await fs.promises.readFile(diskPath);
-          photoBuffer = await sharp(rawBuf)
-            .resize({ width: 220, height: 110, fit: 'inside', withoutEnlargement: true })
-            .png()
-            .toBuffer();
-          hasPhoto = true;
-        }
-      } catch {
-        // fallback if file not on disk or unreadable
-      }
-    }
 
     // Adjust row height depending on content (photos get 80pt, pdfs 32pt, standard 24pt)
     if (hasPhoto) {
@@ -330,7 +378,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       distanceKm !== '-' ? Number(distanceKm) : '-', // 15. Jarak
       notaStatus, // 16. Status Nota
       hasPhoto
-        ? ''
+        ? { text: '', hyperlink: fullNotaUrl }
         : isPdf
         ? { text: `[Dokumen PDF] ${b.notaDinasFilename || 'Buka PDF'}`, hyperlink: fullNotaUrl }
         : fullNotaUrl
@@ -387,10 +435,10 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     });
 
     // Embed photo directly inside the cell if available
-    if (hasPhoto && photoBuffer) {
+    if (hasPhoto && photoData) {
       const imageId = workbook.addImage({
-        buffer: photoBuffer as any,
-        extension: 'png',
+        buffer: photoData.buffer as any,
+        extension: photoData.extension,
       });
 
       worksheet.addImage(imageId, {

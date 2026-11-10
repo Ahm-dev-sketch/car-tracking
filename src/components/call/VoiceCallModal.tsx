@@ -150,13 +150,25 @@ export function VoiceCallModal({
             </div>
           )}
           {callStatus === 'ended' && (
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black bg-zinc-100 text-zinc-700 border border-zinc-300">
-              Panggilan Berakhir
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border ${
+                errorMessage?.toLowerCase().includes('tidak ada jawaban') ||
+                errorMessage?.toLowerCase().includes('tak terjawab') ||
+                errorMessage?.toLowerCase().includes('ditolak')
+                  ? 'bg-rose-100 text-rose-900 border-rose-300'
+                  : 'bg-zinc-100 text-zinc-700 border-zinc-300'
+              }`}
+            >
+              {errorMessage?.toLowerCase().includes('tak terjawab') ||
+              errorMessage?.toLowerCase().includes('tidak ada jawaban') ? (
+                <Icon name="phoneOff" className="size-3.5 text-rose-600" />
+              ) : null}
+              {errorMessage || 'Panggilan Berakhir'}
             </span>
           )}
         </div>
 
-        {errorMessage && (
+        {errorMessage && callStatus !== 'ended' && (
           <div className="mb-4 p-2.5 bg-rose-50 border border-rose-300 rounded-lg text-xs font-medium text-rose-800">
             {errorMessage}
           </div>

@@ -169,7 +169,8 @@ export function ChatDrawer({
 
               // Special formatting for Voice Call History entry
               if (m.message.startsWith('📞 Panggilan')) {
-                const isMissed = m.message.includes('Tak Terjawab') || m.message.includes('Ditolak');
+                const lower = m.message.toLowerCase();
+                const isMissed = lower.includes('tak terjawab') || lower.includes('ditolak');
                 return (
                   <div key={m.id} className="flex justify-center my-1.5">
                     <div

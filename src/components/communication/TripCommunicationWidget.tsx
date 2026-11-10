@@ -52,9 +52,10 @@ export function TripCommunicationWidget({
     isOpen: isChatOpen,
   });
 
-  // Log voice call events to chat history
+  // Log voice call events to chat history & database call log
   const handleLogCall = useCallback(
-    (entry: CallLogEntry, targetPartnerId?: string | null) => {
+    async (entry: CallLogEntry, targetPartnerId?: string | null) => {
+      const partner = targetPartnerId || partnerId;
       let text = '';
       if (entry.type === 'COMPLETED') {
         const mins = Math.floor(entry.durationSeconds / 60);
@@ -62,13 +63,33 @@ export function TripCommunicationWidget({
         const durStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         text = `📞 Panggilan Suara Berakhir (${durStr})`;
       } else if (entry.type === 'MISSED') {
-        text = '📞 Panggilan Tak Terjawab';
+        text = '📞 Panggilan suara tak terjawab (30 detik)';
       } else {
         text = '📞 Panggilan Ditolak';
       }
-      sendMessage(text, targetPartnerId || partnerId);
+
+      try {
+        const res = await fetch('/api/call/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookingId,
+            tripId,
+            receiverId: partner,
+            status: entry.type,
+            durationSeconds: entry.durationSeconds,
+            message: text,
+          }),
+        });
+        if (!res.ok) {
+          throw new Error('Call log API failed');
+        }
+      } catch {
+        // Fallback: send directly through client realtime chat message hook
+        sendMessage(text, partner);
+      }
     },
-    [partnerId, sendMessage]
+    [bookingId, tripId, partnerId, sendMessage]
   );
 
   // WebRTC Call Hook

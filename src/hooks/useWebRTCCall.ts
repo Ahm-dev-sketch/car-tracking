@@ -6,6 +6,8 @@ import { sounds } from '@/lib/sound-effects';
 
 export type CallStatus = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
 
+export const CALL_TIMEOUT_MS = 30000; // 30 seconds call timeout
+
 export interface CallLogEntry {
   type: 'COMPLETED' | 'MISSED' | 'REJECTED';
   durationSeconds: number;
@@ -234,12 +236,60 @@ export function useWebRTCCall({
         },
       });
 
-      // Ringing timeout for outgoing call (40 seconds)
+      // Clear any prior ringing timer
+      if (ringingTimeoutRef.current) {
+        clearTimeout(ringingTimeoutRef.current);
+        ringingTimeoutRef.current = null;
+      }
+
+      // Auto call-timeout for outgoing call (30 seconds)
       ringingTimeoutRef.current = setTimeout(() => {
         if (callStatusRef.current === 'calling') {
-          endCall('MISSED');
+          console.log('[WebRTC Call]: Outgoing call timed out after 30s with no answer');
+
+          // 1. Broadcast timeout signal & call-end to recipient
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'webrtc-timeout',
+            payload: {
+              fromUserId: currentUserId,
+              toUserId: targetUserId,
+              reason: 'MISSED',
+            },
+          });
+
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'call-end',
+            payload: {
+              fromUserId: currentUserId,
+              toUserId: targetUserId,
+              reason: 'MISSED',
+            },
+          });
+
+          // 2. Stop audio ringback and play hangup
+          sounds.stopAll();
+          sounds.playHangup();
+
+          // 3. UI feedback
+          setErrorMessage('Tidak ada jawaban');
+
+          // 4. Log missed call event to chat history & database
+          onLogCallRef.current?.({ type: 'MISSED', durationSeconds: 0 }, targetUserId);
+
+          // 5. Cleanup connections
+          cleanupCall();
+          setCallStatus('ended');
+
+          setTimeout(() => {
+            setCallStatus('idle');
+            setPartnerInfo(null);
+            setErrorMessage(null);
+            setCallDuration(0);
+          }, 2500);
         }
-      }, 40000);
+      }, CALL_TIMEOUT_MS);
     } catch (err: unknown) {
       cleanupCall();
       setCallStatus('idle');
@@ -296,6 +346,11 @@ export function useWebRTCCall({
     sounds.stopAll();
     sounds.playHangup();
 
+    if (ringingTimeoutRef.current) {
+      clearTimeout(ringingTimeoutRef.current);
+      ringingTimeoutRef.current = null;
+    }
+
     if (partnerInfo) {
       channelRef.current?.send({
         type: 'broadcast',
@@ -322,6 +377,11 @@ export function useWebRTCCall({
 
     sounds.stopAll();
     sounds.playHangup();
+
+    if (ringingTimeoutRef.current) {
+      clearTimeout(ringingTimeoutRef.current);
+      ringingTimeoutRef.current = null;
+    }
 
     if (partner) {
       channelRef.current?.send({
@@ -403,17 +463,54 @@ export function useWebRTCCall({
       setCallStatus('ringing');
       sounds.startRingtone();
 
-      // Auto-missed call after 30 seconds
+      // Auto-missed call backup timer on callee (30 seconds)
       if (ringingTimeoutRef.current) clearTimeout(ringingTimeoutRef.current);
       ringingTimeoutRef.current = setTimeout(() => {
         if (callStatusRef.current === 'ringing') {
+          console.log('[WebRTC Call]: Incoming call timed out after 30s with no answer');
           sounds.stopAll();
+          sounds.playHangup();
           setMissedCallsCount((c) => c + 1);
-          setCallStatus('idle');
-          setPartnerInfo(null);
-          pendingOfferRef.current = null;
+          setErrorMessage('Panggilan tak terjawab');
+          cleanupCall();
+          setCallStatus('ended');
+          setTimeout(() => {
+            setCallStatus('idle');
+            setPartnerInfo(null);
+            setErrorMessage(null);
+            setCallDuration(0);
+          }, 2500);
         }
-      }, 30000);
+      }, CALL_TIMEOUT_MS);
+    });
+
+    // Remote caller timed out (30s)
+    channel.on('broadcast', { event: 'webrtc-timeout' }, ({ payload }) => {
+      if (payload.toUserId && payload.toUserId !== currentUserId) return;
+      console.log('[WebRTC Call]: Received webrtc-timeout signal from caller');
+
+      sounds.stopAll();
+      sounds.playHangup();
+
+      if (ringingTimeoutRef.current) {
+        clearTimeout(ringingTimeoutRef.current);
+        ringingTimeoutRef.current = null;
+      }
+
+      if (callStatusRef.current === 'ringing') {
+        setMissedCallsCount((c) => c + 1);
+      }
+
+      setErrorMessage('Panggilan tak terjawab');
+      cleanupCall();
+      setCallStatus('ended');
+
+      setTimeout(() => {
+        setCallStatus('idle');
+        setPartnerInfo(null);
+        setErrorMessage(null);
+        setCallDuration(0);
+      }, 2500);
     });
 
     // Remote accepted our call
@@ -473,8 +570,14 @@ export function useWebRTCCall({
       sounds.stopAll();
       sounds.playHangup();
 
-      if (callStatusRef.current === 'ringing' && payload?.reason === 'MISSED') {
+      if (ringingTimeoutRef.current) {
+        clearTimeout(ringingTimeoutRef.current);
+        ringingTimeoutRef.current = null;
+      }
+
+      if (callStatusRef.current === 'ringing' || payload?.reason === 'MISSED') {
         setMissedCallsCount((c) => c + 1);
+        setErrorMessage('Panggilan tak terjawab');
       }
 
       cleanupCall();
@@ -483,7 +586,8 @@ export function useWebRTCCall({
         setCallStatus('idle');
         setPartnerInfo(null);
         setCallDuration(0);
-      }, 1500);
+        setErrorMessage(null);
+      }, 2000);
     });
 
     // ICE Candidate

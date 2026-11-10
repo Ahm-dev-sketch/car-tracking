@@ -13,7 +13,7 @@ const sendMessageSchema = z.object({
   receiverId: z.string().trim().optional().nullable(),
   message: z.string().trim().min(1, 'Pesan tidak boleh kosong').max(1000),
   senderName: z.string().trim().optional(),
-  senderRole: z.enum(['USER', 'DRIVER', 'ADMIN']).optional().default('USER'),
+  senderRole: z.enum(['USER', 'DRIVER', 'ADMIN', 'SYSTEM']).optional().default('USER'),
 });
 
 export const GET = withErrorHandling(async (req: NextRequest) => {

@@ -10,7 +10,7 @@ export interface ChatMessage {
   trip_id?: string | null;
   sender_id: string;
   sender_name?: string | null;
-  sender_role?: 'USER' | 'DRIVER' | 'ADMIN' | string;
+  sender_role?: 'USER' | 'DRIVER' | 'ADMIN' | 'SYSTEM' | string;
   receiver_id?: string | null;
   message: string;
   is_read: boolean;
@@ -22,7 +22,7 @@ interface UseRealtimeChatProps {
   tripId?: string | null;
   currentUserId: string;
   currentUserName?: string;
-  currentUserRole?: 'USER' | 'DRIVER' | 'ADMIN';
+  currentUserRole?: 'USER' | 'DRIVER' | 'ADMIN' | 'SYSTEM';
   isOpen?: boolean;
 }
 

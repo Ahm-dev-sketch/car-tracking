@@ -71,16 +71,26 @@ function DriverVehicleContent() {
       setIsLoading(true);
       setError(null);
       try {
-        const [config, locs, me] = await Promise.all([
+        const [configRes, locsRes, meRes] = await Promise.allSettled([
           fetchJson<{ sessionState: { activeTrip?: { vehicle: { id: string } }; activeSession?: { vehicle?: { id: string } } } }>('/api/tracking/config'),
           fetchJson<{ data: LocationOption[] }>('/api/locations'),
           fetchJson<{ driver: { status: string; licenseNumber: string; currentVehicle: VehicleDetails | null } | null }>('/api/me'),
         ]);
-        setLocations(locs.data || []);
-        if (!me.driver) throw new Error('Driver profile not found. Please contact an administrator.');
-        setDriverStatus(me.driver.status);
-        setLicenseNumber(me.driver.licenseNumber);
-        const vehicleId = config.sessionState.activeTrip?.vehicle.id || config.sessionState.activeSession?.vehicle?.id || me.driver.currentVehicle?.id;
+
+        if (locsRes.status === 'fulfilled' && locsRes.value?.data) {
+          setLocations(locsRes.value.data);
+        } else if (locsRes.status === 'rejected') {
+          console.error('[Driver Data Fetch Error] /driver/vehicle locations:', locsRes.reason);
+        }
+
+        if (meRes.status !== 'fulfilled' || !meRes.value?.driver) {
+          throw new Error('Driver profile not found. Please contact an administrator.');
+        }
+        const meDriver = meRes.value.driver;
+        const config = configRes.status === 'fulfilled' ? configRes.value : null;
+        setDriverStatus(meDriver.status);
+        setLicenseNumber(meDriver.licenseNumber);
+        const vehicleId = config?.sessionState.activeTrip?.vehicle.id || config?.sessionState.activeSession?.vehicle?.id || meDriver.currentVehicle?.id;
         if (vehicleId) {
           const result = await fetchJson<{ data: VehicleDetails }>(`/api/vehicles/${vehicleId}`);
           setCurrentVehicle(result.data);

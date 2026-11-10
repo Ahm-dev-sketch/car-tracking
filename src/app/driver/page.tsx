@@ -358,13 +358,21 @@ export default function DriverDashboardPage() {
         const poolParams = new URLSearchParams({ status: 'AVAILABLE', limit: '30' });
         if (selectedLocationId) poolParams.set('locationId', selectedLocationId);
 
-        const [poolRes, locsRes] = await Promise.all([
+        const [poolResult, locsResult] = await Promise.allSettled([
           fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?${poolParams.toString()}`),
           fetchJson<{ data: LocationOption[] }>('/api/locations'),
         ]);
         if (version === dashboardRequest.current) {
-          setPoolVehicles(poolRes?.data || []);
-          if (locsRes?.data) setLocations(locsRes.data);
+          if (poolResult.status === 'fulfilled') {
+            setPoolVehicles(poolResult.value?.data || []);
+          } else {
+            console.error('[Driver Data Fetch Error] client pool vehicles:', poolResult.reason);
+          }
+          if (locsResult.status === 'fulfilled' && locsResult.value?.data) {
+            setLocations(locsResult.value.data);
+          } else if (locsResult.status === 'rejected') {
+            console.error('[Driver Data Fetch Error] client locations:', locsResult.reason);
+          }
         }
       } catch (poolErr) {
         console.error('[Driver Data Fetch Error] client pool vehicles/locations:', poolErr);

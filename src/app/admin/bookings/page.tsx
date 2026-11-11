@@ -157,7 +157,11 @@ function AdminBookingsContent() {
         const res = await fetch('/api/locations');
         if (res.ok) {
           const json = await res.json();
-          setLocations(json.data || []);
+          const raw: LocationOption[] = json.data || [];
+          const uniqueLocations = Array.from(
+            new Map(raw.map((loc) => [loc.code || loc.name, loc])).values()
+          );
+          setLocations(uniqueLocations);
         }
       } catch {
         // ignore
@@ -1296,7 +1300,9 @@ function AdminBookingsContent() {
                             className="text-[11px] font-bold border border-zinc-300 rounded bg-white px-1.5 py-0.5 focus:outline-none"
                           >
                             <option value="">Semua Lokasi ({availableVehicles.length})</option>
-                            {locations.map((loc) => (
+                            {Array.from(
+                              new Map(locations.map((loc) => [loc.code || loc.name, loc])).values()
+                            ).map((loc) => (
                               <option key={loc.id} value={loc.id}>
                                 {loc.name} ({loc.code})
                               </option>
@@ -1312,20 +1318,31 @@ function AdminBookingsContent() {
                           const chosenVehicle = selectedVehicleMap[d.id] || (d.currentVehicle?.id ?? '');
                           const chosenVehicleObj = availableVehicles.find((v) => v.id === chosenVehicle);
 
+                          const isSameLocation = (
+                            locA?: { id?: string | null; code?: string | null; name?: string | null } | null,
+                            locB?: { id?: string | null; code?: string | null; name?: string | null } | null
+                          ) => {
+                            if (!locA || !locB) return false;
+                            if (locA.id && locB.id && locA.id === locB.id) return true;
+                            if (locA.code && locB.code && locA.code.trim().toLowerCase() === locB.code.trim().toLowerCase()) return true;
+                            if (locA.name && locB.name && locA.name.trim().toLowerCase() === locB.name.trim().toLowerCase()) return true;
+                            return false;
+                          };
+
                           const isDriverLocationMismatch = Boolean(
-                            interventionBooking?.operationalLocation?.id &&
+                            interventionBooking?.operationalLocation &&
                             hasVehicle &&
                             d.currentVehicle &&
-                            d.currentVehicle.currentOperationalLocation?.id !== interventionBooking.operationalLocation.id &&
-                            d.currentVehicle.homeLocation?.id !== interventionBooking.operationalLocation.id
+                            !isSameLocation(d.currentVehicle.currentOperationalLocation, interventionBooking.operationalLocation) &&
+                            !isSameLocation(d.currentVehicle.homeLocation, interventionBooking.operationalLocation)
                           );
 
                           const isChosenVehicleMismatch = Boolean(
-                            interventionBooking?.operationalLocation?.id &&
+                            interventionBooking?.operationalLocation &&
                             !hasVehicle &&
                             chosenVehicleObj &&
-                            chosenVehicleObj.currentOperationalLocation?.id !== interventionBooking.operationalLocation.id &&
-                            chosenVehicleObj.homeLocation?.id !== interventionBooking.operationalLocation.id
+                            !isSameLocation(chosenVehicleObj.currentOperationalLocation, interventionBooking.operationalLocation) &&
+                            !isSameLocation(chosenVehicleObj.homeLocation, interventionBooking.operationalLocation)
                           );
 
                           const isBlocked = isDriverLocationMismatch || isChosenVehicleMismatch || (!hasVehicle && !chosenVehicle);

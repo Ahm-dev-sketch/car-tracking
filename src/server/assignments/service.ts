@@ -65,10 +65,8 @@ export async function assignVehicle(
       // Use the same vehicle-first lock order as the trip lifecycle.
       await tx.$queryRawUnsafe('SELECT id FROM vehicles WHERE id = $1 FOR UPDATE', vehicleId);
       await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', driverId);
-      const [vehicle, driver] = await Promise.all([
-        tx.vehicle.findUnique({ where: { id: vehicleId } }),
-        tx.driver.findUnique({ where: { id: driverId }, include: { user: true } }),
-      ]);
+      const vehicle = await tx.vehicle.findUnique({ where: { id: vehicleId } });
+      const driver = await tx.driver.findUnique({ where: { id: driverId }, include: { user: true } });
 
       if (!vehicle) {
         throw new ApiError(404, 'VEHICLE_NOT_FOUND', 'Vehicle not found');
@@ -97,10 +95,12 @@ export async function assignVehicle(
         throw new ApiError(409, 'DRIVER_BUSY', 'Cannot change assignment during an active trip');
       }
 
-      const [activeVehicleAssignment, activeDriverAssignment] = await Promise.all([
-        tx.vehicleAssignment.findFirst({ where: { vehicleId, unassignedAt: null } }),
-        tx.vehicleAssignment.findFirst({ where: { driverId, unassignedAt: null } }),
-      ]);
+      const activeVehicleAssignment = await tx.vehicleAssignment.findFirst({
+        where: { vehicleId, unassignedAt: null },
+      });
+      const activeDriverAssignment = await tx.vehicleAssignment.findFirst({
+        where: { driverId, unassignedAt: null },
+      });
 
       if (activeVehicleAssignment || vehicle.currentDriverId) {
         throw new ApiError(409, 'VEHICLE_ALREADY_ASSIGNED', 'Vehicle already has an active assignment');

@@ -232,28 +232,33 @@ export async function startTrip(
       data: { bookingId: booking?.id ?? null, vehicleId, driverId, startedAt: new Date(), startLat: input.startLat, startLng: input.startLng, status: TripStatus.ACTIVE },
       include: tripMutationInclude,
     });
-  }, { maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 15000, timeout: 20000 });
 
-  await logAuditEvent({
-    actorUserId: ctx?.actorUserId ?? trip.driver.userId,
-    action: 'trip.start', entityType: 'Trip', entityId: trip.id,
-    newValue: { tripId: trip.id, vehicleId: trip.vehicleId, driverId, bookingId: trip.bookingId, startLat: input.startLat, startLng: input.startLng },
-    ip: ctx?.ip, userAgent: ctx?.userAgent,
-  });
+  void Promise.resolve(
+    logAuditEvent({
+      actorUserId: ctx?.actorUserId ?? trip.driver.userId,
+      action: 'trip.start', entityType: 'Trip', entityId: trip.id,
+      newValue: { tripId: trip.id, vehicleId: trip.vehicleId, driverId, bookingId: trip.bookingId, startLat: input.startLat, startLng: input.startLng },
+      ip: ctx?.ip, userAgent: ctx?.userAgent,
+    })
+  ).catch((err) => console.warn('[Audit Log Warning]:', err));
+
   if (trip.booking) {
     const booking = trip.booking;
-    await sendTripNotifications([
-      () => notify(booking.userId, {
-        type: 'DRIVER_EN_ROUTE', title: 'Driver on the way',
-        body: `Your driver is on the way to pickup for booking ${booking.bookingNumber}`,
-        data: { tripId: trip.id, bookingId: booking.id },
-      }),
-      () => notifyAdmins({
-        type: 'BOOKING_IN_PROGRESS', title: 'Trip Started',
-        body: `Trip ${trip.id} started for booking ${booking.bookingNumber}`,
-        data: { tripId: trip.id, bookingId: booking.id },
-      }),
-    ]);
+    void Promise.resolve(
+      sendTripNotifications([
+        () => notify(booking.userId, {
+          type: 'DRIVER_EN_ROUTE', title: 'Driver on the way',
+          body: `Your driver is on the way to pickup for booking ${booking.bookingNumber}`,
+          data: { tripId: trip.id, bookingId: booking.id },
+        }),
+        () => notifyAdmins({
+          type: 'BOOKING_IN_PROGRESS', title: 'Trip Started',
+          body: `Trip ${trip.id} started for booking ${booking.bookingNumber}`,
+          data: { tripId: trip.id, bookingId: booking.id },
+        }),
+      ])
+    ).catch((err) => console.warn('[Trip Notification Warning]:', err));
   }
   return trip;
 }
@@ -332,7 +337,7 @@ async function closeTrip(
       data: { status, endedAt, endLat: input.endLat ?? undefined, endLng: input.endLng ?? undefined, distanceMeters: input.distanceMeters ?? undefined },
       include: tripMutationInclude,
     });
-  }, { maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 15000, timeout: 20000 });
 }
 
 export async function endTrip(
@@ -348,26 +353,31 @@ export async function endTrip(
     }
   }, TripStatus.COMPLETED, input);
 
-  await logAuditEvent({
-    actorUserId: ctx?.actorUserId ?? updatedTrip.driver.userId,
-    action: 'trip.end', entityType: 'Trip', entityId: tripId,
-    newValue: { status: TripStatus.COMPLETED, endedAt: updatedTrip.endedAt?.toISOString(), distanceMeters: updatedTrip.distanceMeters },
-    ip: ctx?.ip, userAgent: ctx?.userAgent,
-  });
+  void Promise.resolve(
+    logAuditEvent({
+      actorUserId: ctx?.actorUserId ?? updatedTrip.driver.userId,
+      action: 'trip.end', entityType: 'Trip', entityId: tripId,
+      newValue: { status: TripStatus.COMPLETED, endedAt: updatedTrip.endedAt?.toISOString(), distanceMeters: updatedTrip.distanceMeters },
+      ip: ctx?.ip, userAgent: ctx?.userAgent,
+    })
+  ).catch((err) => console.warn('[Audit Log Warning]:', err));
+
   if (updatedTrip.booking) {
     const booking = updatedTrip.booking;
-    await sendTripNotifications([
-      () => notify(booking.userId, {
-        type: 'BOOKING_PENDING_COMPLETION', title: 'Perjalanan Selesai',
-        body: `Perjalanan untuk booking ${booking.bookingNumber} telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi admin.`,
-        data: { tripId: updatedTrip.id, bookingId: booking.id },
-      }),
-      () => notifyAdmins({
-        type: 'BOOKING_PENDING_COMPLETION', title: 'Trip Selesai - Butuh Approval',
-        body: `Trip ${updatedTrip.id} selesai untuk booking ${booking.bookingNumber}. Menunggu lampiran nota dinas & persetujuan admin.`,
-        data: { tripId: updatedTrip.id, bookingId: booking.id },
-      }),
-    ]);
+    void Promise.resolve(
+      sendTripNotifications([
+        () => notify(booking.userId, {
+          type: 'BOOKING_PENDING_COMPLETION', title: 'Perjalanan Selesai',
+          body: `Perjalanan untuk booking ${booking.bookingNumber} telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi admin.`,
+          data: { tripId: updatedTrip.id, bookingId: booking.id },
+        }),
+        () => notifyAdmins({
+          type: 'BOOKING_PENDING_COMPLETION', title: 'Trip Selesai - Butuh Approval',
+          body: `Trip ${updatedTrip.id} selesai untuk booking ${booking.bookingNumber}. Menunggu lampiran nota dinas & persetujuan admin.`,
+          data: { tripId: updatedTrip.id, bookingId: booking.id },
+        }),
+      ])
+    ).catch((err) => console.warn('[Trip Notification Warning]:', err));
   }
   return updatedTrip;
 }
@@ -384,12 +394,14 @@ export async function abortTrip(
       throw new ApiError(403, 'FORBIDDEN', 'Only assigned driver or admin can abort this trip');
     }
   }, TripStatus.ABORTED);
-  await logAuditEvent({
-    actorUserId: ctx?.actorUserId ?? actor.id,
-    action: 'trip.abort', entityType: 'Trip', entityId: tripId,
-    newValue: { status: TripStatus.ABORTED, reason: input?.reason ?? null },
-    ip: ctx?.ip, userAgent: ctx?.userAgent,
-  });
+  void Promise.resolve(
+    logAuditEvent({
+      actorUserId: ctx?.actorUserId ?? actor.id,
+      action: 'trip.abort', entityType: 'Trip', entityId: tripId,
+      newValue: { status: TripStatus.ABORTED, reason: input?.reason ?? null },
+      ip: ctx?.ip, userAgent: ctx?.userAgent,
+    })
+  ).catch((err) => console.warn('[Audit Log Warning]:', err));
   return updatedTrip;
 }
 
@@ -423,19 +435,23 @@ export async function arriveTrip(
       where: { id: trip.booking.id }, data: { status: BookingStatus.ARRIVED }, include: bookingMutationInclude,
     });
     return { trip: { ...trip, booking }, booking, changed: true };
-  }, { maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 15000, timeout: 20000 });
   if (result.changed) {
-    await logAuditEvent({
-      actorUserId: ctx?.actorUserId ?? actor.id,
-      action: 'trip.arrived', entityType: 'Trip', entityId: tripId,
-      newValue: { status: BookingStatus.ARRIVED, tripId, bookingId: result.booking.id },
-      ip: ctx?.ip, userAgent: ctx?.userAgent,
-    });
-    await sendTripNotifications([() => notify(result.booking.userId, {
-      type: 'DRIVER_ARRIVED', title: 'Driver Arrived',
-      body: `Your driver has arrived at the pickup location for booking ${result.booking.bookingNumber}`,
-      data: { tripId, bookingId: result.booking.id },
-    })]);
+    void Promise.resolve(
+      logAuditEvent({
+        actorUserId: ctx?.actorUserId ?? actor.id,
+        action: 'trip.arrived', entityType: 'Trip', entityId: tripId,
+        newValue: { status: BookingStatus.ARRIVED, tripId, bookingId: result.booking.id },
+        ip: ctx?.ip, userAgent: ctx?.userAgent,
+      })
+    ).catch((err) => console.warn('[Audit Log Warning]:', err));
+    void Promise.resolve(
+      sendTripNotifications([() => notify(result.booking.userId, {
+        type: 'DRIVER_ARRIVED', title: 'Driver Arrived',
+        body: `Your driver has arrived at the pickup location for booking ${result.booking.bookingNumber}`,
+        data: { tripId, bookingId: result.booking.id },
+      })])
+    ).catch((err) => console.warn('[Trip Notification Warning]:', err));
   }
   return { trip: result.trip, booking: result.booking };
 }

@@ -269,28 +269,30 @@ export async function ingestLocations(
       });
 
       return movement;
-    }, { maxWait: 10000, timeout: 30000 });
+    }, { maxWait: 15000, timeout: 20000 });
 
     if (movement !== null) {
-      await publishEvent({
-        type: 'location:update',
-        data: {
-          vehicleId: targetVehicleId,
-          lat: latestPoint.lat,
-          lng: latestPoint.lng,
-          accuracyM: latestPoint.accuracyM,
-          speedMps: latestPoint.speedMps ?? null,
-          headingDeg: latestPoint.headingDeg ?? null,
-          recordedAt: latestPoint.recordedAt.toISOString(),
-          receivedAt: new Date().toISOString(),
-          movement,
-          driverName: activeTrip?.driver?.user?.name ?? activeSession?.driver?.user?.name ?? null,
-          driverPhone: activeTrip?.driver?.user?.phone ?? activeSession?.driver?.user?.phone ?? null,
-          plateNumber: activeTrip?.vehicle?.plateNumber ?? activeSession?.vehicle?.plateNumber ?? null,
-          tripOrigin: activeTrip?.booking?.pickupLocation ?? null,
-          tripDestination: activeTrip?.booking?.destination ?? null,
-        },
-      });
+      void Promise.resolve(
+        publishEvent({
+          type: 'location:update',
+          data: {
+            vehicleId: targetVehicleId,
+            lat: latestPoint.lat,
+            lng: latestPoint.lng,
+            accuracyM: latestPoint.accuracyM,
+            speedMps: latestPoint.speedMps ?? null,
+            headingDeg: latestPoint.headingDeg ?? null,
+            recordedAt: latestPoint.recordedAt.toISOString(),
+            receivedAt: new Date().toISOString(),
+            movement,
+            driverName: activeTrip?.driver?.user?.name ?? activeSession?.driver?.user?.name ?? null,
+            driverPhone: activeTrip?.driver?.user?.phone ?? activeSession?.driver?.user?.phone ?? null,
+            plateNumber: activeTrip?.vehicle?.plateNumber ?? activeSession?.vehicle?.plateNumber ?? null,
+            tripOrigin: activeTrip?.booking?.pickupLocation ?? null,
+            tripDestination: activeTrip?.booking?.destination ?? null,
+          },
+        })
+      ).catch((err) => console.warn('[Publish Event Warning]:', err));
     }
   }
 

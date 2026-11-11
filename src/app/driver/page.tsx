@@ -689,20 +689,23 @@ export default function DriverDashboardPage() {
         body: JSON.stringify(endPayload),
       });
       const trip = json.data;
-      // Driver remains online on standby after ending trip (session & tracking stay active)
+      // Optimistic UI: Immediately clear active trip, close confirmation modal, and stop loading
       setActiveTrip(null);
       setShowEndConfirm(false);
+      setIsEndingTrip(false);
+      actionInFlight.current = false;
       setCompletedTripSummary({
         ...trip,
         durationMinutes: Math.round((new Date(trip.endedAt || Date.now()).getTime() - new Date(trip.startedAt).getTime()) / 60000),
         telemetryUploaded,
         aborted,
       });
-      await loadDashboardData();
       startTracking();
+      // Non-blocking background refresh
+      void loadDashboardData();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Unable to end trip.');
-      await loadDashboardData();
+      void loadDashboardData();
     } finally {
       actionInFlight.current = false;
       setIsEndingTrip(false);

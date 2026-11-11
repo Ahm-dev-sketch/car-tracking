@@ -804,120 +804,125 @@ export async function transitionBooking(
     timeout: 20000,
   });
 
-  // 4. Audit logging
-  await logAuditEvent({
-    actorUserId: ctx?.actorUserId ?? actor.id,
-    action: `booking.${to.toLowerCase()}`,
-    entityType: 'Booking',
-    entityId: updated.id,
-    oldValue: { status: from },
-    newValue: {
-      status: to,
-      driverId: updated.driverId,
-      reason: payload?.reason,
-    },
-    ip: ctx?.ip,
-    userAgent: ctx?.userAgent,
-  });
+  // 4. Audit logging (non-blocking)
+  void Promise.resolve(
+    logAuditEvent({
+      actorUserId: ctx?.actorUserId ?? actor.id,
+      action: `booking.${to.toLowerCase()}`,
+      entityType: 'Booking',
+      entityId: updated.id,
+      oldValue: { status: from },
+      newValue: {
+        status: to,
+        driverId: updated.driverId,
+        reason: payload?.reason,
+      },
+      ip: ctx?.ip,
+      userAgent: ctx?.userAgent,
+    })
+  ).catch((err) => console.warn('[Audit Log Warning]:', err));
 
-  // 5. In-app notifications
-  if (to === BookingStatus.APPROVED) {
-    await notify(updated.userId, {
-      type: 'BOOKING_APPROVED',
-      title: 'Booking Approved',
-      body: `Your booking ${updated.bookingNumber} has been approved`,
-      data: { bookingId: updated.id },
-    });
-  } else if (to === BookingStatus.REJECTED) {
-    await notify(updated.userId, {
-      type: 'BOOKING_REJECTED',
-      title: 'Booking Rejected',
-      body: `Your booking ${updated.bookingNumber} was rejected: ${payload?.reason ?? 'No reason provided'}`,
-      data: { bookingId: updated.id, reason: payload?.reason },
-    });
-  } else if (to === BookingStatus.DRIVER_ASSIGNED) {
-    await notify(updated.userId, {
-      type: 'DRIVER_ASSIGNED',
-      title: 'Driver Assigned',
-      body: `A driver has been assigned to your booking ${updated.bookingNumber}`,
-      data: { bookingId: updated.id, driverId: updated.driverId },
-    });
-    if (updated.driver?.userId) {
-      await notify(updated.driver.userId, {
-        type: 'TRIP_ASSIGNED',
-        title: 'New Trip Assigned',
-        body: `You have been assigned to booking ${updated.bookingNumber}`,
-        data: { bookingId: updated.id },
-      });
-    }
-  } else if (to === BookingStatus.CANCELLED) {
-    if (actor.id !== updated.userId) {
+  // 5. In-app notifications & realtime (non-blocking)
+  const dispatchAsyncSideEffects = async () => {
+    if (to === BookingStatus.APPROVED) {
       await notify(updated.userId, {
-        type: 'BOOKING_CANCELLED',
-        title: 'Booking Cancelled',
-        body: `Your booking ${updated.bookingNumber} was cancelled by administrator: ${payload?.reason ?? 'No reason provided'}`,
+        type: 'BOOKING_APPROVED',
+        title: 'Booking Approved',
+        body: `Your booking ${updated.bookingNumber} has been approved`,
         data: { bookingId: updated.id },
       });
-    } else {
+    } else if (to === BookingStatus.REJECTED) {
+      await notify(updated.userId, {
+        type: 'BOOKING_REJECTED',
+        title: 'Booking Rejected',
+        body: `Your booking ${updated.bookingNumber} was rejected: ${payload?.reason ?? 'No reason provided'}`,
+        data: { bookingId: updated.id, reason: payload?.reason },
+      });
+    } else if (to === BookingStatus.DRIVER_ASSIGNED) {
+      await notify(updated.userId, {
+        type: 'DRIVER_ASSIGNED',
+        title: 'Driver Assigned',
+        body: `A driver has been assigned to your booking ${updated.bookingNumber}`,
+        data: { bookingId: updated.id, driverId: updated.driverId },
+      });
+      if (updated.driver?.userId) {
+        await notify(updated.driver.userId, {
+          type: 'TRIP_ASSIGNED',
+          title: 'New Trip Assigned',
+          body: `You have been assigned to booking ${updated.bookingNumber}`,
+          data: { bookingId: updated.id },
+        });
+      }
+    } else if (to === BookingStatus.CANCELLED) {
+      if (actor.id !== updated.userId) {
+        await notify(updated.userId, {
+          type: 'BOOKING_CANCELLED',
+          title: 'Booking Cancelled',
+          body: `Your booking ${updated.bookingNumber} was cancelled by administrator: ${payload?.reason ?? 'No reason provided'}`,
+          data: { bookingId: updated.id },
+        });
+      } else {
+        await notifyAdmins({
+          type: 'BOOKING_CANCELLED',
+          title: 'Booking Cancelled by User',
+          body: `Booking ${updated.bookingNumber} was cancelled by user`,
+          data: { bookingId: updated.id },
+        });
+      }
+    } else if (to === BookingStatus.DRIVER_EN_ROUTE) {
+      await notify(updated.userId, {
+        type: 'DRIVER_EN_ROUTE',
+        title: 'Driver En Route',
+        body: `Driver is on the way to pick you up for booking ${updated.bookingNumber}`,
+        data: { bookingId: updated.id },
+      });
+    } else if (to === BookingStatus.ARRIVED) {
+      await notify(updated.userId, {
+        type: 'DRIVER_ARRIVED',
+        title: 'Driver Arrived',
+        body: `Your driver has arrived at the pickup location for booking ${updated.bookingNumber}`,
+        data: { bookingId: updated.id },
+      });
+    } else if (to === BookingStatus.NO_DRIVER_AVAILABLE) {
+      await notify(updated.userId, {
+        type: 'NO_DRIVER_AVAILABLE',
+        title: 'No Driver Available',
+        body: `We could not find an available driver for booking ${updated.bookingNumber}`,
+        data: { bookingId: updated.id },
+      });
+    } else if (to === BookingStatus.ADMIN_INTERVENTION) {
       await notifyAdmins({
-        type: 'BOOKING_CANCELLED',
-        title: 'Booking Cancelled by User',
-        body: `Booking ${updated.bookingNumber} was cancelled by user`,
+        type: 'ADMIN_INTERVENTION',
+        title: 'Admin Intervention Required',
+        body: `Booking ${updated.bookingNumber} needs manual driver assignment`,
+        data: { bookingId: updated.id },
+      });
+    } else if (to === BookingStatus.IN_PROGRESS) {
+      await notify(updated.userId, {
+        type: 'BOOKING_IN_PROGRESS',
+        title: 'Trip Started',
+        body: `Your trip for booking ${updated.bookingNumber} has started`,
+        data: { bookingId: updated.id },
+      });
+      await notifyAdmins({
+        type: 'BOOKING_IN_PROGRESS',
+        title: 'Trip In Progress',
+        body: `Booking ${updated.bookingNumber} is now in progress`,
         data: { bookingId: updated.id },
       });
     }
-  } else if (to === BookingStatus.DRIVER_EN_ROUTE) {
-    await notify(updated.userId, {
-      type: 'DRIVER_EN_ROUTE',
-      title: 'Driver En Route',
-      body: `Driver is on the way to pick you up for booking ${updated.bookingNumber}`,
-      data: { bookingId: updated.id },
-    });
-  } else if (to === BookingStatus.ARRIVED) {
-    await notify(updated.userId, {
-      type: 'DRIVER_ARRIVED',
-      title: 'Driver Arrived',
-      body: `Your driver has arrived at the pickup location for booking ${updated.bookingNumber}`,
-      data: { bookingId: updated.id },
-    });
-  } else if (to === BookingStatus.NO_DRIVER_AVAILABLE) {
-    await notify(updated.userId, {
-      type: 'NO_DRIVER_AVAILABLE',
-      title: 'No Driver Available',
-      body: `We could not find an available driver for booking ${updated.bookingNumber}`,
-      data: { bookingId: updated.id },
-    });
-  } else if (to === BookingStatus.ADMIN_INTERVENTION) {
-    await notifyAdmins({
-      type: 'ADMIN_INTERVENTION',
-      title: 'Admin Intervention Required',
-      body: `Booking ${updated.bookingNumber} needs manual driver assignment`,
-      data: { bookingId: updated.id },
-    });
-  } else if (to === BookingStatus.IN_PROGRESS) {
-    await notify(updated.userId, {
-      type: 'BOOKING_IN_PROGRESS',
-      title: 'Trip Started',
-      body: `Your trip for booking ${updated.bookingNumber} has started`,
-      data: { bookingId: updated.id },
-    });
-    await notifyAdmins({
-      type: 'BOOKING_IN_PROGRESS',
-      title: 'Trip In Progress',
-      body: `Booking ${updated.bookingNumber} is now in progress`,
-      data: { bookingId: updated.id },
-    });
 
-  }
+    await publishEvent({
+      type: 'booking:update',
+      data: {
+        bookingId: updated.id,
+        status: updated.status,
+        userId: updated.userId,
+      },
+    });
+  };
 
-  await publishEvent({
-    type: 'booking:update',
-    data: {
-      bookingId: updated.id,
-      status: updated.status,
-      userId: updated.userId,
-    },
-  });
+  dispatchAsyncSideEffects().catch((err) => console.warn('[Async Side Effect Warning]:', err));
 
   return updated;
 }

@@ -22,16 +22,61 @@ interface UseWebRTCCallProps {
   onLogCall?: (entry: CallLogEntry, partnerId?: string | null) => void;
 }
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
+const getIceServers = (): RTCIceServer[] => {
+  const servers: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-  ],
-  iceCandidatePoolSize: 10,
+    { urls: 'stun:stun.relay.metered.ca:80' },
+  ];
+
+  const turnUrlEnv = process.env.NEXT_PUBLIC_TURN_URL?.trim();
+  const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME?.trim();
+  const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL?.trim();
+
+  if (turnUrlEnv && turnUsername && turnCredential) {
+    const urls = turnUrlEnv
+      .split(',')
+      .map((u) => u.trim())
+      .filter(Boolean);
+
+    if (urls.length > 0) {
+      servers.push({
+        urls,
+        username: turnUsername,
+        credential: turnCredential,
+      });
+    }
+  } else {
+    // Fallback OpenRelay jika diuji di local tanpa .env TURN
+    servers.push(
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      }
+    );
+  }
+
+  return servers;
 };
+
+const getRtcConfig = (): RTCConfiguration => ({
+  iceServers: getIceServers(),
+  iceCandidatePoolSize: 10,
+});
 
 export function useWebRTCCall({
   channelId,
@@ -59,6 +104,10 @@ export function useWebRTCCall({
   const callDurationRef = useRef<number>(0);
   const callStatusRef = useRef<CallStatus>('idle');
   const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const isCallerRef = useRef<boolean>(false);
+  const outgoingIceQueueRef = useRef<RTCIceCandidateInit[]>([]);
+  const outgoingIceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isIceRestartingRef = useRef<boolean>(false);
 
   // Keep ref synchronized
   callStatusRef.current = callStatus;
@@ -67,7 +116,7 @@ export function useWebRTCCall({
   const onLogCallRef = useRef(onLogCall);
   onLogCallRef.current = onLogCall;
 
-  // Clear timers and streams
+  // Clear timers, outgoing buffers, and streams
   const cleanupCall = useCallback(() => {
     sounds.stopAll();
 
@@ -85,6 +134,14 @@ export function useWebRTCCall({
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+
+    if (outgoingIceTimerRef.current) {
+      clearInterval(outgoingIceTimerRef.current);
+      outgoingIceTimerRef.current = null;
+    }
+    outgoingIceQueueRef.current = [];
+    isCallerRef.current = false;
+    isIceRestartingRef.current = false;
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -105,6 +162,61 @@ export function useWebRTCCall({
     setRemoteStream(null);
     setIsMuted(false);
   }, []);
+
+  // Synchronously unlock audio for mobile browsers (iOS Safari & Chrome Android)
+  const unlockAudioForMobile = useCallback(() => {
+    if (remoteAudioRef?.current) {
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.play().catch(() => {});
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+        }
+      } catch {}
+    }
+  }, [remoteAudioRef]);
+
+  // Outgoing ICE Candidate buffer with 50ms interval to prevent Supabase Realtime broadcast rate limiting
+  const flushOutgoingIceCandidates = useCallback(() => {
+    if (outgoingIceTimerRef.current) return;
+
+    outgoingIceTimerRef.current = setInterval(() => {
+      if (outgoingIceQueueRef.current.length === 0) {
+        if (outgoingIceTimerRef.current) {
+          clearInterval(outgoingIceTimerRef.current);
+          outgoingIceTimerRef.current = null;
+        }
+        return;
+      }
+
+      const candidate = outgoingIceQueueRef.current.shift();
+      if (candidate && channelRef.current) {
+        try {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'webrtc-ice',
+            payload: {
+              fromUserId: currentUserId,
+              candidate,
+            },
+          });
+        } catch (err) {
+          console.warn('[WebRTC ICE]: Failed to broadcast queued candidate:', err);
+        }
+      }
+    }, 50);
+  }, [currentUserId]);
+
+  const queueOutgoingIceCandidate = useCallback((candidate: RTCIceCandidateInit) => {
+    outgoingIceQueueRef.current.push(candidate);
+    flushOutgoingIceCandidates();
+  }, [flushOutgoingIceCandidates]);
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -135,22 +247,49 @@ export function useWebRTCCall({
     }
   };
 
+  // ICE Restart trigger for network switching / reconnection (caller side)
+  const triggerIceRestart = useCallback(async (pc: RTCPeerConnection) => {
+    if (isIceRestartingRef.current) return;
+    try {
+      isIceRestartingRef.current = true;
+      console.log('[WebRTC ICE]: Triggering ICE restart for re-routing...');
+      if (typeof pc.restartIce === 'function') {
+        pc.restartIce();
+      }
+      const offer = await pc.createOffer({ iceRestart: true });
+      await pc.setLocalDescription(offer);
+
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'call-invite',
+        payload: {
+          fromUserId: currentUserId,
+          fromName: currentUserName,
+          fromRole: currentUserRole,
+          toUserId: partnerInfo?.id,
+          offer,
+          isIceRestart: true,
+        },
+      });
+
+      setTimeout(() => {
+        isIceRestartingRef.current = false;
+      }, 5000);
+    } catch (err) {
+      console.warn('[WebRTC ICE]: Failed to trigger ICE restart:', err);
+      isIceRestartingRef.current = false;
+    }
+  }, [currentUserId, currentUserName, currentUserRole, partnerInfo?.id]);
+
   // Initialize RTCPeerConnection
   const getOrCreatePeerConnection = useCallback(() => {
     if (pcRef.current) return pcRef.current;
 
-    const pc = new RTCPeerConnection(RTC_CONFIG);
+    const pc = new RTCPeerConnection(getRtcConfig());
 
     pc.onicecandidate = (event) => {
-      if (event.candidate && channelRef.current) {
-        channelRef.current.send({
-          type: 'broadcast',
-          event: 'webrtc-ice',
-          payload: {
-            fromUserId: currentUserId,
-            candidate: event.candidate,
-          },
-        });
+      if (event.candidate) {
+        queueOutgoingIceCandidate(event.candidate.toJSON());
       }
     };
 
@@ -175,6 +314,7 @@ export function useWebRTCCall({
       console.log('[ICE State]:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
         clearDisconnectGracePeriod();
+        isIceRestartingRef.current = false;
         if (ringingTimeoutRef.current) {
           clearTimeout(ringingTimeoutRef.current);
           ringingTimeoutRef.current = null;
@@ -182,10 +322,18 @@ export function useWebRTCCall({
         console.log('[WebRTC Audio]: ICE media connectivity fully established');
       } else if (pc.iceConnectionState === 'disconnected') {
         handleConnectionDisconnected();
+        if (callStatusRef.current === 'connected' && isCallerRef.current) {
+          triggerIceRestart(pc);
+        }
       } else if (pc.iceConnectionState === 'failed') {
-        clearDisconnectGracePeriod();
-        console.warn('[WebRTC Audio]: ICE connection permanently failed in production');
-        endCall();
+        if (callStatusRef.current === 'connected' && isCallerRef.current && !isIceRestartingRef.current) {
+          console.warn('[WebRTC Audio]: ICE failed, attempting emergency ICE restart before ending...');
+          triggerIceRestart(pc);
+        } else {
+          clearDisconnectGracePeriod();
+          console.warn('[WebRTC Audio]: ICE connection permanently failed in production');
+          endCall();
+        }
       }
     };
 
@@ -196,6 +344,7 @@ export function useWebRTCCall({
 
       if (remoteAudioRef?.current) {
         remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.muted = false;
         remoteAudioRef.current.play().catch((err) => {
           console.warn('[WebRTC] Autoplay blocked, awaiting user gesture:', err);
         });
@@ -226,7 +375,7 @@ export function useWebRTCCall({
 
     pcRef.current = pc;
     return pc;
-  }, [currentUserId, remoteAudioRef, startTimer]);
+  }, [currentUserId, queueOutgoingIceCandidate, remoteAudioRef, startTimer, triggerIceRestart]);
 
   // Acquire microphone stream
   const getLocalAudioStream = async () => {
@@ -251,6 +400,10 @@ export function useWebRTCCall({
 
   // Start outgoing call
   const startCall = async (targetUserId: string, targetName: string, targetRole?: string) => {
+    // 1. Synchronously unlock audio for mobile browsers on user click gesture
+    unlockAudioForMobile();
+    isCallerRef.current = true;
+
     try {
       setErrorMessage(null);
       setPartnerInfo({ id: targetUserId, name: targetName, role: targetRole });
@@ -347,6 +500,10 @@ export function useWebRTCCall({
   // Callee accepts incoming call
   const acceptCall = async () => {
     if (!partnerInfo) return;
+
+    // 1. Synchronously unlock audio for mobile browsers on user click gesture
+    unlockAudioForMobile();
+    isCallerRef.current = false;
 
     sounds.stopAll();
     if (ringingTimeoutRef.current) {
@@ -484,9 +641,34 @@ export function useWebRTCCall({
     channelRef.current = channel;
 
     // Incoming call invite
-    channel.on('broadcast', { event: 'call-invite' }, ({ payload }) => {
+    channel.on('broadcast', { event: 'call-invite' }, async ({ payload }) => {
       if (payload.toUserId && payload.toUserId !== currentUserId) return;
       if (payload.fromUserId === currentUserId) return;
+
+      // Handle ICE restart during active connected call
+      if (payload.isIceRestart && pcRef.current) {
+        console.log('[WebRTC ICE]: Received ICE restart offer from caller');
+        try {
+          const pc = pcRef.current;
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+          await drainPendingIceCandidates(pc);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          channel.send({
+            type: 'broadcast',
+            event: 'call-accept',
+            payload: {
+              fromUserId: currentUserId,
+              toUserId: payload.fromUserId,
+              answer,
+              isIceRestart: true,
+            },
+          });
+        } catch (err) {
+          console.warn('[WebRTC ICE]: Error answering ICE restart offer:', err);
+        }
+        return;
+      }
 
       if (callStatusRef.current !== 'idle') {
         // Line busy
@@ -575,8 +757,10 @@ export function useWebRTCCall({
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.answer));
           await drainPendingIceCandidates(pcRef.current);
         }
-        setCallStatus('connected');
-        startTimer();
+        if (callStatusRef.current !== 'connected') {
+          setCallStatus('connected');
+          startTimer();
+        }
       } catch (err) {
         console.error('Failed to set remote answer:', err);
       }
@@ -640,19 +824,27 @@ export function useWebRTCCall({
     // ICE Candidate
     channel.on('broadcast', { event: 'webrtc-ice' }, async ({ payload }) => {
       if (payload.fromUserId === currentUserId) return;
-      if (!payload.candidate) return;
+      const candidates: RTCIceCandidateInit[] = payload.candidates
+        ? payload.candidates
+        : payload.candidate
+        ? [payload.candidate]
+        : [];
+
+      if (candidates.length === 0) return;
 
       const pc = pcRef.current;
-      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-        } catch (err) {
-          console.warn('[WebRTC ICE]: Error adding immediate candidate, queuing:', err);
-          pendingCandidatesRef.current.push(payload.candidate);
+      for (const cand of candidates) {
+        if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(cand));
+          } catch (err) {
+            console.warn('[WebRTC ICE]: Error adding immediate candidate, queuing:', err);
+            pendingCandidatesRef.current.push(cand);
+          }
+        } else {
+          console.log('[WebRTC ICE]: Remote description not yet set, buffering candidate to queue');
+          pendingCandidatesRef.current.push(cand);
         }
-      } else {
-        console.log('[WebRTC ICE]: Remote description not yet set, buffering candidate to queue');
-        pendingCandidatesRef.current.push(payload.candidate);
       }
     });
 

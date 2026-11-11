@@ -541,7 +541,7 @@ export async function createOffer(
     });
 
     return { ...createdOffer, booking: updatedBooking };
-  }, { maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 15000, timeout: 20000 });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? null,
@@ -862,7 +862,7 @@ export async function acceptOffer(
     });
 
     return { acceptedOffer, updatedBooking, driver, targetVehicleId };
-  }, { maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 15000, timeout: 20000 });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? result.driver.userId,
@@ -962,7 +962,7 @@ export async function rejectOffer(
     });
 
     return { updatedOffer, updatedBooking };
-  }, { maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 15000, timeout: 20000 });
 
   await logAuditEvent({
     actorUserId: ctx?.actorUserId ?? null,
@@ -1293,7 +1293,7 @@ export async function manualAssignBooking(
     });
 
     return { updatedBooking, driver, targetVehicleId };
-  }, { maxWait: 10000, timeout: 30000 });
+  }, { maxWait: 15000, timeout: 20000 });
 
   await logAuditEvent({
     actorUserId: adminId,
@@ -1452,7 +1452,7 @@ export async function startDriverSession(
         },
       });
     },
-    { maxWait: 10000, timeout: 30000 }
+    { maxWait: 15000, timeout: 20000 }
   );
 
   await logAuditEvent({
@@ -1524,7 +1524,7 @@ export async function endDriverSession(
       });
       return { session, ended, offers };
     },
-    { maxWait: 10000, timeout: 30000 }
+    { maxWait: 15000, timeout: 20000 }
   );
 
   // Release the driver lock before touching bookings; include expired SENT offers too.

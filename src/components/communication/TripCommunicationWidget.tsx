@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { VoiceCallModal } from '@/components/call/VoiceCallModal';
@@ -92,7 +92,8 @@ export function TripCommunicationWidget({
     [bookingId, tripId, partnerId, sendMessage]
   );
 
-  // WebRTC Call Hook
+  // WebRTC Call Hook & Audio Ref
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const {
     callStatus,
     isMuted,
@@ -112,12 +113,28 @@ export function TripCommunicationWidget({
     currentUserId,
     currentUserName,
     currentUserRole,
+    remoteAudioRef,
     onLogCall: handleLogCall,
   });
 
   const handleStartCall = () => {
     if (!partnerId) return;
     clearMissedCalls();
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.play().catch(() => {});
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+        }
+      } catch {}
+    }
     startCall(partnerId, partnerName, partnerRole);
   };
 
@@ -275,6 +292,7 @@ export function TripCommunicationWidget({
         partnerRole={partnerInfo?.role || partnerRole}
         errorMessage={errorMessage}
         remoteStream={remoteStream}
+        audioRef={remoteAudioRef}
         onAccept={acceptCall}
         onReject={rejectCall}
         onEndCall={() => endCall('COMPLETED')}

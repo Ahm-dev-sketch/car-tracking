@@ -12,6 +12,7 @@ interface VoiceCallModalProps {
   partnerRole?: string;
   errorMessage?: string | null;
   remoteStream: MediaStream | null;
+  audioRef?: React.RefObject<HTMLAudioElement | null>;
   onAccept: () => void;
   onReject: () => void;
   onEndCall: () => void;
@@ -32,12 +33,14 @@ export function VoiceCallModal({
   partnerRole = 'Driver',
   errorMessage,
   remoteStream,
+  audioRef: externalAudioRef,
   onAccept,
   onReject,
   onEndCall,
   onToggleMute,
 }: VoiceCallModalProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const internalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = externalAudioRef || internalAudioRef;
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [isSinkIdSupported, setIsSinkIdSupported] = useState(true);
 
@@ -119,6 +122,17 @@ export function VoiceCallModal({
       audioRef.current.play().catch((err) => {
         console.warn('[WebRTC Audio] Play unlock on accept failed:', err);
       });
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+        }
+      } catch {}
     }
     onAccept();
   };

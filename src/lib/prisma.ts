@@ -55,8 +55,9 @@ function createPrismaClient(): PrismaClient {
   if (!globalForPrisma.pgPool) {
     const pool = new pg.Pool({
       connectionString,
-      // In serverless, limiting pool size to 1 per lambda container prevents connection pool exhaustion
-      max: isServerless ? 1 : 5,
+      // In serverless, a modest pool (3) avoids read requests queueing on a single client
+      // within a warm invocation; still bounded to prevent connection-pool exhaustion on free-tier Supabase.
+      max: isServerless ? 3 : 5,
       connectionTimeoutMillis: 20000, // 20s timeout tolerance for serverless cold-starts & connection queues
       idleTimeoutMillis: 15000,
     });

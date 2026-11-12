@@ -165,6 +165,23 @@ export default function DriverDashboardPage() {
   const [matchingVehicles, setMatchingVehicles] = useState<VehicleOption[]>([]);
   const [poolVehicles, setPoolVehicles] = useState<VehicleOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
+
+  // Instant render (stale-while-revalidate): seed from last-known snapshots on mount
+  // so an active trip / assignments never flash as empty; loadDashboardData revalidates.
+  useEffect(() => {
+    const cachedTrip = getSnapshot<ActiveTrip>('driver_active_trip');
+    if (cachedTrip) setActiveTrip(cachedTrip);
+    const cachedSession = getSnapshot<DriverSession>('driver_session');
+    if (cachedSession) setActiveSession(cachedSession);
+    const cachedBookings = getSnapshot<AssignedBooking[]>('driver_bookings');
+    if (cachedBookings && cachedBookings.length > 0) setAssignedBookings(cachedBookings);
+    const cachedOffers = getSnapshot<DriverOffer[]>('driver_offers');
+    if (cachedOffers && cachedOffers.length > 0) setOffers(cachedOffers);
+    const cachedVehicles = getSnapshot<VehicleOption[]>('driver_vehicle');
+    if (cachedVehicles && cachedVehicles.length > 0) setPoolVehicles(cachedVehicles);
+    const cachedLocations = getSnapshot<LocationOption[]>('driver_locations');
+    if (cachedLocations && cachedLocations.length > 0) setLocations(cachedLocations);
+  }, []);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleOption | null>(null);
   const [startPhase, setStartPhase] = useState<'gps' | 'request' | null>(null);

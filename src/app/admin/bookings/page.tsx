@@ -143,6 +143,19 @@ function AdminBookingsContent() {
   // Fleet Drivers & Available Vehicles for Assignment
   const [fleetDrivers, setFleetDrivers] = useState<any[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<any[]>([]);
+
+  // Instant render (stale-while-revalidate): seed from last-known snapshots on mount
+  // so the table fills immediately; background fetches below revalidate.
+  useEffect(() => {
+    const cachedBookings = getSnapshot<AdminBooking[]>('admin_bookings');
+    if (cachedBookings && cachedBookings.length > 0) setBookings(cachedBookings);
+    const cachedLocations = getSnapshot<LocationOption[]>('locations_list');
+    if (cachedLocations && cachedLocations.length > 0) setLocations(cachedLocations);
+    const cachedDrivers = getSnapshot<any[]>('driver_list');
+    if (cachedDrivers && cachedDrivers.length > 0) setFleetDrivers(cachedDrivers);
+    const cachedVehicles = getSnapshot<any[]>('vehicle_list');
+    if (cachedVehicles && cachedVehicles.length > 0) setAvailableVehicles(cachedVehicles);
+  }, []);
   const [vehicleLocationFilter, setVehicleLocationFilter] = useState('');
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
   const [selectedVehicleMap, setSelectedVehicleMap] = useState<Record<string, string>>({});

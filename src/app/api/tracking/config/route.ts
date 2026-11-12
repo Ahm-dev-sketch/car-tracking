@@ -90,14 +90,21 @@ export const GET = withErrorHandling(async () => {
     }
   }
 
-  return NextResponse.json({
-    config: TRACKING_CONFIG,
-    dispatchConfig: DISPATCH_CONFIG,
-    realtimeToken,
-    sessionState: {
-      role: user?.role ?? 'DRIVER',
-      activeTrip,
-      activeSession,
+  // NOTE: Do NOT add a global in-memory cache for this endpoint. The response is
+  // per-user and token-bearing (realtimeToken) plus stateful (activeTrip/activeSession),
+  // so caching it globally would leak one user's token/session into another's response.
+  // The short private Cache-Control header below only affects browser/CDN caching, not a shared store.
+  return NextResponse.json(
+    {
+      config: TRACKING_CONFIG,
+      dispatchConfig: DISPATCH_CONFIG,
+      realtimeToken,
+      sessionState: {
+        role: user?.role ?? 'DRIVER',
+        activeTrip,
+        activeSession,
+      },
     },
-  });
+    { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=120' } },
+  );
 });

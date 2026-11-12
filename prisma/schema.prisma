@@ -276,6 +276,8 @@ model Booking {
   @@index([operationalLocationId])
   @@index([driverId])
   @@index([vehiclePreferenceId])
+  @@index([status, createdAt], map: "bookings_status_created_at_idx")
+  @@index([driverId, status], map: "bookings_driver_id_status_idx")
   @@map("bookings")
 }
 
@@ -291,6 +293,7 @@ model Notification {
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@index([userId, readAt])
+  @@index([userId, readAt, createdAt], map: "notifications_user_id_read_at_created_at_idx")
   @@map("notifications")
 }
 
@@ -319,6 +322,8 @@ model Trip {
   @@index([vehicleId, startedAt(sort: Desc)])
   @@index([driverId, startedAt(sort: Desc)])
   @@index([bookingId])
+  @@index([driverId, status], map: "trips_driver_id_status_idx")
+  @@index([bookingId, status], map: "trips_booking_id_status_idx")
   @@map("trips")
 }
 
@@ -340,6 +345,7 @@ model VehicleLocation {
 
   @@index([driverId])
   @@index([tripId])
+  @@index([tripId, recordedAt(sort: Desc)], map: "vehicle_locations_trip_id_recorded_at_idx")
   @@map("vehicle_locations")
 }
 
@@ -363,6 +369,7 @@ model DriverLocation {
   @@index([driverId, recordedAt(sort: Desc)])
   @@index([tripId])
   @@index([vehicleId])
+  @@index([tripId, recordedAt(sort: Desc)], map: "driver_locations_trip_id_recorded_at_idx")
   @@map("driver_locations")
 }
 

@@ -67,6 +67,15 @@ function UserBookingsContent() {
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
+
+  // Instant render (stale-while-revalidate): seed from last-known snapshot on mount
+  // so the screen fills immediately; the background fetch below then revalidates.
+  useEffect(() => {
+    const cachedLocations = getSnapshot<LocationOption[]>('locations_list');
+    if (cachedLocations && cachedLocations.length > 0) setLocations(cachedLocations);
+    const cachedBookings = getSnapshot<Booking[]>('user_bookings');
+    if (cachedBookings && cachedBookings.length > 0) setBookings(cachedBookings);
+  }, []);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);

@@ -79,6 +79,11 @@ export async function publishEvent(
   }
 }
 
+// Log the missing-binding event at most once per instance so a non-Cloudflare
+// runtime (Vercel/Node.js) doesn't flood the dashboard with warnings while the
+// Cloudflare <-> Supabase Realtime fallback keeps working.
+let loggedMissingLocationHub = false;
+
 // Cloudflare Workers deploy-time stub.
 // Real DO RPC call wired during Phase 8 deployment.
 export async function publishToCloudflareDO(
@@ -86,9 +91,12 @@ export async function publishToCloudflareDO(
   env?: CloudflareEnv
 ): Promise<void> {
   if (!env?.LOCATION_HUB) {
-    logger.warn({
-      msg: 'Cloudflare LOCATION_HUB binding not present in current environment (scheduled for Phase 8 deploy)',
-    });
+    if (!loggedMissingLocationHub) {
+      logger.debug({
+        msg: 'Cloudflare LOCATION_HUB binding not present (running on Vercel/Node.js — Supabase Realtime fallback active; logging once per instance)',
+      });
+      loggedMissingLocationHub = true;
+    }
     return;
   }
 

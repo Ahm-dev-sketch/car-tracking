@@ -20,12 +20,12 @@ async function main() {
   console.log('Roles seeded successfully');
 
   const locations = [
-    { name: 'Halim', code: '102' },
-    { name: 'Karawang', code: '202' },
-    { name: 'Karawang', code: '204' },
-    { name: 'Padalarang', code: '802' },
-    { name: 'Tegalluar Station', code: '402' },
-    { name: 'Tegalluar Depo', code: '502' },
+    { name: 'Halim', code: '102', latitude: -6.2494, longitude: 106.8914 },
+    { name: 'Karawang', code: '202', latitude: -6.3802, longitude: 107.2488 },
+    { name: 'Karawang', code: '204', latitude: -6.369, longitude: 107.262 },
+    { name: 'Padalarang', code: '802', latitude: -6.837, longitude: 107.4845 },
+    { name: 'Tegalluar Station', code: '402', latitude: -6.9297, longitude: 107.6623 },
+    { name: 'Tegalluar Depo', code: '502', latitude: -6.921, longitude: 107.652 },
   ];
 
   const locMap = new Map<string, string>();
@@ -37,6 +37,11 @@ async function main() {
     if (!existing) {
       existing = await prisma.location.create({
         data: loc,
+      });
+    } else {
+      await prisma.location.update({
+        where: { id: existing.id },
+        data: { latitude: loc.latitude, longitude: loc.longitude },
       });
     }
     locMap.set(loc.code, existing.id);

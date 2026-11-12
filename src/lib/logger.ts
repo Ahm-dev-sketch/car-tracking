@@ -21,4 +21,7 @@ export const logger = {
   error(fields: LogFields): void {
     console.error(format('error', fields));
   },
+  debug(fields: LogFields): void {
+    console.debug(format('debug', fields));
+  },
 };

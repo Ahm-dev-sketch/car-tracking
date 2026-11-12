@@ -97,6 +97,8 @@ model Location {
   id        String   @id @default(cuid())
   name      String
   code      String
+  latitude  Float?   @map("latitude")
+  longitude Float?   @map("longitude")
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

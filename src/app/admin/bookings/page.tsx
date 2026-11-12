@@ -14,6 +14,12 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 import { Icon } from '@/components/ui/Icon';
 import { ExportReportModal } from '@/components/admin/ExportReportModal';
+import {
+  saveSnapshot,
+  getSnapshot,
+  enqueueOfflineAction,
+  processOfflineQueue,
+} from '@/lib/offline-sync';
 
 interface AdminBooking {
   id: string;
@@ -162,9 +168,15 @@ function AdminBookingsContent() {
             new Map(raw.map((loc) => [loc.code || loc.name, loc])).values()
           );
           setLocations(uniqueLocations);
+          await saveSnapshot('locations_list', uniqueLocations);
+          return;
         }
       } catch {
-        // ignore
+        // network failure / offline → fall back to snapshot below
+      }
+      const cached = await getSnapshot<LocationOption[]>('locations_list');
+      if (cached?.length) {
+        setLocations(cached);
       }
     }
     loadLocations();
@@ -198,13 +210,23 @@ function AdminBookingsContent() {
         setTotalRecords(json.pagination?.total ?? list.length);
         setTotalPages(json.pagination?.totalPages ?? 1);
         setPage(targetPage);
+        await saveSnapshot('admin_bookings', list);
         window.dispatchEvent(new Event('bookings:changed'));
       } else {
         const err = await res.json();
         setApiError(err.error?.message || 'Failed to load bookings');
       }
     } catch {
-      setApiError('Network error loading bookings');
+      const cached = await getSnapshot<AdminBooking[]>('admin_bookings');
+      if (cached?.length) {
+        setBookings(cached);
+        setTotalRecords(cached.length);
+        setTotalPages(1);
+        setPage(1);
+        setApiError('Menampilkan data terakhir (offline)');
+      } else {
+        setApiError('Network error loading bookings');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -218,6 +240,20 @@ function AdminBookingsContent() {
     });
   }, [statusFilter, locationFilter]);
 
+  // Re-sync offline queue when connection returns or another tab signals completion
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncAndRefetch = () => {
+      processOfflineQueue().then(() => fetchBookings(page));
+    };
+    window.addEventListener('offline-sync:complete', syncAndRefetch);
+    window.addEventListener('online', syncAndRefetch);
+    return () => {
+      window.removeEventListener('offline-sync:complete', syncAndRefetch);
+      window.removeEventListener('online', syncAndRefetch);
+    };
+  }, [page]);
+
   const fetchAvailableVehicles = async (locId?: string) => {
     setIsLoadingVehicles(true);
     try {
@@ -225,10 +261,15 @@ function AdminBookingsContent() {
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        setAvailableVehicles(json.data || []);
+        const data = json.data || [];
+        setAvailableVehicles(data);
+        await saveSnapshot('vehicle_list', data);
       }
     } catch {
-      // ignore
+      const cached = await getSnapshot<any[]>('vehicle_list');
+      if (cached?.length) {
+        setAvailableVehicles(cached);
+      }
     } finally {
       setIsLoadingVehicles(false);
     }
@@ -247,6 +288,10 @@ function AdminBookingsContent() {
     const initialLocation = b.operationalLocation?.id || locationFilter || '';
     setVehicleLocationFilter(initialLocation);
 
+    let candidatesLoaded = false;
+    let driversLoaded = false;
+    let vehiclesLoaded = false;
+
     try {
       const vehicleUrl = `/api/vehicles?status=AVAILABLE&limit=50${initialLocation ? `&locationId=${encodeURIComponent(initialLocation)}` : ''}`;
       const [candRes, driverRes, vehicleRes] = await Promise.allSettled([
@@ -257,23 +302,50 @@ function AdminBookingsContent() {
 
       if (candRes.status === 'fulfilled' && candRes.value.ok) {
         const json = await candRes.value.json();
-        setCandidates(json.data || []);
+        const data = json.data || [];
+        setCandidates(data);
+        await saveSnapshot('admin_candidates', data);
+        candidatesLoaded = true;
       }
 
       if (driverRes.status === 'fulfilled' && driverRes.value.ok) {
         const json = await driverRes.value.json();
-        setFleetDrivers(json.data || []);
+        const data = json.data || [];
+        setFleetDrivers(data);
+        await saveSnapshot('driver_list', data);
+        driversLoaded = true;
       }
 
       if (vehicleRes.status === 'fulfilled' && vehicleRes.value.ok) {
         const json = await vehicleRes.value.json();
-        setAvailableVehicles(json.data || []);
+        const data = json.data || [];
+        setAvailableVehicles(data);
+        await saveSnapshot('vehicle_list', data);
+        vehiclesLoaded = true;
       }
     } catch {
-      setInterventionError('Gagal memuat kandidat dan driver online');
-    } finally {
-      setLoadingCandidates(false);
+      // network failure / offline → fall back to snapshots below
     }
+
+    // Show last-known availability when offline
+    if (!candidatesLoaded) {
+      const cached = await getSnapshot<CandidateDriver[]>('admin_candidates');
+      if (cached?.length) setCandidates(cached);
+    }
+    if (!driversLoaded) {
+      const cached = await getSnapshot<any[]>('driver_list');
+      if (cached?.length) setFleetDrivers(cached);
+    }
+    if (!vehiclesLoaded) {
+      const cached = await getSnapshot<any[]>('vehicle_list');
+      if (cached?.length) setAvailableVehicles(cached);
+    }
+
+    if (!candidatesLoaded && !driversLoaded && !vehiclesLoaded) {
+      setInterventionError('Menampilkan data terakhir (offline)');
+    }
+
+    setLoadingCandidates(false);
   };
 
   const handleManualAssign = async (driverId: string, vehicleId?: string) => {
@@ -281,14 +353,57 @@ function AdminBookingsContent() {
     setAssigningCandidateId(driverId);
     setInterventionError(null);
 
+    const chosenVehicle = vehicleId || selectedVehicleMap[driverId];
+    const bookingId = interventionBooking.id;
+
+    const applyOptimisticAssign = () => {
+      const candidate = candidates.find((c) => c.driverId === driverId);
+      const fleetDriver = fleetDrivers.find((d) => d.id === driverId);
+      const driverName = candidate?.driverName || candidate?.name || fleetDriver?.user?.name;
+
+      setBookings((prev) =>
+        prev.map((bk) =>
+          bk.id === bookingId
+            ? {
+                ...bk,
+                status: 'DRIVER_ASSIGNED',
+                driver: driverName
+                  ? {
+                      id: driverId,
+                      licenseNumber: candidate?.licenseNumber || fleetDriver?.licenseNumber || '',
+                      user: {
+                        name: driverName,
+                        phone: candidate?.phone || fleetDriver?.user?.phone || '',
+                      },
+                    }
+                  : bk.driver,
+              }
+            : bk
+        )
+      );
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      await enqueueOfflineAction('ADMIN_ASSIGN_BOOKING', {
+        endpoint: `/api/admin/bookings/${bookingId}/manual-assign`,
+        method: 'POST',
+        payload: { driverId, vehicleId: chosenVehicle },
+        bookingId,
+      });
+      applyOptimisticAssign();
+      setSuccessMessage('Penugasan disimpan offline — Menunggu Sync');
+      setInterventionBooking(null);
+      setAssigningCandidateId(null);
+      return;
+    }
+
     try {
       const payload: { driverId: string; vehicleId?: string } = { driverId };
-      const chosenVehicle = vehicleId || selectedVehicleMap[driverId];
       if (chosenVehicle) {
         payload.vehicleId = chosenVehicle;
       }
 
-      const res = await fetch(`/api/admin/bookings/${interventionBooking.id}/manual-assign`, {
+      const res = await fetch(`/api/admin/bookings/${bookingId}/manual-assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -302,7 +417,15 @@ function AdminBookingsContent() {
         setInterventionError(err.error?.message || 'Gagal menugaskan driver');
       }
     } catch {
-      setInterventionError('Kesalahan jaringan saat menugaskan driver');
+      await enqueueOfflineAction('ADMIN_ASSIGN_BOOKING', {
+        endpoint: `/api/admin/bookings/${bookingId}/manual-assign`,
+        method: 'POST',
+        payload: { driverId, vehicleId: chosenVehicle },
+        bookingId,
+      });
+      applyOptimisticAssign();
+      setSuccessMessage('Penugasan disimpan offline — Menunggu Sync');
+      setInterventionBooking(null);
     } finally {
       setAssigningCandidateId(null);
     }

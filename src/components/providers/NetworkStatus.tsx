@@ -1,37 +1,58 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getOfflineQueueCount, processOfflineQueue } from '@/lib/offline-sync';
 
 export function NetworkStatus() {
   const [isOnline, setIsOnline] = useState(true);
   const [hasChanged, setHasChanged] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const refreshPending = useCallback(() => {
+    try {
+      setPendingCount(getOfflineQueueCount());
+    } catch {
+      setPendingCount(0);
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     setIsOnline(navigator.onLine);
+    refreshPending();
 
     const handleOnline = () => {
       setIsOnline(true);
       setHasChanged(true);
       setDismissed(false);
+      refreshPending();
+      // Auto-drain any queued offline actions the moment connectivity returns.
+      void processOfflineQueue().catch(() => {});
     };
 
     const handleOffline = () => {
       setIsOnline(false);
       setHasChanged(true);
       setDismissed(false);
+      refreshPending();
+    };
+
+    const handleSyncComplete = () => {
+      refreshPending();
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('offline-sync:complete', handleSyncComplete);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('offline-sync:complete', handleSyncComplete);
     };
-  }, []);
+  }, [refreshPending]);
 
   // Auto-dismiss "Back online" toast after 4s
   useEffect(() => {
@@ -43,10 +64,16 @@ export function NetworkStatus() {
     }
   }, [isOnline, hasChanged, dismissed]);
 
-  // Never render if dismissed or if online and never went offline
-  if (dismissed || (isOnline && !hasChanged)) {
+  const pending = pendingCount > 0;
+
+  // Never render if dismissed or if online and never went offline (and nothing pending)
+  if (dismissed || (isOnline && !hasChanged && !pending)) {
     return null;
   }
+
+  const message = !isOnline
+    ? (pending ? `Mode Offline • ${pendingCount} data menunggu dikirim` : 'Connection lost — updates paused')
+    : (pending ? `Menyinkronkan ${pendingCount} data tertunda ke server...` : 'Back online');
 
   return (
     <div
@@ -72,10 +99,17 @@ export function NetworkStatus() {
           )}
         </span>
         <span>
-          {!isOnline
-            ? 'Connection lost — updates paused'
-            : 'Back online'}
+          {message}
         </span>
+        {isOnline && pending && (
+          <button
+            type="button"
+            onClick={() => void processOfflineQueue().catch(() => {})}
+            className="ml-1 min-h-11 px-3 flex items-center justify-center hover:bg-white/20 rounded-full text-white/90 hover:text-white cursor-pointer font-semibold"
+          >
+            Sync Sekarang
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setDismissed(true)}

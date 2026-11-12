@@ -18,6 +18,7 @@ import { FleetMap, VehicleMarkerData, RoutePoint } from '@/components/map';
 import { Icon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { fetchJson } from '@/lib/fetch-json';
+import { saveSnapshot, getSnapshot, enqueueOfflineAction, processOfflineQueue } from '@/lib/offline-sync';
 import { TripCommunicationWidget } from '@/components/communication/TripCommunicationWidget';
 
 interface ActiveTrip {
@@ -103,6 +104,29 @@ interface DriverSession {
   } | null;
 }
 
+// Offline-first safe cache read/write (storage failures are non-fatal to the driver flow)
+function readSnapshot<T>(key: string): T | null {
+  try {
+    return getSnapshot<T>(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshot<T>(key: string, data: T): void {
+  try {
+    saveSnapshot<T>(key, data);
+  } catch {
+    // Cache writes are best-effort; never block the driver flow.
+  }
+}
+
+// Network failure (fetch TypeError) or the browser reporting itself offline.
+function isOfflineError(error: unknown): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  return error instanceof TypeError;
+}
+
 function TripRoute({ pickup, destination }: { pickup: string; destination: string }) {
   return (
     <div className="relative space-y-5 py-1 pl-8">
@@ -166,6 +190,7 @@ export default function DriverDashboardPage() {
     distanceMeters?: number | null;
     telemetryUploaded: boolean;
     aborted: boolean;
+    pendingSync: boolean;
   } | null>(null);
 
   const [telemetryWarning, setTelemetryWarning] = useState<string | null>(null);
@@ -194,12 +219,22 @@ export default function DriverDashboardPage() {
         setTelemetryWarning(result?.data?.rejected && result.data.rejected.length > 0 ? result.data.rejected[0].reason : null);
       }
     } catch (error) {
+      // Offline: buffer points into the persisted queue (module caps at 200 points)
+      if (isOfflineError(error)) {
+        enqueueOfflineAction('DRIVER_LOCATION_PING', {
+          endpoint: '/api/tracking/locations',
+          method: 'POST',
+          payload: { points: batch },
+          tripId: activeTrip?.id,
+        });
+        return;
+      }
       // Apply 20s backoff to avoid continuous request loops if server is encountering issues
       uploadBackoffUntil.current = Date.now() + 20000;
       setTelemetryWarning(error instanceof Error ? error.message : 'Location upload paused. Retrying in 20s.');
       throw error;
     }
-  }, []);
+  }, [activeTrip]);
 
   const {
     isTracking,
@@ -274,10 +309,17 @@ export default function DriverDashboardPage() {
     try {
       const json = await fetchJson<{ data: DriverOffer[] }>('/api/driver/offers');
       if (version === dashboardRequest.current) {
-        setOffers((json.data || []).filter((o) => new Date(o.expiresAt).getTime() > Date.now()));
+        const fresh = (json.data || []).filter((o) => new Date(o.expiresAt).getTime() > Date.now());
+        setOffers(fresh);
+        writeSnapshot('driver_offers', fresh);
       }
     } catch {
       // Offers expire locally; the next polling interval retries delivery.
+      // Offline fallback: restore cached offers so an assigned dispatch never disappears.
+      const cached = readSnapshot<DriverOffer[]>('driver_offers');
+      if (cached && version === dashboardRequest.current) {
+        setOffers(cached.filter((o) => new Date(o.expiresAt).getTime() > Date.now()));
+      }
     }
   }, []);
 
@@ -328,8 +370,16 @@ export default function DriverDashboardPage() {
       if (config) {
         if (config.realtimeToken) setRealtimeToken(config.realtimeToken);
         if (config.config?.tripIntervalSec) setTripIntervalSec(config.config.tripIntervalSec);
-        setActiveTrip(config.sessionState?.activeTrip || null);
-        setActiveSession(config.sessionState?.activeSession || null);
+        const trip = config.sessionState?.activeTrip || null;
+        const sess = config.sessionState?.activeSession || null;
+        setActiveTrip(trip);
+        setActiveSession(sess);
+        writeSnapshot('driver_active_trip', trip);
+        writeSnapshot('driver_session', sess);
+      } else {
+        // Offline fallback: restore in-flight trip/session so an active job survives reload
+        setActiveTrip(readSnapshot<ActiveTrip | null>('driver_active_trip') ?? null);
+        setActiveSession(readSnapshot<DriverSession | null>('driver_session') ?? null);
       }
 
       // Filter on the server before pagination; history must not hide a pending pickup.
@@ -349,9 +399,10 @@ export default function DriverDashboardPage() {
           page += 1;
         } while (page <= totalPages);
         setAssignedBookings(bookings);
+        writeSnapshot('driver_bookings', bookings);
       } catch (bookErr) {
         console.error('[Driver Data Fetch Error] client /api/bookings:', bookErr);
-        setAssignedBookings([]);
+        setAssignedBookings(readSnapshot<AssignedBooking[]>('driver_bookings') ?? []);
       }
 
       try {
@@ -364,14 +415,21 @@ export default function DriverDashboardPage() {
         ]);
         if (version === dashboardRequest.current) {
           if (poolResult.status === 'fulfilled') {
-            setPoolVehicles(poolResult.value?.data || []);
+            const pool = poolResult.value?.data || [];
+            setPoolVehicles(pool);
+            writeSnapshot('driver_vehicle', pool);
           } else {
             console.error('[Driver Data Fetch Error] client pool vehicles:', poolResult.reason);
+            const cached = readSnapshot<VehicleOption[]>('driver_vehicle');
+            if (cached) setPoolVehicles(cached);
           }
           if (locsResult.status === 'fulfilled' && locsResult.value?.data) {
             setLocations(locsResult.value.data);
+            writeSnapshot('driver_locations', locsResult.value.data);
           } else if (locsResult.status === 'rejected') {
             console.error('[Driver Data Fetch Error] client locations:', locsResult.reason);
+            const cached = readSnapshot<LocationOption[]>('driver_locations');
+            if (cached) setLocations(cached);
           }
         }
       } catch (poolErr) {
@@ -416,6 +474,28 @@ export default function DriverDashboardPage() {
       document.removeEventListener('visibilitychange', refresh);
     };
   }, [loadDashboardData, fetchOffers]);
+
+  // Reconnect & sync: drain the offline queue when back online or after a sync completes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      void processOfflineQueue()
+        .then(() => loadDashboardData())
+        .catch(() => loadDashboardData());
+    };
+    const handleSyncComplete = () => {
+      void loadDashboardData();
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline-sync:complete', handleSyncComplete);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline-sync:complete', handleSyncComplete);
+    };
+  }, [loadDashboardData]);
 
   // When active trip exists OR online session is active, activate GPS tracking
   useEffect(() => {
@@ -538,7 +618,17 @@ export default function DriverDashboardPage() {
       await fetchJson(`/api/driver/offers/${offerId}/accept`, { method: 'POST' });
       setOffers((prev) => prev.filter((o) => o.id !== offerId));
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Unable to accept offer.');
+      if (isOfflineError(error)) {
+        enqueueOfflineAction('DRIVER_ACCEPT_OFFER', {
+          endpoint: `/api/driver/offers/${offerId}/accept`,
+          method: 'POST',
+          offerId,
+        });
+        setOffers((prev) => prev.filter((o) => o.id !== offerId));
+        setActionError('Penawaran diterima offline — akan disinkronkan.');
+      } else {
+        setActionError(error instanceof Error ? error.message : 'Unable to accept offer.');
+      }
     } finally {
       await loadDashboardData();
       actionInFlight.current = false;
@@ -605,9 +695,9 @@ export default function DriverDashboardPage() {
     setStartError(null);
     setStartPhase('gps');
     let submitted = false;
+    let coords: { lat: number; lng: number } | null = null;
     try {
       // Fast path: if currentPosition is already known, use it immediately without waiting for a new GPS lock
-      let coords: { lat: number; lng: number } | null = null;
       if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {
         coords = { lat: currentPosition.lat, lng: currentPosition.lng };
       } else {
@@ -622,16 +712,57 @@ export default function DriverDashboardPage() {
         body: JSON.stringify({ ...target, startLat: coords.lat, startLng: coords.lng }),
       });
       setActiveTrip(json.data);
+      writeSnapshot('driver_active_trip', json.data);
       setElapsedDuration('');
       setTelemetryWarning(null);
       startTracking();
       await loadDashboardData();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to start trip. Please try again.';
-      setStartError(message);
-      setActionError(message);
-      // A lost HTTP response does not prove a mutation failed. Reconcile before retry.
-      if (submitted) await loadDashboardData();
+      if (isOfflineError(error) && target.bookingId && coords) {
+        const tempTripId = `offline-trip-${Date.now()}`;
+        const booking = assignedBookings.find((b) => b.id === target.bookingId);
+        const vehicleSource = booking?.vehicle || selectedVehicle;
+        const localTrip: ActiveTrip = {
+          id: tempTripId,
+          status: 'IN_PROGRESS',
+          startedAt: new Date().toISOString(),
+          startLat: coords.lat,
+          startLng: coords.lng,
+          vehicle: vehicleSource
+            ? { id: vehicleSource.id, plateNumber: vehicleSource.plateNumber, brand: vehicleSource.brand, model: vehicleSource.model }
+            : { id: target.vehicleId || 'offline-vehicle', plateNumber: '—', brand: '', model: '' },
+          booking: booking
+            ? {
+                id: booking.id,
+                bookingNumber: booking.bookingNumber,
+                pickupLocation: booking.pickupLocation,
+                destination: booking.destination,
+                status: booking.status,
+                passengerCount: booking.passengerCount,
+              }
+            : null,
+        };
+        setActiveTrip(localTrip);
+        writeSnapshot('driver_active_trip', localTrip);
+        setElapsedDuration('');
+        setTelemetryWarning(null);
+        startTracking();
+        enqueueOfflineAction('DRIVER_START_TRIP', {
+          endpoint: '/api/trips',
+          method: 'POST',
+          payload: { ...target, startLat: coords.lat, startLng: coords.lng },
+          bookingId: target.bookingId,
+          tempTripId,
+          tripId: tempTripId,
+        });
+        setActionError('Trip dimulai offline — akan disinkronkan saat online.');
+      } else {
+        const message = error instanceof Error ? error.message : 'Unable to start trip. Please try again.';
+        setStartError(message);
+        setActionError(message);
+        // A lost HTTP response does not prove a mutation failed. Reconcile before retry.
+        if (submitted) await loadDashboardData();
+      }
     } finally {
       actionInFlight.current = false;
       setStartPhase(null);
@@ -672,17 +803,17 @@ export default function DriverDashboardPage() {
     setIsEndingTrip(true);
     setActionError(null);
 
-    try {
-      // Drain pending telemetry while the trip is ending
-      let telemetryUploaded = true;
-      try { await flushBuffer(); } catch { telemetryUploaded = false; }
-      const endPayload: { endLat?: number; endLng?: number } = {};
-      if (currentPosition) {
-        endPayload.endLat = currentPosition.lat;
-        endPayload.endLng = currentPosition.lng;
-      }
+    // Drain pending telemetry while the trip is ending
+    let telemetryUploaded = true;
+    try { await flushBuffer(); } catch { telemetryUploaded = false; }
+    const endPayload: { endLat?: number; endLng?: number } = {};
+    if (currentPosition) {
+      endPayload.endLat = currentPosition.lat;
+      endPayload.endLng = currentPosition.lng;
+    }
+    const aborted = Boolean(activeTrip.booking && currentBookingStatus !== 'IN_PROGRESS');
 
-      const aborted = Boolean(activeTrip.booking && currentBookingStatus !== 'IN_PROGRESS');
+    try {
       const json = await fetchJson<{ data: { id: string; startedAt: string; endedAt?: string; distanceMeters?: number | null } }>(`/api/trips/${activeTrip.id}/${aborted ? 'abort' : 'end'}`, {
         method: aborted ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -691,6 +822,7 @@ export default function DriverDashboardPage() {
       const trip = json.data;
       // Optimistic UI: Immediately clear active trip, close confirmation modal, and stop loading
       setActiveTrip(null);
+      writeSnapshot('driver_active_trip', null);
       setShowEndConfirm(false);
       setIsEndingTrip(false);
       actionInFlight.current = false;
@@ -699,13 +831,37 @@ export default function DriverDashboardPage() {
         durationMinutes: Math.round((new Date(trip.endedAt || Date.now()).getTime() - new Date(trip.startedAt).getTime()) / 60000),
         telemetryUploaded,
         aborted,
+        pendingSync: false,
       });
       startTracking();
       // Non-blocking background refresh
       void loadDashboardData();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Unable to end trip.');
-      void loadDashboardData();
+      if (isOfflineError(error)) {
+        // Optimistic offline end: queue the mutation, clear the trip, and don't trap the driver
+        enqueueOfflineAction('DRIVER_END_TRIP', {
+          endpoint: `/api/trips/${activeTrip.id}/${aborted ? 'abort' : 'end'}`,
+          method: aborted ? 'POST' : 'PATCH',
+          payload: endPayload,
+          bookingId: activeTrip.booking?.id,
+          tripId: activeTrip.id,
+        });
+        setActiveTrip(null);
+        writeSnapshot('driver_active_trip', null);
+        setShowEndConfirm(false);
+        setCompletedTripSummary({
+          id: activeTrip.id,
+          startedAt: activeTrip.startedAt,
+          durationMinutes: Math.round((Date.now() - new Date(activeTrip.startedAt).getTime()) / 60000),
+          distanceMeters: null,
+          telemetryUploaded,
+          aborted,
+          pendingSync: true,
+        });
+      } else {
+        setActionError(error instanceof Error ? error.message : 'Unable to end trip.');
+        void loadDashboardData();
+      }
     } finally {
       actionInFlight.current = false;
       setIsEndingTrip(false);
@@ -1566,8 +1722,12 @@ export default function DriverDashboardPage() {
         <Modal
           isOpen={Boolean(completedTripSummary)}
           onClose={() => setCompletedTripSummary(null)}
-          title={completedTripSummary.aborted ? 'Pickup trip stopped' : 'Trip completed successfully'}
-          description={completedTripSummary.aborted ? 'The booking remains assigned for retry' : 'GPS tracking session finalized'}
+          title={completedTripSummary.pendingSync
+            ? 'Trip selesai (Menunggu Sinkronisasi)'
+            : completedTripSummary.aborted ? 'Pickup trip stopped' : 'Trip completed successfully'}
+          description={completedTripSummary.pendingSync
+            ? 'Perjalanan selesai offline — akan disinkronkan otomatis saat online'
+            : completedTripSummary.aborted ? 'The booking remains assigned for retry' : 'GPS tracking session finalized'}
           footer={
             <button
               type="button"
@@ -1579,6 +1739,14 @@ export default function DriverDashboardPage() {
           }
         >
           <div className="space-y-5 text-sm">
+            {completedTripSummary.pendingSync && (
+              <div className="rounded-xl border-2 border-black bg-amber-50 p-3.5 text-xs text-amber-950 shadow-[2px_2px_0px_0px_#000]">
+                <span className="font-black block mb-0.5">Trip selesai (Menunggu Sinkronisasi)</span>
+                <p className="text-[11px] font-medium text-amber-900">
+                  Perjalanan selesai offline. Data akan dikirim otomatis saat koneksi kembali.
+                </p>
+              </div>
+            )}
             <div className="rounded-xl border-2 border-black bg-emerald-100 p-4 leading-relaxed text-zinc-950 shadow-[3px_3px_0px_0px_#000]">
               <span className="block font-black">{completedTripSummary.aborted ? 'Trip stopped, booking not completed' : 'Trip closed'}</span>
               <p className="mt-1 text-xs font-medium text-emerald-950">{completedTripSummary.telemetryUploaded ? 'Trip and online session closed. Valid GPS updates received by the server are retained.' : 'Trip closed, but some final GPS updates could not be uploaded. Your earlier stored updates are retained.'}</p>

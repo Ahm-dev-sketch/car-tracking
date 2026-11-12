@@ -14,6 +14,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
+import { saveSnapshot, getSnapshot, getOfflineQueue, processOfflineQueue } from '@/lib/offline-sync';
 
 interface Booking {
   id: string;
@@ -99,14 +100,28 @@ function UserBookingsContent() {
   // Fetch locations
   useEffect(() => {
     async function loadLocations() {
+      const useSnapshot = () => {
+        const cached = getSnapshot<LocationOption[]>('locations_list');
+        if (cached && cached.length > 0) setLocations(cached);
+      };
+
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        useSnapshot();
+        return;
+      }
+
       try {
         const res = await fetch('/api/locations');
         if (res.ok) {
           const json = await res.json();
-          setLocations(json.data || []);
+          const list: LocationOption[] = json.data || [];
+          setLocations(list);
+          saveSnapshot('locations_list', list);
+        } else {
+          useSnapshot();
         }
       } catch {
-        // ignore
+        useSnapshot();
       }
     }
     loadLocations();
@@ -121,9 +136,56 @@ function UserBookingsContent() {
     router.replace(`/user/bookings?${params.toString()}`);
   };
 
+  const mergePendingOffline = (list: Booking[]): Booking[] => {
+    let pending: Booking[] = [];
+    try {
+      pending = getOfflineQueue()
+        .filter((item) => item.type === 'USER_CREATE_BOOKING')
+        .map((item) => {
+          const p = (item.payload ?? {}) as any;
+          const createdAt = item.createdAt
+            ? new Date(item.createdAt).toISOString()
+            : new Date().toISOString();
+          return {
+            id: item.id,
+            bookingNumber: `OFFLINE-${String(item.id).slice(0, 8).toUpperCase()}`,
+            pickupLocation: p.pickupLocation ?? '',
+            destination: p.destination ?? '',
+            departureAt: p.departureAt ?? createdAt,
+            expectedReturnAt: p.expectedReturnAt ?? createdAt,
+            passengerCount: Number(p.passengerCount) || 1,
+            purpose: p.purpose ?? '',
+            notes: p.notes ?? null,
+            status: 'OFFLINE_PENDING',
+            serviceType: p.serviceType,
+            createdAt,
+          } as Booking;
+        });
+    } catch {
+      pending = [];
+    }
+    return [...pending, ...list];
+  };
+
   const fetchBookings = async (targetPage = 1) => {
     setIsLoading(true);
     setApiError(null);
+
+    const applySnapshot = () => {
+      const cached = getSnapshot<Booking[]>('user_bookings');
+      const list: Booking[] = cached && cached.length > 0 ? cached : [];
+      setBookings(mergePendingOffline(list));
+      setTotalRecords(list.length);
+      setTotalPages(1);
+      setPage(targetPage);
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      applySnapshot();
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const params = new URLSearchParams({
         page: String(targetPage),
@@ -136,7 +198,8 @@ function UserBookingsContent() {
       if (res.ok) {
         const json = await res.json();
         const list: Booking[] = json.data || [];
-        setBookings(list);
+        saveSnapshot('user_bookings', list);
+        setBookings(mergePendingOffline(list));
         setTotalRecords(json.pagination?.total ?? list.length);
         setTotalPages(json.pagination?.totalPages ?? 1);
         setPage(targetPage);
@@ -145,7 +208,7 @@ function UserBookingsContent() {
         setApiError(err.error?.message || 'Failed to load bookings');
       }
     } catch {
-      setApiError('Network error loading bookings');
+      applySnapshot();
     } finally {
       setIsLoading(false);
     }
@@ -158,6 +221,27 @@ function UserBookingsContent() {
       locationId: locationFilter,
     });
   }, [statusFilter, locationFilter]);
+
+  // Re-sync when offline actions are flushed or the device comes back online
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleSync = () => {
+      processOfflineQueue()
+        .then(() => fetchBookings(1))
+        .catch(() => {
+          // non-fatal: retry on next online/sync event
+        });
+    };
+
+    window.addEventListener('offline-sync:complete', handleSync);
+    window.addEventListener('online', handleSync);
+    return () => {
+      window.removeEventListener('offline-sync:complete', handleSync);
+      window.removeEventListener('online', handleSync);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCancelConfirm = async () => {
     if (!cancellingBooking) return;
@@ -312,7 +396,13 @@ function UserBookingsContent() {
       header: 'Status',
       cell: (b) => (
         <div className="space-y-1">
-          <StatusBadge status={b.status} />
+          {b.status === 'OFFLINE_PENDING' ? (
+            <span className="inline-flex max-w-full items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] bg-amber-300 text-black">
+              MENUNGGU SYNC (OFFLINE)
+            </span>
+          ) : (
+            <StatusBadge status={b.status} />
+          )}
           {b.etaSeconds !== undefined && b.etaSeconds !== null && (
             <div className="text-[10px] font-mono text-indigo-700">
               ETA: {formatEta(b.etaSeconds, b.etaEstimated)}

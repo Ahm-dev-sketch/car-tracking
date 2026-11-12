@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icon';
 import { DispatchProgress, formatEta } from './DispatchProgress';
 import { findNearestHub } from '@/lib/operational-locations';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
+import { enqueueOfflineAction } from '@/lib/offline-sync';
 
 export interface LocationOption {
   id: string;
@@ -76,6 +77,7 @@ export function BookingModal({
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
 
   // User GPS Location (Wajib)
   const [geoStatus, setGeoStatus] = useState<'idle' | 'locating' | 'granted' | 'denied' | 'unsupported'>('idle');
@@ -147,6 +149,7 @@ export function BookingModal({
       setSubmittedBooking(null);
       setNoDriverState(null);
       setFormError(null);
+      setOfflineNotice(null);
       return;
     }
 
@@ -171,6 +174,7 @@ export function BookingModal({
     setPurpose('');
     setNotes('');
     setFormError(null);
+    setOfflineNotice(null);
     setSubmittedBooking(null);
     setNoDriverState(null);
     setNearestHubName(null);
@@ -382,22 +386,49 @@ export function BookingModal({
       ? [notes.trim(), `[Layanan Drop Off - Tanggal: ${dropOffDate}, Jam Jemput: ${dropOffTime}]`].filter(Boolean).join(' ')
       : notes.trim() || undefined;
 
-    try {
-      const payload = {
-        operationalLocationId,
-        pickupLocation: pickupLocation.trim(),
-        destination: destination.trim(),
-        departureAt: depDate.toISOString(),
-        expectedReturnAt: retDate.toISOString(),
-        passengerCount: Number(passengerCount),
-        purpose: effectivePurpose,
-        notes: autoNote || undefined,
-        serviceType,
-        vehiclePreferenceId: vehiclePrefId || undefined,
-        pickupLat: userCoords?.lat ?? null,
-        pickupLng: userCoords?.lng ?? null,
+    const payload = {
+      operationalLocationId,
+      pickupLocation: pickupLocation.trim(),
+      destination: destination.trim(),
+      departureAt: depDate.toISOString(),
+      expectedReturnAt: retDate.toISOString(),
+      passengerCount: Number(passengerCount),
+      purpose: effectivePurpose,
+      notes: autoNote || undefined,
+      serviceType,
+      vehiclePreferenceId: vehiclePrefId || undefined,
+      pickupLat: userCoords?.lat ?? null,
+      pickupLng: userCoords?.lng ?? null,
+    };
+
+    const enqueueAsOffline = () => {
+      enqueueOfflineAction('USER_CREATE_BOOKING', {
+        endpoint: '/api/bookings',
+        method: 'POST',
+        payload,
+      });
+
+      const optimisticBooking = {
+        ...payload,
+        bookingNumber: `OFFLINE-${Date.now().toString(36).toUpperCase()}`,
+        status: 'OFFLINE_PENDING',
       };
 
+      setOfflineNotice(
+        'Pesanan Anda tersimpan di perangkat ini dan akan dikirim otomatis saat koneksi kembali online.'
+      );
+      onSuccess?.(optimisticBooking);
+      setIsSubmitting(false);
+      onClose();
+    };
+
+    // Offline before even attempting the fetch
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      enqueueAsOffline();
+      return;
+    }
+
+    try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -424,7 +455,8 @@ export function BookingModal({
         setSubmittedBooking(bookingData);
       }
     } catch {
-      setFormError('Network error submitting reservation');
+      // Network failure => save on-device and enqueue for later (no red error)
+      enqueueAsOffline();
     } finally {
       setIsSubmitting(false);
     }
@@ -855,6 +887,11 @@ export function BookingModal({
     >
       <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
         {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
+        {offlineNotice && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+            {offlineNotice}
+          </div>
+        )}
 
         {/* GPS Location Banner (Wajib Bagi User) */}
         <div className={`rounded-xl border-[2.5px] border-black p-3.5 text-xs shadow-[3px_3px_0px_0px_#000] transition-colors duration-200 ${

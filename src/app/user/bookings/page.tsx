@@ -267,6 +267,16 @@ function UserBookingsContent() {
       });
 
       if (res.ok) {
+        // Optimistically remove the cancelled booking from list + snapshot so it
+        // never lingers, then refetch to reconcile with server truth.
+        setBookings((prev) => prev.filter((b) => b.id !== cancellingBooking.id));
+        const cached = getSnapshot<Booking[]>('user_bookings');
+        if (cached && cached.length > 0) {
+          saveSnapshot(
+            'user_bookings',
+            cached.filter((b) => b.id !== cancellingBooking.id),
+          );
+        }
         setCancellingBooking(null);
         setCancelReason('');
         fetchBookings(page);

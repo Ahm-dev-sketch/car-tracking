@@ -9,6 +9,7 @@ import { RelativeTime } from '@/components/ui/RelativeTime';
 import { IosInstallHint } from '@/components/providers/InstallPrompt';
 import { Icon as OverviewIcon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
+import { selectNextDeparture } from '@/lib/booking-status';
 
 interface Booking {
   id: string;
@@ -86,9 +87,7 @@ export default function UserOverviewPage() {
     ].includes(b.status)
   );
 
-  const upcomingBooking = bookings
-    .filter((b) => new Date(b.departureAt) > new Date() && b.status !== 'CANCELLED' && b.status !== 'REJECTED')
-    .sort((a, b) => new Date(a.departureAt).getTime() - new Date(b.departureAt).getTime())[0];
+  const upcomingBooking = selectNextDeparture(bookings);
 
   return (
     <div className="min-w-0 space-y-7 pb-[max(1rem,env(safe-area-inset-bottom))] text-black sm:space-y-9">
@@ -224,7 +223,7 @@ export default function UserOverviewPage() {
                 </div>
               ) : (
                 <div className="mt-5">
-                  <p className="text-xl font-extrabold tracking-tight text-black">Nothing scheduled yet.</p>
+                  <p className="text-xl font-extrabold tracking-tight text-black">No upcoming trips scheduled.</p>
                   <p className="mt-1.5 text-sm font-medium leading-relaxed text-zinc-600">Your next departure will appear here once you book.</p>
                 </div>
               )}

@@ -2,20 +2,40 @@
 
 import { SessionProvider, useSession } from 'next-auth/react';
 import React, { useEffect } from 'react';
-import { clearAuthState, installAuthInterceptor } from '@/lib/auth-lifecycle';
+import {
+  handleUnauthenticatedStatus,
+  installAuthInterceptor,
+  onExplicitLogout,
+  readLastUserId,
+  writeLastUserId,
+} from '@/lib/auth-lifecycle';
 
 function AuthLifecycle() {
-  const { status } = useSession();
+  const { status, data } = useSession();
+  const userId = data?.user?.id;
 
   useEffect(() => {
     installAuthInterceptor();
   }, []);
 
+  // On unauthenticated: preserve the offline outbox on a network drop (offline).
   useEffect(() => {
     if (status === 'unauthenticated') {
-      clearAuthState();
+      handleUnauthenticatedStatus();
     }
   }, [status]);
+
+  // A different userId logging in on this browser means the prior user's cached
+  // snapshots AND offline outbox are stale/foreign — wipe them.
+  useEffect(() => {
+    if (status === 'authenticated' && userId) {
+      const prev = readLastUserId();
+      if (prev && prev !== userId) {
+        onExplicitLogout();
+      }
+      writeLastUserId(userId);
+    }
+  }, [status, userId]);
 
   return null;
 }

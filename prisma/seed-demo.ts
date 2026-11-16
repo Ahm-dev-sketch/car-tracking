@@ -7,8 +7,13 @@
  */
 import { PrismaClient, RoleCode, VehicleStatus, VehicleType, Transmission, DriverStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import pg from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-const prisma = new PrismaClient();
+try { process.loadEnvFile?.('.env'); } catch { /* .env optional */ }
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL || process.env.DIRECT_URL || '', max: 5 });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 const DEMO_PASSWORD = 'Demo1234';
 
@@ -271,4 +276,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

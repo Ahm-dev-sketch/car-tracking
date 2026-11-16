@@ -9,6 +9,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { Icon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
+import { onExplicitLogout } from '@/lib/auth-lifecycle';
 import { getNavigation, isNavigationActive } from './navigation';
 
 interface NotificationItem {
@@ -235,6 +236,7 @@ export function NavBar() {
             type="button"
             onClick={() => {
               resetInstallDismissal();
+              onExplicitLogout();
               signOut({ callbackUrl: '/login' });
             }}
             className="button-secondary w-full rounded-xl border-2 border-black bg-rose-200 text-black font-extrabold shadow-[3px_3px_0px_0px_#000] hover:bg-rose-300"

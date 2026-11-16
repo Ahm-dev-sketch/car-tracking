@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
 :root {
@@ -9,6 +9,7 @@
   --motion: cubic-bezier(0.22, 1, 0.36, 1);
   --layer-nav: 30;
   --layer-toast: 40;
+  /* dock floor (0.875rem) + bar height (4rem) + its hard shadow + breathing room */
   --mobile-nav-space: calc(6.5rem + env(safe-area-inset-bottom, 0px));
 }
 
@@ -324,48 +325,95 @@ a:hover .button-icon, button:hover .button-icon { transform: translate(1px, -1px
   color: #121212;
   box-shadow: 2.5px 2.5px 0px 0px #121212;
 }
+/* Mobile dock — a single floating pill; every destination takes an equal slot.
+   Nothing protrudes, so the bar height and the page clearance stay honest. */
 .mobile-dock {
   position: fixed;
   z-index: var(--layer-nav);
   bottom: max(0.875rem, env(safe-area-inset-bottom));
   left: 1rem;
   right: 1rem;
-  max-width: 32rem;
+  max-width: 25rem;
   margin-inline: auto;
-  display: flex;
-  gap: 0.375rem;
-  padding: 0.4rem;
+  display: grid;
+  /* Equal thirds/fifths: no appended column, no dead gap, first item never hugs the edge. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: stretch;
+  height: 4rem;
+  padding: 0 0.5rem;
   border: 2.5px solid #121212;
-  border-radius: 1.125rem;
+  border-radius: 1.25rem;
   background: #ffffff;
-  box-shadow: 5px 5px 0px 0px #121212;
+  box-shadow: 4px 4px 0px 0px #121212;
 }
-.dock-link {
-  flex: 1;
+.dock-tab {
+  position: relative;
   min-width: 0;
-  min-height: 3.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  border-radius: 0.625rem;
-  border: 2px solid transparent;
-  color: #121212;
-  font-size: 0.6875rem;
-  font-weight: 700;
+  gap: 0.3125rem;
+  padding: 0.25rem 0;
+  background: transparent;
+  border: none;
+  outline: none;
   cursor: pointer;
-  transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  text-decoration: none;
+  user-select: none;
 }
-.dock-link:hover { background: #f4f2ea; }
-.dock-link[aria-current="page"], .dock-link[aria-expanded="true"] {
-  background: #fef08a;
+.dock-tab:focus-visible { outline: none; }
+.dock-tab:focus-visible .dock-tab-icon { outline: 2.5px solid #121212; outline-offset: 2px; }
+.dock-tab-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  border: 2.5px solid transparent;
+  background: transparent;
+  color: #71717a;
+  transition:
+    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
+}
+/* Active: the project's yellow chip with a single hard shadow — same weight for every tab. */
+.dock-tab[aria-current="page"] .dock-tab-icon,
+.dock-tab[aria-expanded="true"] .dock-tab-icon {
+  transform: translateY(-1px);
+  background-color: #fde047;
   border-color: #121212;
   box-shadow: 2px 2px 0px 0px #121212;
+  color: #121212;
 }
-.dock-link:active {
-  transform: translate(1px, 1px);
-  box-shadow: 1px 1px 0px 0px #121212;
+.dock-tab:hover:not([aria-current="page"]):not([aria-expanded="true"]) .dock-tab-icon {
+  background-color: #f4f2ea;
+  color: #121212;
+}
+.dock-tab:active .dock-tab-icon { transform: translateY(1px) scale(0.94); }
+.dock-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #71717a;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+.dock-tab[aria-current="page"] .dock-tab-label,
+.dock-tab[aria-expanded="true"] .dock-tab-label {
+  color: #121212;
+  font-weight: 900;
 }
 .install-toast {
   position: fixed;

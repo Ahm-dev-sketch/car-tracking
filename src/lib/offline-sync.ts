@@ -22,7 +22,7 @@ export interface OfflineAction {
 export const SNAPSHOT_PREFIX = 'kcic_snapshot_';
 export const OUTBOX_STORAGE_KEY = 'kcic_outbox_queue';
 
-const TRIP_ID_MAP_KEY = 'kcic_trip_id_map';
+export const TRIP_ID_MAP_KEY = 'kcic_trip_id_map';
 const PING_POINT_CAP = 200;
 
 // --- SSR-safe storage helpers ------------------------------------------------

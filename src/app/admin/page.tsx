@@ -50,7 +50,7 @@ interface ActiveTripPreview {
 }
 
 export default function AdminOverviewPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [activeTripsList, setActiveTripsList] = useState<ActiveTripPreview[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
@@ -86,6 +86,7 @@ export default function AdminOverviewPage() {
   };
 
   useEffect(() => {
+    if (status !== 'authenticated') return;
     loadStats(true);
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -96,7 +97,7 @@ export default function AdminOverviewPage() {
     return () => {
       clearInterval(interval);
     };
-  }, []);
+  }, [status]);
 
   const selectedLoc = stats?.byLocation.find((l) => l.locationId === selectedLocationId);
 

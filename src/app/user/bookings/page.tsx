@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LocationBadge } from '@/components/ui/LocationBadge';
 import { DataTable, Column } from '@/components/ui/DataTable';
@@ -64,6 +65,7 @@ interface Booking {
 function UserBookingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { status } = useSession();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -71,11 +73,12 @@ function UserBookingsContent() {
   // Instant render (stale-while-revalidate): seed from last-known snapshot on mount
   // so the screen fills immediately; the background fetch below then revalidates.
   useEffect(() => {
+    if (status !== 'authenticated') return;
     const cachedLocations = getSnapshot<LocationOption[]>('locations_list');
     if (cachedLocations && cachedLocations.length > 0) setLocations(cachedLocations);
     const cachedBookings = getSnapshot<Booking[]>('user_bookings');
     if (cachedBookings && cachedBookings.length > 0) setBookings(cachedBookings);
-  }, []);
+  }, [status]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -108,6 +111,7 @@ function UserBookingsContent() {
 
   // Fetch locations
   useEffect(() => {
+    if (status !== 'authenticated') return;
     async function loadLocations() {
       const useSnapshot = () => {
         const cached = getSnapshot<LocationOption[]>('locations_list');
@@ -134,7 +138,7 @@ function UserBookingsContent() {
       }
     }
     loadLocations();
-  }, []);
+  }, [status]);
 
   const syncUrlParams = (newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());

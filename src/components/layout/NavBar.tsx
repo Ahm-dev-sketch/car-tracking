@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -34,6 +34,7 @@ export function NavBar() {
   const name = session?.user?.name || session?.user?.email || 'Your account';
   const initials = name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase();
   const moreActive = role === 'ADMIN' && links.slice(3).some((link) => isNavigationActive(pathname, link.href));
+  const hasMoreButton = role === 'ADMIN' || role === 'DRIVER';
 
   useEffect(() => {
     if (!session?.user) return;
@@ -61,7 +62,6 @@ export function NavBar() {
 
   useEffect(() => {
     if (!session?.user || role !== 'ADMIN') {
-      setPendingActionCount(0);
       return;
     }
     let cancelled = false;
@@ -153,32 +153,45 @@ export function NavBar() {
 
       <nav className="mobile-dock" aria-label="Mobile navigation">
         {dockLinks.map((link) => {
+          const isActive = isNavigationActive(pathname, link.href);
           const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
           return (
             <Link
               key={link.href}
               href={link.href}
-              className="dock-link relative"
-              aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}
+              className="dock-tab"
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={link.label}
             >
-              <div className="relative">
-                <Icon name={link.icon} className="size-[21px]" />
+              <span className="dock-tab-icon">
+                <Icon name={link.icon} className="size-5" />
                 {showBadge && (
                   <span
                     aria-label={`${pendingActionCount} pesanan butuh aksi`}
-                    className="absolute -top-1.5 -right-2.5 min-w-4 h-4 px-1 rounded-full border border-black bg-rose-500 text-white text-[9px] font-black flex items-center justify-center leading-none shadow-[1px_1px_0px_0px_#000]"
+                    className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full border border-black bg-rose-500 text-white text-[9px] font-black flex items-center justify-center leading-none shadow-[1px_1px_0px_0px_#000]"
                   >
                     {pendingActionCount > 99 ? '99+' : pendingActionCount}
                   </span>
                 )}
-              </div>
-              <span>{link.shortLabel}</span>
+              </span>
+              <span className="dock-tab-label" aria-hidden="true">{link.shortLabel}</span>
             </Link>
           );
         })}
-        {(role === 'ADMIN' || role === 'DRIVER') && (
-          <button type="button" onClick={() => setMenuOpen(true)} className="dock-link" aria-expanded={menuOpen} aria-current={moreActive ? 'page' : undefined} aria-haspopup="dialog">
-            <Icon name="more" /><span>More</span>
+        {hasMoreButton && (
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            className="dock-tab dock-tab--more"
+            aria-expanded={menuOpen}
+            aria-current={moreActive ? 'page' : undefined}
+            aria-haspopup="dialog"
+            aria-label="Buka menu navigasi lainnya"
+          >
+            <span className="dock-tab-icon">
+              <Icon name="more" className="size-5" />
+            </span>
+            <span className="dock-tab-label" aria-hidden="true">More</span>
           </button>
         )}
       </nav>

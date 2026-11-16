@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // Keep the dev indicators badge from covering the mobile dock (bottom-left).
+  devIndicators: false,
   turbopack: {
     root: path.resolve(__dirname),
     rules: {

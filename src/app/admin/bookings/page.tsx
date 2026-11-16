@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LocationBadge } from '@/components/ui/LocationBadge';
@@ -100,6 +101,7 @@ interface LocationOption {
 function AdminBookingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { status } = useSession();
 
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -147,6 +149,7 @@ function AdminBookingsContent() {
   // Instant render (stale-while-revalidate): seed from last-known snapshots on mount
   // so the table fills immediately; background fetches below revalidate.
   useEffect(() => {
+    if (status !== 'authenticated') return;
     const cachedBookings = getSnapshot<AdminBooking[]>('admin_bookings');
     if (cachedBookings && cachedBookings.length > 0) setBookings(cachedBookings);
     const cachedLocations = getSnapshot<LocationOption[]>('locations_list');
@@ -155,7 +158,7 @@ function AdminBookingsContent() {
     if (cachedDrivers && cachedDrivers.length > 0) setFleetDrivers(cachedDrivers);
     const cachedVehicles = getSnapshot<any[]>('vehicle_list');
     if (cachedVehicles && cachedVehicles.length > 0) setAvailableVehicles(cachedVehicles);
-  }, []);
+  }, [status]);
   const [vehicleLocationFilter, setVehicleLocationFilter] = useState('');
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
   const [selectedVehicleMap, setSelectedVehicleMap] = useState<Record<string, string>>({});

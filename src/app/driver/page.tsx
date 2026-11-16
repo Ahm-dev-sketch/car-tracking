@@ -146,7 +146,7 @@ function TripRoute({ pickup, destination }: { pickup: string; destination: strin
 }
 
 export default function DriverDashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [assignedBookings, setAssignedBookings] = useState<AssignedBooking[]>([]);
   const [activeSession, setActiveSession] = useState<DriverSession | null>(null);
@@ -169,6 +169,7 @@ export default function DriverDashboardPage() {
   // Instant render (stale-while-revalidate): seed from last-known snapshots on mount
   // so an active trip / assignments never flash as empty; loadDashboardData revalidates.
   useEffect(() => {
+    if (status !== 'authenticated') return;
     const cachedTrip = getSnapshot<ActiveTrip>('driver_active_trip');
     if (cachedTrip) setActiveTrip(cachedTrip);
     const cachedSession = getSnapshot<DriverSession>('driver_session');
@@ -181,7 +182,7 @@ export default function DriverDashboardPage() {
     if (cachedVehicles && cachedVehicles.length > 0) setPoolVehicles(cachedVehicles);
     const cachedLocations = getSnapshot<LocationOption[]>('driver_locations');
     if (cachedLocations && cachedLocations.length > 0) setLocations(cachedLocations);
-  }, []);
+  }, [status]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleOption | null>(null);
   const [startPhase, setStartPhase] = useState<'gps' | 'request' | null>(null);
@@ -215,6 +216,7 @@ export default function DriverDashboardPage() {
 
   // Batch flush handler for useGeolocation with backoff protection
   const handleLocationFlush = useCallback(async (batch: GeoPoint[]) => {
+    if (status !== 'authenticated') return;
     if (batch.length === 0) return;
     
     // Check if in backoff period due to server error (e.g. 500)
@@ -251,7 +253,7 @@ export default function DriverDashboardPage() {
       setTelemetryWarning(error instanceof Error ? error.message : 'Location upload paused. Retrying in 20s.');
       throw error;
     }
-  }, [activeTrip]);
+  }, [activeTrip, status]);
 
   const {
     isTracking,
@@ -467,6 +469,7 @@ export default function DriverDashboardPage() {
   }, [fetchOffers, selectedLocationId]);
 
   useEffect(() => {
+    if (status !== 'authenticated') return;
     let refreshing = false;
     const refresh = async () => {
       if (refreshing || actionInFlight.current || document.visibilityState === 'hidden') return;
@@ -490,7 +493,7 @@ export default function DriverDashboardPage() {
       clearInterval(offerInterval);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [loadDashboardData, fetchOffers]);
+  }, [loadDashboardData, fetchOffers, status]);
 
   // Reconnect & sync: drain the offline queue when back online or after a sync completes.
   useEffect(() => {

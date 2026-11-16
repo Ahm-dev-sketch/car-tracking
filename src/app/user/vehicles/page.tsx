@@ -69,6 +69,17 @@ function UserVehiclesContent() {
   // Booking modal state
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bookingVehicle, setBookingVehicle] = useState<Vehicle | null>(null);
+  const [sharedDestinationUrl, setSharedDestinationUrl] = useState<string | null>(null);
+
+  // Consume shared destination on mount
+  useEffect(() => {
+    const raw = sessionStorage.getItem('kcic_share_destination');
+    if (raw) {
+      sessionStorage.removeItem('kcic_share_destination');
+      setSharedDestinationUrl(raw);
+      setIsBookingOpen(true);
+    }
+  }, []);
 
   // Fetch operational locations for filter
   useEffect(() => {
@@ -493,12 +504,14 @@ function UserVehiclesContent() {
         onClose={() => {
           setIsBookingOpen(false);
           setBookingVehicle(null);
+          setSharedDestinationUrl(null);
         }}
         onSuccess={() => {
           fetchVehicles(page);
         }}
         initialVehiclePreference={memoizedVehiclePref}
         initialLocationId={locationFilter || undefined}
+        initialDestinationUrl={sharedDestinationUrl}
       />
     </div>
   );

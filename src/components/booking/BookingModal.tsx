@@ -39,6 +39,7 @@ export interface BookingModalProps {
   onSuccess?: (booking: any) => void;
   initialVehiclePreference?: PreferredVehicle | null;
   initialLocationId?: string;
+  initialDestinationUrl?: string | null;
 }
 
 export function BookingModal({
@@ -47,6 +48,7 @@ export function BookingModal({
   onSuccess,
   initialVehiclePreference,
   initialLocationId,
+  initialDestinationUrl = null,
 }: BookingModalProps) {
   const router = useRouter();
 
@@ -95,6 +97,7 @@ export function BookingModal({
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationsLoadedRef = useRef(false);
   const userManuallySelectedRef = useRef(false);
+  const initialDestinationHandledRef = useRef(false);
 
   const requestUserLocation = useCallback((locationList?: LocationOption[]) => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
@@ -152,10 +155,14 @@ export function BookingModal({
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       locationsLoadedRef.current = false;
       userManuallySelectedRef.current = false;
+      initialDestinationHandledRef.current = false;
       setSubmittedBooking(null);
       setNoDriverState(null);
       setFormError(null);
       setOfflineNotice(null);
+      setDestinationCoords(null);
+      setDestinationLinkError(null);
+      setDestination('');
       return;
     }
 
@@ -204,6 +211,12 @@ export function BookingModal({
 
     // Proactively acquire user GPS location
     requestUserLocation();
+
+    // Resolve an initial destination URL from a share-target flow (once per open).
+    if (initialDestinationUrl && !initialDestinationHandledRef.current) {
+      initialDestinationHandledRef.current = true;
+      void handleDestinationChange(initialDestinationUrl);
+    }
 
     // Fetch operational locations
     async function loadLocations() {
@@ -313,6 +326,18 @@ export function BookingModal({
 
     const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
+    // Fast path: full (non-short) Google Maps URLs with coords resolve locally, no server round-trip.
+    if (!isShortLink(value)) {
+      const parsed = parseGoogleMapsUrl(value);
+      if (parsed) {
+        setDestination(parsed.label);
+        setDestinationCoords({ lat: parsed.lat, lng: parsed.lng });
+        setDestinationLinkError(null);
+        return; // no network
+      }
+      // Full URL but no coords (text-only place/search) — fall through to server for Nominatim.
+    }
+
     if (isOffline) {
       if (isShortLink(value)) {
         setDestinationLinkError(
@@ -321,14 +346,8 @@ export function BookingModal({
         return;
       }
 
-      const parsed = parseGoogleMapsUrl(value);
-      if (parsed) {
-        setDestinationCoords({ lat: parsed.lat, lng: parsed.lng });
-        setDestination(parsed.label);
-        setDestinationLinkError(null);
-      } else {
-        setDestinationLinkError('Could not resolve this Google Maps link');
-      }
+      // Text-only full URL while offline: no coords to extract and no server available.
+      setDestinationLinkError('Could not resolve this Google Maps link');
       return;
     }
 

@@ -12,6 +12,11 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: '#f4f7f5',
     theme_color: '#f4f7f5',
     orientation: 'portrait-primary',
+    share_target: {
+      action: '/share-target',
+      method: 'GET',
+      params: { title: 'title', text: 'text', url: 'url' },
+    },
     icons: [
       {
         src: '/icons/icon-192.png',

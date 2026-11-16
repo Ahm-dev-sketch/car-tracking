@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -67,6 +67,18 @@ function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }
       map.setView([lat, lng], zoom, { animate: true });
     }
   }, [lat, lng, zoom, map]);
+
+  return null;
+}
+
+function FitBounds({ points, maxZoom }: { points: [number, number][]; maxZoom?: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!points || points.length < 2) return;
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: maxZoom ?? 15 });
+  }, [map, points, maxZoom]);
 
   return null;
 }
@@ -141,6 +153,18 @@ export default function FleetMap({
     ? [targetVehicle.lat, targetVehicle.lng]
     : center;
 
+  const fitPoints = useMemo<[number, number][]>(
+    () =>
+      (routePoints ?? [])
+        .filter((p) => !isNaN(p.lat) && !isNaN(p.lng))
+        .map((p) => [p.lat, p.lng] as [number, number]),
+    [routePoints]
+  );
+
+  // Fit bounds to the full route whenever both pickup and destination are present.
+  // The vehicle marker still renders inside the fitted view (it lies on the route).
+  const shouldFitBounds = fitPoints.length >= 2;
+
   return (
     <div className={`relative rounded-[1.625rem] overflow-hidden isolate ${className}`}>
       <MapContainer
@@ -154,7 +178,8 @@ export default function FleetMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <MapUpdater center={mapCenter} zoom={zoom} />
+        {!shouldFitBounds && <MapUpdater center={mapCenter} zoom={zoom} />}
+        {shouldFitBounds && <FitBounds points={fitPoints} />}
 
         {vehicles.map((v) => {
           if (isNaN(v.lat) || isNaN(v.lng)) return null;

@@ -12,6 +12,7 @@ import { DispatchProgress, formatEta } from './DispatchProgress';
 import { findNearestHub } from '@/lib/operational-locations';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
 import { enqueueOfflineAction } from '@/lib/offline-sync';
+import { looksLikeGoogleMapsUrl, isShortLink, parseGoogleMapsUrl } from '@/lib/google-maps-url';
 
 export interface LocationOption {
   id: string;
@@ -85,6 +86,11 @@ export function BookingModal({
   const [nearestHubName, setNearestHubName] = useState<string | null>(null);
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+
+  // Destination link resolution (Google Maps share links)
+  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [isResolvingLink, setIsResolvingLink] = useState(false);
+  const [destinationLinkError, setDestinationLinkError] = useState<string | null>(null);
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationsLoadedRef = useRef(false);
@@ -296,6 +302,60 @@ export function BookingModal({
     };
   }, [submittedBooking?.id]);
 
+  const handleDestinationChange = async (value: string) => {
+    setDestination(value);
+
+    if (!looksLikeGoogleMapsUrl(value)) {
+      setDestinationCoords(null);
+      setDestinationLinkError(null);
+      return;
+    }
+
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+
+    if (isOffline) {
+      if (isShortLink(value)) {
+        setDestinationLinkError(
+          'Short Google Maps links need an internet connection. Paste the full link (with @lat,lng) or connect to the internet.'
+        );
+        return;
+      }
+
+      const parsed = parseGoogleMapsUrl(value);
+      if (parsed) {
+        setDestinationCoords({ lat: parsed.lat, lng: parsed.lng });
+        setDestination(parsed.label);
+        setDestinationLinkError(null);
+      } else {
+        setDestinationLinkError('Could not resolve this Google Maps link');
+      }
+      return;
+    }
+
+    setIsResolvingLink(true);
+    try {
+      const res = await fetch('/api/maps/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: value }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        setDestination(json.data.label);
+        setDestinationCoords({ lat: json.data.lat, lng: json.data.lng });
+        setDestinationLinkError(null);
+      } else {
+        const json = await res.json().catch(() => null);
+        setDestinationLinkError(json?.error?.message || 'Could not resolve this Google Maps link');
+      }
+    } catch {
+      setDestinationLinkError('Could not reach the server to resolve this link.');
+    } finally {
+      setIsResolvingLink(false);
+    }
+  };
+
   const handleSubmit = async (e?: React.FormEvent, overrideVehiclePreferenceId?: string) => {
     if (e) e.preventDefault();
     setFormError(null);
@@ -399,6 +459,8 @@ export function BookingModal({
       vehiclePreferenceId: vehiclePrefId || undefined,
       pickupLat: userCoords?.lat ?? null,
       pickupLng: userCoords?.lng ?? null,
+      destinationLat: destinationCoords?.lat ?? null,
+      destinationLng: destinationCoords?.lng ?? null,
     };
 
     const enqueueAsOffline = () => {
@@ -419,6 +481,8 @@ export function BookingModal({
       );
       onSuccess?.(optimisticBooking);
       setIsSubmitting(false);
+      setDestinationCoords(null);
+      setDestinationLinkError(null);
       onClose();
     };
 
@@ -444,6 +508,8 @@ export function BookingModal({
 
       const bookingData = json.data || json;
       onSuccess?.(bookingData);
+      setDestinationCoords(null);
+      setDestinationLinkError(null);
 
       // Check dispatchState
       if (bookingData.dispatchState === 'NO_DRIVER_AVAILABLE') {
@@ -1081,15 +1147,34 @@ export function BookingModal({
           </FormField>
 
           <FormField label="Destination" name="destination" required>
-            <input
-              id="destination"
-              type="text"
-              required
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="e.g. Tegalluar Depo Office"
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            />
+            <div className="relative">
+              <input
+                id="destination"
+                type="text"
+                required
+                value={destination}
+                onChange={(e) => handleDestinationChange(e.target.value)}
+                placeholder="e.g. Tegalluar Depo Office"
+                aria-invalid={destinationLinkError ? true : undefined}
+                className="w-full min-h-12 rounded-xl border-[2.5px] border-black bg-white px-4 py-3 pr-10 text-base font-medium text-black shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#059669] focus:outline-none sm:text-sm"
+              />
+              {isResolvingLink && (
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                  <Spinner size="sm" />
+                </span>
+              )}
+            </div>
+            {destinationCoords && (
+              <p className="flex items-center gap-1 text-[11px] text-zinc-600">
+                <Icon name="pin" className="size-3 text-rose-600" />
+                <span>{destinationCoords.lat.toFixed(5)}, {destinationCoords.lng.toFixed(5)}</span>
+              </p>
+            )}
+            {destinationLinkError && (
+              <p role="alert" className="text-xs font-bold text-rose-600">
+                {destinationLinkError}
+              </p>
+            )}
           </FormField>
         </div>
 

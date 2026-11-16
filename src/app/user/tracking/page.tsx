@@ -42,6 +42,8 @@ interface ActiveBookingInfo {
   destination: string;
   pickupLat?: number | null;
   pickupLng?: number | null;
+  destinationLat?: number | null;
+  destinationLng?: number | null;
   etaSeconds?: number | null;
   etaEstimated?: boolean;
   passengerCount?: number;
@@ -226,6 +228,19 @@ function UserTrackingContent() {
         lng: selectedBooking.pickupLng,
         label: 'Jemput: ' + selectedBooking.pickupLocation,
         type: 'pickup',
+      });
+    }
+    if (
+      selectedBooking.destinationLat !== null &&
+      selectedBooking.destinationLat !== undefined &&
+      selectedBooking.destinationLng !== null &&
+      selectedBooking.destinationLng !== undefined
+    ) {
+      pts.push({
+        lat: selectedBooking.destinationLat,
+        lng: selectedBooking.destinationLng,
+        label: 'Tujuan: ' + selectedBooking.destination,
+        type: 'destination',
       });
     }
     return pts;

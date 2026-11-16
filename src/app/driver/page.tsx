@@ -42,6 +42,8 @@ interface ActiveTrip {
     passengerCount?: number;
     pickupLat?: number | null;
     pickupLng?: number | null;
+    destinationLat?: number | null;
+    destinationLng?: number | null;
     user?: {
       id: string;
       name: string;
@@ -55,6 +57,8 @@ interface AssignedBooking {
   bookingNumber: string;
   pickupLocation: string;
   destination: string;
+  destinationLat?: number | null;
+  destinationLng?: number | null;
   departureAt: string;
   purpose: string;
   passengerCount: number;
@@ -310,17 +314,34 @@ export default function DriverDashboardPage() {
 
   const driverRoutePoints = useMemo<RoutePoint[]>(() => {
     if (!activeTrip?.booking) return [];
+    const booking = activeTrip.booking;
+    const linked = assignedBookings.find((b) => b.id === booking.id);
     const pts: RoutePoint[] = [];
-    if (activeTrip.booking.pickupLat && activeTrip.booking.pickupLng) {
+    if (booking.pickupLat && booking.pickupLng) {
       pts.push({
-        lat: activeTrip.booking.pickupLat,
-        lng: activeTrip.booking.pickupLng,
-        label: 'Jemput: ' + activeTrip.booking.pickupLocation,
+        lat: booking.pickupLat,
+        lng: booking.pickupLng,
+        label: 'Jemput: ' + booking.pickupLocation,
         type: 'pickup',
       });
     }
+    const destLat = booking.destinationLat ?? linked?.destinationLat;
+    const destLng = booking.destinationLng ?? linked?.destinationLng;
+    if (
+      destLat != null &&
+      destLng != null &&
+      Number.isFinite(destLat) &&
+      Number.isFinite(destLng)
+    ) {
+      pts.push({
+        lat: destLat,
+        lng: destLng,
+        label: 'Tujuan: ' + booking.destination,
+        type: 'destination',
+      });
+    }
     return pts;
-  }, [activeTrip]);
+  }, [activeTrip, assignedBookings]);
 
   // Fetch driver offers (polling fallback)
   const fetchOffers = useCallback(async () => {

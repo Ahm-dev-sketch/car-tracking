@@ -47,6 +47,67 @@ function extractTextQuery(url: string): string | null {
   return null;
 }
 
+// Nominatim returns `lon` (NOT `lng`). Accept both for safety/tests.
+interface NominatimHit {
+  lat?: string | number;
+  lon?: string | number;
+  lng?: string | number;
+  name?: string;
+  display_name?: string;
+}
+
+const DEFAULT_LABEL = 'Pinned Google Maps Location';
+
+// Build a small ordered list of candidate queries: the full text first, then each
+// comma-separated segment left-to-right (venue/business names before street/city
+// segments). Google place names often carry brand prefixes ("CGV Cinemas ...") and
+// trailing addresses that Nominatim cannot match as a whole; a shorter segment
+// usually resolves. Capped to stay within Nominatim's light-usage policy.
+function buildGeocodeCandidates(query: string): string[] {
+  const trimmed = query.trim();
+  const candidates: string[] = [trimmed];
+  for (const part of trimmed.split(',')) {
+    const seg = part.trim();
+    if (seg.length >= 2 && !candidates.includes(seg)) candidates.push(seg);
+  }
+  return candidates.slice(0, 6);
+}
+
+async function geocodeViaNominatim(
+  query: string,
+  resolvedUrl: string,
+  fetchImpl: typeof fetch
+): Promise<ResolvedLocation | null> {
+  for (const q of buildGeocodeCandidates(query)) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
+      const res = await fetchImpl(url, {
+        headers: { 'User-Agent': NOMINATIM_USER_AGENT, Accept: 'application/json' },
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as NominatimHit[];
+      const first = Array.isArray(data) ? data[0] : undefined;
+      const lat = first?.lat !== undefined ? Number(first.lat) : NaN;
+      const lngRaw = first?.lon ?? first?.lng;
+      const lng = lngRaw !== undefined ? Number(lngRaw) : NaN;
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return {
+          lat,
+          lng,
+          label:
+            first && first.name && first.name.trim()
+              ? first.name
+              : first?.display_name ?? DEFAULT_LABEL,
+          resolvedUrl,
+        };
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
+
 export async function resolveMapsLink(
   url: string,
   fetchImpl: typeof fetch
@@ -91,29 +152,9 @@ export async function resolveMapsLink(
 
   const query = extractTextQuery(finalUrl);
   if (query) {
-    try {
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-      const res = await fetchImpl(nominatimUrl, {
-        headers: { 'User-Agent': NOMINATIM_USER_AGENT, Accept: 'application/json' },
-      });
-      if (res.ok) {
-        const data = (await res.json()) as Array<{
-          lat?: string | number;
-          lng?: string | number;
-          display_name?: string;
-        }>;
-        const first = Array.isArray(data) ? data[0] : undefined;
-        if (first && first.lat !== undefined && first.lng !== undefined) {
-          return {
-            lat: Number(first.lat),
-            lng: Number(first.lng),
-            label: first.display_name ?? 'Pinned Google Maps Location',
-            resolvedUrl: finalUrl,
-          };
-        }
-      }
-    } catch {
-      // Merely unresolvable query: fall through to NO_COORDINATES (never 500).
+    const geocoded = await geocodeViaNominatim(query, finalUrl, fetchImpl);
+    if (geocoded) {
+      return geocoded;
     }
   }
 

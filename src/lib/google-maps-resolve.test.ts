@@ -52,7 +52,7 @@ describe('resolveMapsLink', () => {
   it('falls back to Nominatim for a text query URL', async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: true,
-      json: async () => [{ lat: '-6.2', lng: '106.8', display_name: 'Stasiun Halim' }],
+      json: async () => [{ lat: '-6.2', lon: '106.8', display_name: 'Stasiun Halim' }],
     })) as unknown as typeof fetch;
 
     const result = await resolveMapsLink(
@@ -63,6 +63,37 @@ describe('resolveMapsLink', () => {
     expect(result.lat).toBe(-6.2);
     expect(result.lng).toBe(106.8);
     expect(result.label).toBe('Stasiun Halim');
+  });
+
+  it('shortens an over-specific place name until Nominatim matches', async () => {
+    // Google place URLs carry brand prefixes + full addresses that Nominatim cannot
+    // match as a whole. The resolver must retry with shorter comma-separated segments.
+    const fullName =
+      'CGV Cinemas Green Pramuka Square Mall, Green Pramuka Square, Jl. Jenderal Ahmad Yani No.Kav. 49, Rawasari, Kota Jakarta Pusat 10570';
+    const responses = new Map<string, Array<{ lat: string; lon: string; name: string }>>();
+    // Full name + "CGV Cinemas..." segment return empty; "Green Pramuka Square" matches.
+    responses.set(fullName, []);
+    responses.set('CGV Cinemas Green Pramuka Square Mall', []);
+    responses.set('Green Pramuka Square', [
+      { lat: '-6.1896994', lon: '106.8742939', name: 'Green Pramuka Square' },
+    ]);
+
+    const fetchImpl = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => {
+        const q = new URL(url).searchParams.get('q') ?? '';
+        return responses.get(q) ?? [];
+      },
+    })) as unknown as typeof fetch;
+
+    const result = await resolveMapsLink(
+      `https://www.google.com/maps/place/${encodeURIComponent(fullName)}`,
+      fetchImpl
+    );
+
+    expect(result.lat).toBeCloseTo(-6.1896994);
+    expect(result.lng).toBeCloseTo(106.8742939);
+    expect(result.label).toBe('Green Pramuka Square');
   });
 
   it('throws NO_COORDINATES when neither coordinates nor a text query exist', async () => {

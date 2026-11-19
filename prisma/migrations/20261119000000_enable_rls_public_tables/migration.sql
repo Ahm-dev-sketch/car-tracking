@@ -14,6 +14,8 @@
 --
 -- This migration intentionally does NOT create any policy: with RLS enabled and
 -- zero policies, `anon` and `authenticated` see zero rows (deny-all by default).
+-- It also drops every pre-existing policy on public tables so an old always-true
+-- ("USING (true)") policy can never keep granting access after RLS is on.
 
 -- 1) Explicit statements for every Prisma-managed table in the public schema
 --    (self-documenting, matches prisma/schema.prisma @@map names).
@@ -56,4 +58,24 @@ BEGIN
     n := n + 1;
   END LOOP;
   RAISE NOTICE 'rls-enable-public: RLS enabled on % additional table(s)', n;
+END $$;
+
+-- 3) Drop every pre-existing policy on public tables. With RLS enabled and zero
+--    policies, anon/authenticated are deny-all by default. This removes any
+--    lingering always-true ("USING (true)") policy from Supabase's auto-created
+--    tables (e.g. fleet_chat_messages) so access is truly closed. Idempotent.
+DO $$
+DECLARE
+  pol RECORD;
+  n integer := 0;
+BEGIN
+  FOR pol IN
+    SELECT policyname, tablename
+    FROM pg_policies
+    WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+    n := n + 1;
+  END LOOP;
+  RAISE NOTICE 'rls-enable-public: dropped % policy/policies', n;
 END $$;

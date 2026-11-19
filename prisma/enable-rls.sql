@@ -14,10 +14,9 @@
 --   * Live Tracking / Notifications / Offers use the app's own WebSocket server
 --     (Cloudflare Durable Object), not Supabase postgres_changes.
 --
--- NOTE: this script only ENABLES RLS. It does NOT drop any existing permissive
--- policies. If a table already has an always-true ("USING (true)") policy, that
--- policy would still grant access. To close it fully, also run:
---     DROP POLICY IF EXISTS "<policy name>" ON public.<table>;
+-- NOTE: this script ENABLES RLS and DROPS every existing policy on public
+-- tables, so an old always-true ("USING (true)") policy cannot keep granting
+-- access. Run it once in the Supabase SQL Editor to fully close public access.
 -- ============================================================================
 
 BEGIN;
@@ -62,6 +61,26 @@ BEGIN
     n := n + 1;
   END LOOP;
   RAISE NOTICE 'enable-rls: RLS enabled on % additional table(s)', n;
+END $$;
+
+-- 3) Drop every pre-existing policy on public tables. With RLS enabled and zero
+--    policies, anon/authenticated are deny-all by default. This removes any
+--    lingering always-true ("USING (true)") policy from Supabase's auto-created
+--    tables (e.g. fleet_chat_messages) so access is truly closed. Idempotent.
+DO $$
+DECLARE
+  pol RECORD;
+  n integer := 0;
+BEGIN
+  FOR pol IN
+    SELECT policyname, tablename
+    FROM pg_policies
+    WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
+    n := n + 1;
+  END LOOP;
+  RAISE NOTICE 'enable-rls: dropped % policy/policies', n;
 END $$;
 
 COMMIT;

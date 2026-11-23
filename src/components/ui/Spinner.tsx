@@ -17,7 +17,7 @@ export function Spinner({
     <span
       role="status"
       aria-label="Loading"
-      className={`inline-block animate-spin rounded-full border-current border-t-transparent text-zinc-600 ${sizeClasses[size]} ${className}`}
+      className={`inline-block animate-spin rounded-full border-current border-t-transparent text-slate-600 ${sizeClasses[size]} ${className}`}
     >
       <span className="sr-only">Loading...</span>
     </span>

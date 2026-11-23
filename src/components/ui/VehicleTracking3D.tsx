@@ -70,31 +70,31 @@ export function VehicleTracking3D() {
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="group relative w-full select-none overflow-hidden rounded-2xl border-[3px] border-black bg-[#fbf7f7] shadow-[6px_6px_0px_0px_#000] transition-shadow duration-300 hover:shadow-[8px_8px_0px_0px_#000]"
+      className="group relative w-full select-none overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-md"
       style={{ perspective: '1100px' }}
       aria-label="3D Live Vehicle Tracking Simulation"
       role="region"
     >
       {/* 1. TOP TELEMETRY HUD BAR */}
-      <div className="relative z-20 flex flex-wrap items-center justify-between gap-2 border-b-2 border-black bg-white/95 px-3.5 py-2.5 backdrop-blur-xs">
+      <div className="relative z-20 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3.5 py-2.5">
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-3 w-3 rounded-full border border-black bg-emerald-500" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-600 opacity-75 motion-reduce:animate-none" />
+            <span className="relative inline-flex h-3 w-3 rounded-full bg-success-600" />
           </span>
-          <span className="font-mono text-xs font-black tracking-wider text-black">
+          <span className="font-mono text-xs font-semibold tracking-wider text-slate-900">
             LIVE 3D RADAR // KCIC-08
           </span>
-          <span className="hidden rounded-md border border-black bg-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase text-black sm:inline-block">
+          <span className="hidden rounded-md border border-success-200 bg-success-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-success-700 sm:inline-block">
             Autonomous Feed
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="rounded-md border border-black bg-amber-200 px-2 py-0.5 font-mono text-[10px] font-black text-black">
+          <span className="rounded-md border border-warning-200 bg-warning-50 px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-warning-700">
             GPS 3D LOCK [14 SAT]
           </span>
-          <span className="hidden font-mono text-[10px] font-bold text-zinc-600 sm:inline-block">
+          <span className="hidden font-mono text-[10px] font-medium tabular-nums text-slate-500 sm:inline-block">
             5Hz TELEMETRY
           </span>
         </div>
@@ -102,7 +102,7 @@ export function VehicleTracking3D() {
 
       {/* 2. 3D TILT STAGE VIEWPORT */}
       <div
-        className="relative h-[280px] w-full overflow-hidden bg-[#f5e8e8] sm:h-[320px]"
+        className="relative h-[280px] w-full overflow-hidden bg-slate-50 sm:h-[320px]"
         style={{
           transformStyle: 'preserve-3d',
           transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
@@ -114,15 +114,15 @@ export function VehicleTracking3D() {
           className="pointer-events-none absolute inset-0 opacity-45"
           style={{
             backgroundImage: `
-              linear-gradient(to right, #000 1px, transparent 1px),
-              linear-gradient(to bottom, #000 1px, transparent 1px)
+              linear-gradient(to right, #cbd5e1 1px, transparent 1px),
+              linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)
             `,
             backgroundSize: '34px 34px',
           }}
         />
 
         {/* Diagonal Route Vector Compass / Cardinal Overlay */}
-        <div className="pointer-events-none absolute right-4 top-3 font-mono text-[10px] font-black text-zinc-400 opacity-60">
+        <div className="pointer-events-none absolute right-4 top-3 font-mono text-[10px] font-medium tabular-nums text-slate-400 opacity-70">
           BEARING: 134° SE // ELEV: 112M
         </div>
 
@@ -136,8 +136,8 @@ export function VehicleTracking3D() {
           <defs>
             {/* Road Asphalt Pattern / Gradients */}
             <linearGradient id="roadGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#18181b" />
-              <stop offset="100%" stopColor="#27272a" />
+              <stop offset="0%" stopColor="#1e293b" />
+              <stop offset="100%" stopColor="#334155" />
             </linearGradient>
 
             {/* Headlight Beam Cone Gradient */}
@@ -149,20 +149,20 @@ export function VehicleTracking3D() {
 
             {/* Car Body Gradients (KCIC Whoosh Crimson Komodo) */}
             <linearGradient id="carBodyLit" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#e11d48" />
-              <stop offset="100%" stopColor="#be123c" />
+              <stop offset="0%" stopColor="#d01434" />
+              <stop offset="100%" stopColor="#c8102e" />
             </linearGradient>
             <linearGradient id="carBodyShade" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#9f1239" />
-              <stop offset="100%" stopColor="#881337" />
+              <stop offset="0%" stopColor="#a90d27" />
+              <stop offset="100%" stopColor="#8c0b20" />
             </linearGradient>
             <linearGradient id="windshieldGlass" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#fecdd3" />
-              <stop offset="100%" stopColor="#fb7185" />
+              <stop offset="0%" stopColor="#fbd5dc" />
+              <stop offset="100%" stopColor="#f28a9b" />
             </linearGradient>
             <linearGradient id="radarWaveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#e11d48" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#be123c" stopOpacity="0" />
+              <stop offset="0%" stopColor="#d01434" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#c8102e" stopOpacity="0" />
             </linearGradient>
           </defs>
 
@@ -210,15 +210,15 @@ export function VehicleTracking3D() {
             {/* Ground Bed Drop Shadow */}
             <polygon
               points="-40,15 150,-15 670,225 480,395"
-              fill="#000"
-              opacity="0.18"
+              fill="#0f172a"
+              opacity="0.10"
             />
 
             {/* Asphalt Highway Surface */}
             <polygon
               points="-50,0 140,-30 660,210 470,380"
               fill="url(#roadGradient)"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="3.5"
             />
 
@@ -237,7 +237,7 @@ export function VehicleTracking3D() {
               y1="0"
               x2="470"
               y2="380"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="2.5"
             />
 
@@ -256,7 +256,7 @@ export function VehicleTracking3D() {
               y1="-30"
               x2="660"
               y2="210"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="2.5"
             />
 
@@ -301,7 +301,7 @@ export function VehicleTracking3D() {
             {/* Waypoint Marker Post & Signboard */}
             <g transform="translate(190, 80)">
               {/* Post */}
-              <rect x="0" y="0" width="5" height="32" fill="#000" rx="1" />
+              <rect x="0" y="0" width="5" height="32" fill="#f1f5f9" rx="1" />
               {/* Signboard */}
               <rect
                 x="-42"
@@ -310,7 +310,7 @@ export function VehicleTracking3D() {
                 height="28"
                 rx="6"
                 fill="#ffffff"
-                stroke="#000"
+                stroke="#cbd5e1"
                 strokeWidth="2.5"
               />
               <rect x="-38" y="-22" width="80" height="6" fill="#f59e0b" rx="2" />
@@ -319,9 +319,9 @@ export function VehicleTracking3D() {
                 y="-6"
                 textAnchor="middle"
                 fontSize="8.5"
-                fontWeight="900"
+                fontWeight="700"
                 fontFamily="monospace"
-                fill="#000"
+                fill="#e2e8f0"
               >
                 KM 42 // KARAWANG
               </text>
@@ -357,7 +357,7 @@ export function VehicleTracking3D() {
           {/* D. BOOST SPEED LINES (Shown when boosted)   */}
           {/* ------------------------------------------- */}
           {isBoosted && (
-            <g stroke="#fb7185" strokeWidth="2.5" strokeDasharray="30 40">
+            <g stroke="#f28a9b" strokeWidth="2.5" strokeDasharray="30 40">
               <line
                 x1="20"
                 y1="30"
@@ -396,8 +396,8 @@ export function VehicleTracking3D() {
             {/* 1. Car Drop Shadow on Road */}
             <polygon
               points="185,188 305,248 375,222 355,195 240,145 170,165"
-              fill="#000"
-              opacity="0.4"
+              fill="#0f172a"
+              opacity="0.22"
             />
 
             {/* 2. Rear-Far Wheel (partially visible) */}
@@ -406,8 +406,8 @@ export function VehicleTracking3D() {
               cy="154"
               rx="11"
               ry="18"
-              fill="#18181b"
-              stroke="#000"
+              fill="#334155"
+              stroke="#cbd5e1"
               strokeWidth="2.5"
               transform="rotate(22 245 154)"
             />
@@ -418,8 +418,8 @@ export function VehicleTracking3D() {
               cy="198"
               rx="11"
               ry="18"
-              fill="#18181b"
-              stroke="#000"
+              fill="#334155"
+              stroke="#cbd5e1"
               strokeWidth="2.5"
               transform="rotate(22 352 198)"
             />
@@ -432,8 +432,8 @@ export function VehicleTracking3D() {
                 cy="0"
                 rx="14"
                 ry="22"
-                fill="#18181b"
-                stroke="#000"
+                fill="#334155"
+                stroke="#cbd5e1"
                 strokeWidth="3"
                 transform="rotate(24)"
               />
@@ -443,13 +443,13 @@ export function VehicleTracking3D() {
                 cy="0"
                 rx="7"
                 ry="12"
-                fill="#fb7185"
-                stroke="#000"
+                fill="#f28a9b"
+                stroke="#cbd5e1"
                 strokeWidth="2"
                 transform="rotate(24)"
               />
               {/* Hub Spoke */}
-              <circle cx="0" cy="0" r="3" fill="#000" />
+              <circle cx="0" cy="0" r="3" fill="#334155" />
             </g>
 
             {/* 5. Front-Near Wheel (Main Left-Front) */}
@@ -460,8 +460,8 @@ export function VehicleTracking3D() {
                 cy="0"
                 rx="14"
                 ry="22"
-                fill="#18181b"
-                stroke="#000"
+                fill="#334155"
+                stroke="#cbd5e1"
                 strokeWidth="3"
                 transform="rotate(24)"
               />
@@ -471,13 +471,13 @@ export function VehicleTracking3D() {
                 cy="0"
                 rx="7"
                 ry="12"
-                fill="#fb7185"
-                stroke="#000"
+                fill="#f28a9b"
+                stroke="#cbd5e1"
                 strokeWidth="2"
                 transform="rotate(24)"
               />
               {/* Hub Spoke */}
-              <circle cx="0" cy="0" r="3" fill="#000" />
+              <circle cx="0" cy="0" r="3" fill="#334155" />
             </g>
 
             {/* 6. Car Lower Side Body (Near Side Facing Viewer) */}
@@ -495,7 +495,7 @@ export function VehicleTracking3D() {
                 Z
               "
               fill="url(#carBodyLit)"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="3"
             />
 
@@ -514,15 +514,15 @@ export function VehicleTracking3D() {
                 L 175,168
                 Z
               "
-              fill="#18181b"
-              stroke="#000"
+              fill="#334155"
+              stroke="#cbd5e1"
               strokeWidth="2"
             />
 
             {/* KCIC Fleet Decal on Car Door */}
             <g transform="translate(236, 192) rotate(24)">
-              <rect x="0" y="0" width="46" height="13" rx="2" fill="#ffffff" stroke="#000" strokeWidth="1.5" />
-              <text x="23" y="9.5" textAnchor="middle" fontSize="7.5" fontWeight="900" fontFamily="sans-serif" fill="#be123c">
+              <rect x="0" y="0" width="46" height="13" rx="2" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+              <text x="23" y="9.5" textAnchor="middle" fontSize="7.5" fontWeight="700" fontFamily="sans-serif" fill="#c8102e">
                 KCIC FLEET
               </text>
             </g>
@@ -531,15 +531,15 @@ export function VehicleTracking3D() {
             <polygon
               points="348,198 382,182 382,158 348,172"
               fill="url(#carBodyShade)"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="3"
             />
 
             {/* Front KCIC Aerodynamic Nose Grille */}
             <polygon
               points="356,192 376,182 376,170 356,179"
-              fill="#18181b"
-              stroke="#000"
+              fill="#334155"
+              stroke="#cbd5e1"
               strokeWidth="2"
             />
             {/* Golden KCIC Wing Emblem */}
@@ -550,14 +550,14 @@ export function VehicleTracking3D() {
             <polygon
               points="347,192 355,188 355,178 347,181"
               fill="#fef08a"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="2"
             />
             {/* Far Headlight */}
             <polygon
               points="373,178 381,174 381,165 373,168"
               fill="#fef08a"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="2"
             />
 
@@ -565,17 +565,17 @@ export function VehicleTracking3D() {
             <polygon
               points="292,212 348,172 382,158 328,142"
               fill="url(#carBodyLit)"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="3"
             />
             {/* Hood Center Ridge Line */}
-            <line x1="310" y1="177" x2="355" y2="165" stroke="#000" strokeWidth="1.8" />
+            <line x1="310" y1="177" x2="355" y2="165" stroke="#cbd5e1" strokeWidth="1.8" />
 
             {/* 9. Front Windshield (Angled Glass) */}
             <polygon
               points="292,212 328,142 306,118 266,168"
               fill="url(#windshieldGlass)"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="3"
             />
             {/* Windshield Reflection White Sheen */}
@@ -589,19 +589,19 @@ export function VehicleTracking3D() {
             <polygon
               points="266,168 196,132 196,146 266,186"
               fill="#09090b"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="3"
             />
             {/* Side Window White Specular Line */}
             <line x1="202" y1="138" x2="258" y2="166" stroke="#fda4af" strokeWidth="2" opacity="0.6" />
             {/* B-Pillar divider */}
-            <line x1="230" y1="148" x2="230" y2="171" stroke="#000" strokeWidth="3" />
+            <line x1="230" y1="148" x2="230" y2="171" stroke="#cbd5e1" strokeWidth="3" />
 
             {/* 11. Car Aerodynamic Roof Cap (Warm Ivory / Canary Accent) */}
             <polygon
               points="266,168 306,118 244,98 204,136"
               fill="#faf9f5"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="3"
             />
 
@@ -609,7 +609,7 @@ export function VehicleTracking3D() {
             <polygon
               points="175,178 175,162 186,156 186,172"
               fill="#ef4444"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="2"
             />
 
@@ -619,8 +619,8 @@ export function VehicleTracking3D() {
               cy="128"
               rx="9"
               ry="5"
-              fill="#e11d48"
-              stroke="#000"
+              fill="#d01434"
+              stroke="#cbd5e1"
               strokeWidth="2"
             />
 
@@ -632,7 +632,7 @@ export function VehicleTracking3D() {
               rx="18"
               ry="9"
               fill="none"
-              stroke="#be123c"
+              stroke="#c8102e"
               strokeWidth="2.5"
               style={{ animation: 'radarRingPulse 2s ease-out infinite' }}
             />
@@ -643,7 +643,7 @@ export function VehicleTracking3D() {
               rx="18"
               ry="9"
               fill="none"
-              stroke="#e11d48"
+              stroke="#d01434"
               strokeWidth="2.5"
               style={{ animation: 'radarRingPulse 2s ease-out infinite 0.75s' }}
             />
@@ -657,16 +657,16 @@ export function VehicleTracking3D() {
               y1="124"
               x2="255"
               y2="58"
-              stroke="#000"
+              stroke="#cbd5e1"
               strokeWidth="2.5"
               strokeDasharray="4 3"
             />
-            <circle cx="255" cy="124" r="3.5" fill="#e11d48" stroke="#000" strokeWidth="2" />
+            <circle cx="255" cy="124" r="3.5" fill="#d01434" stroke="#cbd5e1" strokeWidth="2" />
 
             {/* Floating 3D Billboard Tag */}
             <g transform="translate(175, 16)">
-              {/* Hard Neobrutal Shadow */}
-              <rect x="4" y="4" width="160" height="42" rx="8" fill="#000" />
+              {/* Soft Elevation Base */}
+              <rect x="1" y="2" width="160" height="42" rx="8" fill="#0f172a" opacity="0.08" />
               {/* Main Badge Container */}
               <rect
                 x="0"
@@ -675,23 +675,23 @@ export function VehicleTracking3D() {
                 height="42"
                 rx="8"
                 fill="#ffffff"
-                stroke="#000"
-                strokeWidth="2.5"
+                stroke="#e2e8f0"
+                strokeWidth="1.5"
               />
 
               {/* Status Header */}
-              <circle cx="14" cy="15" r="4" fill="#e11d48" stroke="#000" strokeWidth="1.5" />
-              <text x="24" y="18" fontSize="10" fontWeight="900" fontFamily="sans-serif" fill="#000">
+              <circle cx="14" cy="15" r="4" fill="#c8102e" stroke="#ffffff" strokeWidth="1.5" />
+              <text x="24" y="18" fontSize="10" fontWeight="700" fontFamily="sans-serif" fill="#0f172a">
                 KCIC-08 // IN TRANSIT
               </text>
 
-              <rect x="116" y="8" width="36" height="13" rx="3" fill="#fef08a" stroke="#000" strokeWidth="1.2" />
-              <text x="134" y="17.5" textAnchor="middle" fontSize="8" fontWeight="900" fontFamily="monospace" fill="#000">
+              <rect x="116" y="8" width="36" height="13" rx="3" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1" />
+              <text x="134" y="17.5" textAnchor="middle" fontSize="8" fontWeight="700" fontFamily="monospace" fill="#b45309">
                 ACTIVE
               </text>
 
               {/* Speed & Coordinate Subtitle */}
-              <text x="14" y="32" fontSize="9" fontWeight="800" fontFamily="monospace" fill="#52525b">
+              <text x="14" y="32" fontSize="9" fontWeight="500" fontFamily="monospace" fill="#64748b">
                 {speed} KM/H • -6.241° 106.882°
               </text>
             </g>
@@ -699,30 +699,30 @@ export function VehicleTracking3D() {
         </svg>
 
         {/* 4. SPEEDOMETER & TELEMETRY HUD WIDGET (BOTTOM-LEFT) */}
-        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 rounded-xl border-2 border-black bg-white/95 p-2.5 shadow-[3px_3px_0px_0px_#000] backdrop-blur-xs">
+        <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 p-2.5 shadow-sm backdrop-blur-xs">
           <div className="text-left">
-            <span className="block text-[9px] font-black uppercase tracking-wider text-zinc-500">
+            <span className="block text-[9px] font-medium uppercase tracking-wider text-slate-500">
               Cruise Speed
             </span>
             <div className="flex items-baseline gap-1">
-              <span className="font-mono text-2xl font-black tabular-nums text-black">
+              <span className="font-mono text-2xl font-semibold tabular-nums text-slate-900">
                 {speed}
               </span>
-              <span className="font-mono text-xs font-bold text-zinc-600">KM/H</span>
+              <span className="font-mono text-xs font-medium text-slate-500">KM/H</span>
             </div>
           </div>
 
           {/* Mini Tachometer Bar */}
-          <div className="flex flex-col gap-1 border-l-2 border-black/15 pl-2.5">
+          <div className="flex flex-col gap-1 border-l border-slate-200 pl-2.5">
             <div className="flex items-center gap-1">
-              <span className={`h-2.5 w-1.5 rounded-xs border border-black ${speed > 70 ? 'bg-emerald-400' : 'bg-zinc-200'}`} />
-              <span className={`h-3 w-1.5 rounded-xs border border-black ${speed > 80 ? 'bg-emerald-400' : 'bg-zinc-200'}`} />
-              <span className={`h-3.5 w-1.5 rounded-xs border border-black ${speed > 90 ? 'bg-emerald-500' : 'bg-zinc-200'}`} />
-              <span className={`h-4 w-1.5 rounded-xs border border-black ${speed > 105 ? 'bg-amber-400' : 'bg-zinc-200'}`} />
-              <span className={`h-4.5 w-1.5 rounded-xs border border-black ${speed > 120 ? 'bg-rose-500' : 'bg-zinc-200'}`} />
+              <span className={`h-2.5 w-1.5 rounded-sm ${speed > 70 ? 'bg-success-600' : 'bg-slate-200'}`} />
+              <span className={`h-3 w-1.5 rounded-sm ${speed > 80 ? 'bg-success-600' : 'bg-slate-200'}`} />
+              <span className={`h-3.5 w-1.5 rounded-sm ${speed > 90 ? 'bg-success-600' : 'bg-slate-200'}`} />
+              <span className={`h-4 w-1.5 rounded-sm ${speed > 105 ? 'bg-warning-600' : 'bg-slate-200'}`} />
+              <span className={`h-4.5 w-1.5 rounded-sm ${speed > 120 ? 'bg-danger-600' : 'bg-slate-200'}`} />
             </div>
-            <span className="inline-flex items-center gap-1 font-mono text-[9px] font-black text-emerald-800">
-              <Icon name="bolt" className="size-3 text-emerald-800" />
+            <span className="inline-flex items-center gap-1 font-mono text-[9px] font-semibold text-success-700">
+              <Icon name="bolt" className="size-3 text-success-700" />
               {isBoosted ? 'BOOST' : 'CRUISE'}
             </span>
           </div>
@@ -734,10 +734,10 @@ export function VehicleTracking3D() {
           <button
             type="button"
             onClick={toggleBoost}
-            className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+            className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${
               isBoosted
-                ? 'bg-amber-400 text-black hover:bg-amber-300'
-                : 'bg-white text-zinc-900 hover:bg-zinc-100'
+                ? 'border-warning-200 bg-warning-50 text-warning-700 hover:bg-warning-100'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
             title="Accelerate vehicle and road stream"
           >
@@ -749,10 +749,10 @@ export function VehicleTracking3D() {
           <button
             type="button"
             onClick={triggerRadar}
-            className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-black text-zinc-900 shadow-[2px_2px_0px_0px_#000] transition hover:bg-emerald-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             title="Broadcast instant radar wave"
           >
-            <Icon name="signal" className="size-3.5 text-zinc-900" />
+            <Icon name="signal" className="size-3.5 text-slate-600" />
             <span>PING</span>
           </button>
 
@@ -760,10 +760,10 @@ export function VehicleTracking3D() {
           <button
             type="button"
             onClick={() => setIsHighBeam((b) => !b)}
-            className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] transition active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+            className={`inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors ${
               isHighBeam
-                ? 'bg-emerald-300 text-black'
-                : 'bg-zinc-100 text-zinc-600'
+                ? 'border-success-200 bg-success-50 text-success-700 hover:bg-success-100'
+                : 'border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200'
             }`}
             title="Toggle headlight intensity"
           >
@@ -774,29 +774,29 @@ export function VehicleTracking3D() {
       </div>
 
       {/* 3. BOTTOM ROUTE PROGRESSION STRIP */}
-      <div className="relative z-20 flex items-center justify-between border-t-2 border-black bg-white px-3.5 py-2 text-xs font-bold text-black">
+      <div className="relative z-20 flex items-center justify-between border-t border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-900">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[11px] font-black uppercase text-emerald-800">
+          <span className="font-mono text-[11px] font-semibold uppercase text-success-700">
             HALIM
           </span>
-          <Icon name="arrow" className="size-3 text-zinc-500" />
-          <span className="font-mono text-[11px] font-black uppercase text-black">
+          <Icon name="arrow" className="size-3 text-slate-400" />
+          <span className="font-mono text-[11px] font-semibold uppercase text-slate-900">
             TEGALLUAR
           </span>
-          <span className="hidden font-mono text-[10px] text-zinc-500 sm:inline-block">
+          <span className="hidden font-mono text-[10px] tabular-nums text-slate-500 sm:inline-block">
             (KM 42 of 142)
           </span>
         </div>
 
         {/* Progress Bar */}
         <div className="flex items-center gap-2">
-          <div className="h-2.5 w-24 overflow-hidden rounded-full border border-black bg-zinc-100 sm:w-32">
+          <div className="h-2.5 w-24 overflow-hidden rounded-full bg-slate-100 sm:w-32">
             <div
-              className="h-full bg-emerald-500 transition-all duration-500"
+              className="h-full bg-brand-600 transition-all duration-500"
               style={{ width: isBoosted ? '58%' : '42%' }}
             />
           </div>
-          <span className="font-mono text-[10px] font-black text-zinc-800">
+          <span className="font-mono text-[10px] font-semibold tabular-nums text-slate-700">
             {isBoosted ? '58%' : '42%'}
           </span>
         </div>

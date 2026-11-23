@@ -26,7 +26,7 @@ export default function ShareTargetPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-2 text-zinc-600">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-2 text-slate-600">
       <Spinner size="lg" />
       <p className="text-sm">Opening…</p>
     </div>

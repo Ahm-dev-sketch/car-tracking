@@ -341,13 +341,13 @@ export function BookingModal({
     if (isOffline) {
       if (isShortLink(value)) {
         setDestinationLinkError(
-          'Short Google Maps links need an internet connection. Paste the full link (with @lat,lng) or connect to the internet.'
+          'Tautan Google Maps pendek memerlukan koneksi internet. Tempelkan tautan lengkap (dengan @lat,lng) atau sambungkan ke internet.'
         );
         return;
       }
 
       // Text-only full URL while offline: no coords to extract and no server available.
-      setDestinationLinkError('Could not resolve this Google Maps link');
+      setDestinationLinkError('Tautan Google Maps tidak dapat dibaca');
       return;
     }
 
@@ -366,10 +366,10 @@ export function BookingModal({
         setDestinationLinkError(null);
       } else {
         const json = await res.json().catch(() => null);
-        setDestinationLinkError(json?.error?.message || 'Could not resolve this Google Maps link');
+        setDestinationLinkError(json?.error?.message || 'Tautan Google Maps tidak dapat dibaca');
       }
     } catch {
-      setDestinationLinkError('Could not reach the server to resolve this link.');
+      setDestinationLinkError('Tidak dapat menghubungi server untuk membaca tautan ini.');
     } finally {
       setIsResolvingLink(false);
     }
@@ -381,7 +381,7 @@ export function BookingModal({
     setIsSubmitting(true);
 
     if (!operationalLocationId) {
-      setFormError('Operational location is required');
+      setFormError('Lokasi operasional wajib dipilih');
       setIsSubmitting(false);
       return;
     }
@@ -393,13 +393,13 @@ export function BookingModal({
     }
 
     if (!pickupLocation.trim()) {
-      setFormError('Pickup location is required');
+      setFormError('Lokasi penjemputan wajib diisi');
       setIsSubmitting(false);
       return;
     }
 
     if (!destination.trim()) {
-      setFormError('Destination is required');
+      setFormError('Tujuan wajib diisi');
       setIsSubmitting(false);
       return;
     }
@@ -521,7 +521,7 @@ export function BookingModal({
       const json = await res.json();
 
       if (!res.ok) {
-        setFormError(json.error?.message || 'Failed to submit booking');
+        setFormError(json.error?.message || 'Gagal mengirim reservasi');
         return;
       }
 
@@ -590,7 +590,7 @@ export function BookingModal({
             ? 'Permintaan Pemesanan Terkirim'
             : 'Mencari Armada'
         }
-        description={`Booking Reference #${submittedBooking.bookingNumber || ''}`}
+        description={`Referensi Pemesanan #${submittedBooking.bookingNumber || ''}`}
         maxWidth="lg"
       >
         <div className="space-y-5">
@@ -797,7 +797,7 @@ export function BookingModal({
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+                      className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
                     >
                       <svg className="size-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.698.074-2.001-.466-1.503-.623-2.529-2.115-2.607-2.219-.074-.103-.615-.818-.615-1.56 0-.743.391-1.107.531-1.258.14-.15.307-.188.409-.188.103 0 .205.004.296.009.096.005.225-.036.352.27.13.313.444 1.082.483 1.161.039.08.065.173.013.277-.052.103-.079.168-.156.259-.078.09-.163.201-.233.27-.08.077-.163.161-.07.32.093.16.413.682.886 1.103.609.543 1.123.711 1.282.79.16.08.254.07.348-.039.095-.109.406-.473.514-.635.109-.162.217-.135.367-.08.151.054.958.452 1.123.535.165.083.276.124.316.193.04.07.04.405-.104.81z"/>
@@ -807,7 +807,7 @@ export function BookingModal({
 
                     <a
                       href={`tel:${driverPhone}`}
-                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                      className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                     >
                       <Icon name="phone" className="size-4" />
                       <span>Telepon Driver</span>
@@ -887,23 +887,23 @@ export function BookingModal({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="No Driver Available"
-        description="Auto-dispatch could not find an available online driver"
+        title="Driver Tidak Tersedia"
+        description="Auto-dispatch tidak menemukan driver online yang tersedia"
         maxWidth="lg"
       >
         <div className="space-y-4">
           <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs leading-relaxed text-warning-700">
-            <p className="font-semibold text-warning-700">All eligible drivers are currently busy or offline.</p>
+            <p className="font-semibold text-warning-700">Semua driver yang memenuhi syarat sedang sibuk atau offline.</p>
             <p className="mt-1">
-              Your request was registered as reference <span className="font-mono font-semibold tabular-nums">#{noDriverState.booking?.bookingNumber}</span>.
-              You can choose an alternative available vehicle below, or wait for admin manual dispatch.
+              Permintaan Anda tercatat dengan referensi <span className="font-mono font-semibold tabular-nums">#{noDriverState.booking?.bookingNumber}</span>.
+              Anda dapat memilih kendaraan alternatif yang tersedia di bawah ini, atau menunggu penugasan manual dari admin.
             </p>
           </div>
 
           {noDriverState.alternatives.length > 0 ? (
             <div className="space-y-2">
               <h4 className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                Alternative Vehicles at this Location (<span className="tabular-nums">{noDriverState.alternatives.length}</span>)
+                Kendaraan Alternatif di Lokasi Ini (<span className="tabular-nums">{noDriverState.alternatives.length}</span>)
               </h4>
               <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
                 {noDriverState.alternatives.map((alt) => (
@@ -915,7 +915,7 @@ export function BookingModal({
                       <span className="font-mono font-semibold tabular-nums text-slate-900">{alt.plateNumber}</span>
                       <p className="text-slate-600">
                         {alt.brand} {alt.model}
-                        {alt.seatingCapacity && ` • ${alt.seatingCapacity} seats`}
+                        {alt.seatingCapacity && ` • ${alt.seatingCapacity} kursi`}
                       </p>
                     </div>
                     <button
@@ -924,7 +924,7 @@ export function BookingModal({
                       onClick={() => handleBookAlternative(alt)}
                       className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                     >
-                      {isSubmitting ? <Spinner size="sm" /> : 'Book Alternative'}
+                      {isSubmitting ? <Spinner size="sm" /> : 'Pilih Alternatif'}
                     </button>
                   </div>
                 ))}
@@ -932,7 +932,7 @@ export function BookingModal({
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500">
-              No immediate alternative vehicles found at this location.
+              Tidak ada kendaraan alternatif yang tersedia di lokasi ini.
             </div>
           )}
 
@@ -944,7 +944,7 @@ export function BookingModal({
               }}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Back to Form
+              Kembali ke Formulir
             </button>
             <button
               type="button"
@@ -954,7 +954,7 @@ export function BookingModal({
               }}
               className="min-h-9 cursor-pointer rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
             >
-              Go to My Bookings
+              Ke Pemesanan Saya
             </button>
           </div>
         </div>
@@ -966,11 +966,31 @@ export function BookingModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Reserve a Vehicle"
-      description="Select operational location and trip details for auto-dispatch"
-      maxWidth="lg"
+      title="Reservasi Kendaraan"
+      description="Pilih lokasi operasional dan detail perjalanan untuk penugasan otomatis"
+      maxWidth="2xl"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            form="booking-form"
+            disabled={isSubmitting}
+            className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-50"
+          >
+            {isSubmitting && <Spinner size="sm" className="text-white" />}
+            <span>Kirim Reservasi</span>
+          </button>
+        </>
+      }
     >
-      <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
+      <form id="booking-form" onSubmit={(e) => handleSubmit(e)} className="space-y-4">
         {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
         {offlineNotice && (
           <div className="rounded-xl border border-success-200 bg-success-50 p-3 text-xs leading-relaxed text-success-700">
@@ -979,9 +999,9 @@ export function BookingModal({
         )}
 
         {/* Section: Rute & Lokasi */}
-        <section className="space-y-3.5 rounded-xl border border-slate-200 bg-white p-4">
+        <section className="space-y-3.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
-            <Icon name="route" className="size-4 text-brand-600" />
+            <Icon name="route" className="size-4 shrink-0 text-brand-600" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Rute &amp; Lokasi</h3>
           </header>
 
@@ -1009,7 +1029,7 @@ export function BookingModal({
                     &plusmn;{userCoords.accuracyM}m akurasi
                   </span>
                 </div>
-                <p className="text-[11px] leading-relaxed text-slate-600">
+                <p className="min-w-0 break-words text-[11px] leading-relaxed text-slate-600">
                   Koordinat: <span className="tabular-nums">{userCoords.lat.toFixed(5)}, {userCoords.lng.toFixed(5)}</span>
                   {nearestHubName ? ` · Hub terdekat: ${nearestHubName}` : ''}
                 </p>
@@ -1051,10 +1071,10 @@ export function BookingModal({
           </div>
 
           {/* Operational Location (Required) */}
-          <FormField label="Operational Location" name="operationalLocation" required>
+          <FormField label="Lokasi Operasional" name="operationalLocation" required>
             {loadingLocations ? (
               <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
-                <Spinner size="sm" /> Loading operational locations...
+                <Spinner size="sm" /> Memuat lokasi operasional...
               </div>
             ) : (
               <select
@@ -1076,7 +1096,7 @@ export function BookingModal({
                 required
               >
                 <option value="" disabled>
-                  Select operational hub / base...
+                  Pilih hub operasional...
                 </option>
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
@@ -1089,18 +1109,18 @@ export function BookingModal({
 
           {/* Pickup & Destination */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FormField label="Pickup Location" name="pickupLocation" required>
-              <div className="space-y-1">
+            <FormField label="Lokasi Penjemputan" name="pickupLocation" required>
+              <div className="min-w-0 space-y-1">
                 <input
                   id="pickupLocation"
                   type="text"
                   required
                   value={pickupLocation}
                   onChange={(e) => setPickupLocation(e.target.value)}
-                  placeholder="e.g. Halim Gate 2"
+                  placeholder="cth. Gate 2 Halim"
                 />
                 {userCoords && (
-                  <div className="flex flex-wrap items-center justify-between gap-1 pt-0.5 text-[11px]">
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-1 pt-0.5 text-[11px]">
                     <button
                       type="button"
                       onClick={() => {
@@ -1112,17 +1132,17 @@ export function BookingModal({
                       }}
                       className="inline-flex cursor-pointer items-center gap-1 font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
                     >
-                      <Icon name="pin" className="size-3 text-brand-600" />
+                      <Icon name="pin" className="size-3 shrink-0 text-brand-600" />
                       <span>Gunakan alamat lokasi saya</span>
                     </button>
                     {isResolvingAddress ? (
                       <span className="text-[10px] italic text-slate-400">Mencari alamat...</span>
                     ) : resolvedAddress ? (
-                      <span className="max-w-[280px] truncate text-[10px] font-medium text-slate-600" title={resolvedAddress}>
+                      <span className="min-w-0 max-w-[280px] truncate text-[10px] font-medium text-slate-600" title={resolvedAddress}>
                         {resolvedAddress}
                       </span>
                     ) : (
-                      <span className="font-mono text-[10px] tabular-nums text-slate-400">
+                      <span className="min-w-0 font-mono text-[10px] tabular-nums text-slate-400">
                         {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
                       </span>
                     )}
@@ -1131,15 +1151,15 @@ export function BookingModal({
               </div>
             </FormField>
 
-            <FormField label="Destination" name="destination" required>
-              <div className="relative">
+            <FormField label="Tujuan" name="destination" required>
+              <div className="relative min-w-0">
                 <input
                   id="destination"
                   type="text"
                   required
                   value={destination}
                   onChange={(e) => handleDestinationChange(e.target.value)}
-                  placeholder="e.g. Tegalluar Depo Office"
+                  placeholder="cth. Kantor Depo Tegalluar"
                   aria-invalid={destinationLinkError ? true : undefined}
                   className="pr-10"
                 />
@@ -1150,13 +1170,13 @@ export function BookingModal({
                 )}
               </div>
               {destinationCoords && (
-                <p className="flex items-center gap-1 text-[11px] tabular-nums text-slate-600">
-                  <Icon name="pin" className="size-3 text-brand-600" />
-                  <span>{destinationCoords.lat.toFixed(5)}, {destinationCoords.lng.toFixed(5)}</span>
+                <p className="flex min-w-0 items-center gap-1 text-[11px] tabular-nums text-slate-600">
+                  <Icon name="pin" className="size-3 shrink-0 text-brand-600" />
+                  <span className="min-w-0 break-words">{destinationCoords.lat.toFixed(5)}, {destinationCoords.lng.toFixed(5)}</span>
                 </p>
               )}
               {destinationLinkError && (
-                <p role="alert" className="text-xs font-medium text-danger-700">
+                <p role="alert" className="break-words text-xs font-medium text-danger-700">
                   {destinationLinkError}
                 </p>
               )}
@@ -1165,9 +1185,9 @@ export function BookingModal({
         </section>
 
         {/* Section: Layanan */}
-        <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+        <section className="space-y-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
-            <Icon name="car" className="size-4 text-brand-600" />
+            <Icon name="car" className="size-4 shrink-0 text-brand-600" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Layanan</h3>
           </header>
 
@@ -1181,7 +1201,7 @@ export function BookingModal({
                 type="button"
                 onClick={() => setServiceType('DROP_OFF')}
                 aria-pressed={serviceType === 'DROP_OFF'}
-                className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                className={`flex min-h-12 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                   serviceType === 'DROP_OFF'
                     ? 'border-brand-200 bg-brand-600 text-white'
                     : 'border-transparent bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -1197,7 +1217,7 @@ export function BookingModal({
                 type="button"
                 onClick={() => setServiceType('STANDBY')}
                 aria-pressed={serviceType === 'STANDBY'}
-                className={`flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                className={`flex min-h-12 min-w-0 cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                   serviceType === 'STANDBY'
                     ? 'border-brand-200 bg-brand-600 text-white'
                     : 'border-transparent bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -1214,9 +1234,9 @@ export function BookingModal({
         </section>
 
         {/* Section: Jadwal & Penumpang */}
-        <section className="space-y-3.5 rounded-xl border border-slate-200 bg-white p-4">
+        <section className="space-y-3.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
-            <Icon name="calendar" className="size-4 text-brand-600" />
+            <Icon name="calendar" className="size-4 shrink-0 text-brand-600" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Jadwal &amp; Penumpang</h3>
           </header>
 
@@ -1233,7 +1253,7 @@ export function BookingModal({
                 </span>
               </div>
               <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
-                <div>
+                <div className="min-w-0">
                   <label htmlFor="dropOffDate" className="mb-1 block text-[11px] font-medium text-slate-700">
                     Tanggal Jemput <span className="text-brand-500">*</span>
                   </label>
@@ -1243,10 +1263,10 @@ export function BookingModal({
                     required
                     value={dropOffDate}
                     onChange={(e) => setDropOffDate(e.target.value)}
-                    className="min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs tabular-nums text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                    className="min-h-12 w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 text-xs tabular-nums text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label htmlFor="dropOffTime" className="mb-1 block text-[11px] font-medium text-slate-700">
                     Jam Jemput <span className="text-brand-500">*</span>
                   </label>
@@ -1256,7 +1276,7 @@ export function BookingModal({
                     required
                     value={dropOffTime}
                     onChange={(e) => setDropOffTime(e.target.value)}
-                    className="min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs tabular-nums text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                    className="min-h-12 w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 text-xs tabular-nums text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
                   />
                 </div>
               </div>
@@ -1292,7 +1312,7 @@ export function BookingModal({
 
           {/* Passenger count & Purpose */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <FormField label="Passengers" name="passengerCount" required>
+            <FormField label="Jumlah Penumpang" name="passengerCount" required>
               <input
                 id="passengerCount"
                 type="number"
@@ -1305,7 +1325,7 @@ export function BookingModal({
               />
             </FormField>
 
-            <div className="sm:col-span-2">
+            <div className="min-w-0 sm:col-span-2">
               <FormField
                 label={serviceType === 'STANDBY' ? 'Keperluan / Keterangan (Wajib)' : 'Keperluan / Keterangan (Opsional)'}
                 name="purpose"
@@ -1329,25 +1349,25 @@ export function BookingModal({
         </section>
 
         {/* Section: Kebutuhan Nota Dinas / Layanan */}
-        <section className="space-y-3.5 rounded-xl border border-slate-200 bg-white p-4">
+        <section className="space-y-3.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
-            <Icon name="bookings" className="size-4 text-brand-600" />
+            <Icon name="bookings" className="size-4 shrink-0 text-brand-600" />
             <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kebutuhan Nota Dinas / Layanan</h3>
           </header>
 
           {/* Specific Vehicle Preference (Option B - Optional) */}
           <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                Specific Vehicle Preference (Optional)
+              <span className="min-w-0 text-xs font-medium uppercase tracking-wider text-slate-500">
+                Preferensi Kendaraan (Opsional)
               </span>
               {preferredVehicle && (
                 <button
                   type="button"
                   onClick={() => setPreferredVehicle(null)}
-                  className="cursor-pointer text-xs font-semibold text-danger-700 underline-offset-2 hover:underline"
+                  className="shrink-0 cursor-pointer text-xs font-semibold text-danger-700 underline-offset-2 hover:underline"
                 >
-                  Clear Preference
+                  Hapus Pilihan
                 </button>
               )}
             </div>
@@ -1362,26 +1382,26 @@ export function BookingModal({
                     {preferredVehicle.status && <StatusBadge status={preferredVehicle.status} />}
                   </div>
                   <div className="mt-0.5 font-medium text-slate-600">
-                    {preferredVehicle.brand} {preferredVehicle.model} • <span className="tabular-nums">{preferredVehicle.seatingCapacity}</span> seats
+                    {preferredVehicle.brand} {preferredVehicle.model} • <span className="tabular-nums">{preferredVehicle.seatingCapacity}</span> kursi
                     {preferredVehicle.vehicleType && ` • ${preferredVehicle.vehicleType}`}
                   </div>
                 </div>
                 <span className="shrink-0 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
-                  Selected
+                  Dipilih
                 </span>
               </div>
             ) : (
               <div className="space-y-1.5">
                 <input
                   type="text"
-                  placeholder="Search by license plate to request specific vehicle..."
+                  placeholder="Cari nomor polisi untuk memilih kendaraan tertentu..."
                   value={vehicleSearchQuery}
                   onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                  className="min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                  className="min-h-12 w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
                 />
                 {isSearchingVehicles && (
                   <div className="flex items-center gap-1.5 py-1 text-xs font-medium text-slate-600">
-                    <Spinner size="sm" /> Searching vehicles...
+                    <Spinner size="sm" /> Mencari kendaraan...
                   </div>
                 )}
                 {vehicleSearchResults.length > 0 && (
@@ -1400,7 +1420,7 @@ export function BookingModal({
                         <div className="min-w-0">
                           <span className="font-mono font-semibold tabular-nums text-slate-900">{v.plateNumber}</span>
                           <span className="ml-2 text-slate-600">
-                            {v.brand} {v.model} (<span className="tabular-nums">{v.seatingCapacity}</span> seats)
+                            {v.brand} {v.model} (<span className="tabular-nums">{v.seatingCapacity}</span> kursi)
                           </span>
                         </div>
                         <StatusBadge status={v.status || 'AVAILABLE'} />
@@ -1409,42 +1429,23 @@ export function BookingModal({
                   </div>
                 )}
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  Leaving this empty allows auto-dispatch to assign the fastest eligible driver &amp; vehicle.
+                  Biarkan kosong agar auto-dispatch memilih driver &amp; kendaraan tercepat yang tersedia.
                 </p>
               </div>
             )}
           </div>
 
           {/* Notes */}
-          <FormField label="Notes (Optional)" name="notes">
+          <FormField label="Catatan (Opsional)" name="notes">
             <textarea
               id="notes"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Special equipment, contact details, or operational instructions"
+              placeholder="Peralatan khusus, kontak, atau instruksi operasional"
             />
           </FormField>
         </section>
-
-        {/* Footer */}
-        <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-2 border-t border-slate-200 bg-white/95 px-1 pb-1 pt-3 backdrop-blur-xs">
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-h-11 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-50"
-          >
-            {isSubmitting && <Spinner size="sm" className="text-white" />}
-            <span>Submit Reservation</span>
-          </button>
-        </div>
       </form>
     </Modal>
   );

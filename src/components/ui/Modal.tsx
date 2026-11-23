@@ -220,53 +220,57 @@ export function Modal({
           onClose();
         backdropPress.current = false;
       }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-center justify-end overflow-hidden border-0 bg-transparent p-0 pt-[max(1rem,env(safe-area-inset-top))] text-slate-900 outline-none open:flex backdrop:bg-slate-900/40 backdrop:backdrop-blur-[2px] sm:justify-center sm:p-6 sm:pt-[max(1.5rem,env(safe-area-inset-top))] sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-center justify-end overflow-hidden border-0 bg-transparent p-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-slate-900 outline-none open:flex backdrop:bg-slate-900/40 backdrop:backdrop-blur-[2px] sm:justify-center sm:p-6 sm:pt-[max(1.5rem,env(safe-area-inset-top))] sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
     >
       <div
-        className={`flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] transition-[transform,opacity] duration-200 ease-out starting:translate-y-4 starting:opacity-0 motion-reduce:transition-none sm:max-h-[90dvh] sm:rounded-xl ${maxWidthClasses[maxWidth]}`}
+        className={`relative flex max-h-[90vh] min-h-0 w-[calc(100%_-_2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg transition-[transform,opacity] duration-200 ease-out starting:translate-y-4 starting:opacity-0 motion-reduce:transition-none sm:max-h-[90dvh] sm:w-full ${maxWidthClasses[maxWidth]}`}
       >
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)] sm:pb-0">
-          {/* KCIC identity accent line */}
-          <div className="h-0.5 w-full shrink-0 bg-brand-500" aria-hidden="true" />
-          <div
-            className="mx-auto mb-1 mt-2 h-1 w-10 shrink-0 rounded-full bg-slate-300 sm:hidden"
-            aria-hidden="true"
-          />
-          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
-            <div className="min-w-0">
-              <h2
-                id={titleId}
-                className="text-lg font-semibold tracking-tight text-slate-900"
-              >
-                {title}
-              </h2>
-              {description && (
-                <p
-                  id={descriptionId}
-                  className="mt-1 text-xs leading-relaxed text-slate-500"
-                >
-                  {description}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="-mr-1 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-              aria-label="Close dialog"
+        {/* KCIC identity accent line */}
+        <div className="h-0.5 w-full shrink-0 bg-brand-500" aria-hidden="true" />
+        <div
+          className="mx-auto mb-1 mt-2 h-1 w-10 shrink-0 rounded-full bg-slate-300 sm:hidden"
+          aria-hidden="true"
+        />
+
+        {/* Zone 1 — header */}
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+          <div className="min-w-0">
+            <h2
+              id={titleId}
+              className="text-lg font-semibold tracking-tight text-slate-900"
             >
-              <Icon name="close" className="size-4" />
-            </button>
+              {title}
+            </h2>
+            {description && (
+              <p
+                id={descriptionId}
+                className="mt-1 text-xs leading-relaxed text-slate-500"
+              >
+                {description}
+              </p>
+            )}
           </div>
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">
-            {children}
-          </div>
-          {footer && (
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5 border-t border-slate-200 bg-slate-50/60 px-5 py-4 sm:px-6">
-              {footer}
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="-mr-1 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+            aria-label="Close dialog"
+          >
+            <Icon name="close" className="size-4" />
+          </button>
         </div>
+
+        {/* Zone 2 — scrollable body */}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
+          {children}
+        </div>
+
+        {/* Zone 3 — footer */}
+        {footer && (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
+            {footer}
+          </div>
+        )}
       </div>
     </dialog>
   );

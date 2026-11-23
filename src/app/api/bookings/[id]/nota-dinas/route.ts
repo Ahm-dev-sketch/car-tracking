@@ -23,7 +23,7 @@ const ALLOWED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.webp']);
 
 export async function POST(
   req: NextRequest,
-  context?: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. Authenticate user

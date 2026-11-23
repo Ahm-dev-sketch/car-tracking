@@ -8,7 +8,7 @@ import { BookingStatus } from '@prisma/client';
 export const dynamic = 'force-dynamic';
 
 export const POST = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
     requireRole(user, 'ADMIN');
 

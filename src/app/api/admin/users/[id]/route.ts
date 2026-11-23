@@ -6,7 +6,7 @@ import { updateUserSchema } from '@/lib/validation';
 import { updateUser } from '@/server/users/service';
 
 export const PATCH = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
     requireRole(user, 'ADMIN');
 

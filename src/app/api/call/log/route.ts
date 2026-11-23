@@ -72,14 +72,14 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   let chatText = validated.message;
   if (!chatText) {
     if (validated.status === 'MISSED') {
-      chatText = '📞 Panggilan suara tak terjawab (30 detik)';
+      chatText = 'Panggilan suara tak terjawab (30 detik)';
     } else if (validated.status === 'COMPLETED') {
       const mins = Math.floor(validated.durationSeconds / 60);
       const secs = validated.durationSeconds % 60;
       const durStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-      chatText = `📞 Panggilan Suara Berakhir (${durStr})`;
+      chatText = `Panggilan Suara Berakhir (${durStr})`;
     } else {
-      chatText = '📞 Panggilan Ditolak';
+      chatText = 'Panggilan Ditolak';
     }
   }
 

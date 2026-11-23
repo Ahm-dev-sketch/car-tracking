@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { BookingStatus } from '@prisma/client';
 
 export const POST = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
 
     const params = await context?.params;

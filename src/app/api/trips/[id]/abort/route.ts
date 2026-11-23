@@ -6,7 +6,7 @@ import { abortTripSchema } from '@/lib/validation';
 import { abortTrip } from '@/server/trips/service';
 
 export const POST = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
 
     const params = await context?.params;

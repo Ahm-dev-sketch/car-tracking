@@ -8,7 +8,7 @@ import { assignVehicle } from '@/server/assignments/service';
 
 export const POST = withRateLimit(
   withErrorHandling(
-    async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+    async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
       const user = await getSessionUser();
       requireRole(user, 'ADMIN');
 

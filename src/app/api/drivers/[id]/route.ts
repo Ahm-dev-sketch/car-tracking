@@ -4,7 +4,7 @@ import { getSessionUser } from '@/lib/auth-guard';
 import { getDriverById } from '@/server/drivers/service';
 
 export const GET = withErrorHandling(
-  async (_req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (_req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     await getSessionUser();
 
     const params = await context?.params;

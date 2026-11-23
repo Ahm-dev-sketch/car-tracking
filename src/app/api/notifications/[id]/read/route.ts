@@ -4,7 +4,7 @@ import { getSessionUser } from '@/lib/auth-guard';
 import { markAsRead } from '@/server/notifications/service';
 
 export const PATCH = withErrorHandling(
-  async (_req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (_req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
 
     const params = await context?.params;

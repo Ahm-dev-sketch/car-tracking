@@ -7,7 +7,7 @@ import { transitionBooking } from '@/server/bookings/service';
 import { BookingStatus } from '@prisma/client';
 
 export const PATCH = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
 
     const params = await context?.params;

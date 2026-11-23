@@ -6,7 +6,7 @@ import { getVehicleTracking } from '@/server/tracking/service';
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandling(
-  async (_req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (_req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
 
     const params = await context?.params;

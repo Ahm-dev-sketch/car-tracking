@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveMapsLink } from '@/app/api/maps/resolve/route';
+import { resolveMapsLink } from '@/lib/google-maps-resolve';
 
 vi.mock('@/lib/auth-guard', () => ({
   getSessionUser: vi.fn(async () => ({

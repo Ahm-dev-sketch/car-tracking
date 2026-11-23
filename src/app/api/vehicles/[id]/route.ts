@@ -6,7 +6,7 @@ import { updateVehicleSchema } from '@/lib/validation';
 import { getVehicleById, updateVehicle, deleteVehicle } from '@/server/vehicles/service';
 
 export const GET = withErrorHandling(
-  async (_req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (_req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
 
     const params = await context?.params;
@@ -24,7 +24,7 @@ export const GET = withErrorHandling(
 );
 
 export const PATCH = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
     requireRole(user, 'ADMIN');
 
@@ -47,7 +47,7 @@ export const PATCH = withErrorHandling(
 );
 
 export const DELETE = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
     requireRole(user, 'ADMIN');
 

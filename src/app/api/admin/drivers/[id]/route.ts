@@ -6,7 +6,7 @@ import { updateDriverSchema } from '@/lib/validation';
 import { updateDriver, deactivateDriver } from '@/server/drivers/service';
 
 export const PATCH = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
     requireRole(user, 'ADMIN');
 
@@ -30,7 +30,7 @@ export const PATCH = withErrorHandling(
 );
 
 export const DELETE = withErrorHandling(
-  async (req: NextRequest, context?: { params: Promise<{ id: string }> }) => {
+  async (req: NextRequest, context: { params: Promise<{ id: string }> }) => {
     const user = await getSessionUser();
     requireRole(user, 'ADMIN');
 

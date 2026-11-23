@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Phone, PhoneOff, Volume2, VolumeX } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 import { CallStatus } from '@/hooks/useWebRTCCall';
 
 interface VoiceCallModalProps {
@@ -42,13 +42,20 @@ export function VoiceCallModal({
   const internalAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioRef = externalAudioRef || internalAudioRef;
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
-  // Capability read straight from the platform, no state and no effect.
-  const isSinkIdSupported =
-    typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
-  // Speaker routing only exists while a call is actually connected, so the
-  // flag is clamped at render instead of being reset by an effect.
-  const isSpeakerActive = isSpeakerOn && callStatus === 'connected';
+  const [isSinkIdSupported, setIsSinkIdSupported] = useState(true);
 
+  useEffect(() => {
+    setIsSinkIdSupported('setSinkId' in HTMLMediaElement.prototype);
+  }, []);
+
+  // Reset speaker state when call terminates
+  useEffect(() => {
+    if (callStatus === 'idle' || callStatus === 'ended') {
+      setIsSpeakerOn(false);
+    }
+  }, [callStatus]);
+
+  // Bind remote stream to audio element with safe Autoplay Policy handling
   useEffect(() => {
     const audioEl = audioRef.current;
     if (!audioEl || !remoteStream) return;
@@ -59,7 +66,14 @@ export function VoiceCallModal({
     audioEl.muted = false;
 
     const attemptPlay = () => {
-      audioEl.play().catch(() => {});
+      audioEl
+        .play()
+        .then(() => {
+          console.log('[WebRTC Audio]: Remote audio playing successfully in production');
+        })
+        .catch((err) => {
+          console.warn('[WebRTC Audio] Autoplay tertahan:', err);
+        });
     };
 
     attemptPlay();
@@ -79,30 +93,46 @@ export function VoiceCallModal({
     };
   }, [remoteStream, callStatus]);
 
+  // Toggle speakerphone / loudspeaker output
   const toggleSpeaker = async () => {
-    if (!audioRef.current || !isSinkIdSupported) {
+    if (!audioRef.current || !('setSinkId' in HTMLMediaElement.prototype)) {
+      console.warn('[WebRTC Audio] setSinkId tidak didukung di browser ini');
       setIsSpeakerOn((prev: boolean) => !prev);
       return;
     }
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioOutputs = devices.filter((d) => d.kind === 'audiooutput');
+      // Cari device speaker eksternal / default loudspeaker jika tersedia
       const targetDeviceId =
-        !isSpeakerActive && audioOutputs.length > 1
+        !isSpeakerOn && audioOutputs.length > 1
           ? audioOutputs.find((d) => d.label.toLowerCase().includes('speaker'))?.deviceId ||
             audioOutputs[1].deviceId
           : '';
-      await (audioRef.current as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> }).setSinkId(
-        targetDeviceId
-      );
-      setIsSpeakerOn(!isSpeakerActive);
-    } catch {}
+      await (audioRef.current as any).setSinkId(targetDeviceId);
+      setIsSpeakerOn(!isSpeakerOn);
+    } catch (error) {
+      console.error('[Speaker Toggle Error]:', error);
+    }
   };
 
   const handleAccept = () => {
     if (audioRef.current) {
       audioRef.current.muted = false;
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch((err) => {
+        console.warn('[WebRTC Audio] Play unlock on accept failed:', err);
+      });
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+        }
+      } catch {}
     }
     onAccept();
   };
@@ -110,118 +140,125 @@ export function VoiceCallModal({
   if (callStatus === 'idle') return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+      {/* Hidden audio element for WebRTC audio playback */}
       <audio ref={audioRef} autoPlay playsInline muted={false} />
 
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Panggilan suara dengan ${partnerName}`}
-        className="w-full max-w-sm rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white p-6 text-center shadow-[var(--shadow-float)]"
-      >
-        {/* Avatar */}
-        <div className="relative mx-auto mb-4 grid size-24 place-items-center">
+      <div className="w-full max-w-sm rounded-2xl border-[3px] border-black bg-white p-6 text-center text-black shadow-[6px_6px_0px_0px_#000] animate-in fade-in zoom-in-95 duration-150">
+        {/* Caller Avatar / Animation */}
+        <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center">
           {(callStatus === 'calling' || callStatus === 'ringing') && (
-            <span
-              className="sonar-ring absolute size-20 rounded-full bg-[var(--kcic-red-soft)]"
-              aria-hidden="true"
-            />
+            <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-30 animate-ping" />
           )}
-          <span className="relative grid size-20 place-items-center rounded-full bg-[var(--slate-navy)] text-xl font-semibold text-white">
-            {partnerName.slice(0, 2).toUpperCase() || 'KC'}
-          </span>
+          <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-black bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]">
+            <span className="text-2xl font-black">
+              {partnerName.slice(0, 2).toUpperCase() || 'KC'}
+            </span>
+          </div>
         </div>
 
-        <h3 className="truncate text-base font-semibold text-slate-900">{partnerName}</h3>
-        <p className="mt-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
-          {partnerRole === 'DRIVER'
-            ? 'Pengemudi armada'
-            : partnerRole === 'ADMIN'
-              ? 'Dispatcher admin'
-              : 'Penumpang'}
+        {/* Partner Name & Role */}
+        <h3 className="text-lg font-black text-zinc-950 truncate">{partnerName}</h3>
+        <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">
+          {partnerRole === 'DRIVER' ? 'Pengemudi Armada' : partnerRole === 'ADMIN' ? 'Dispatcher Admin' : 'Penumpang'}
         </p>
 
-        {/* Status */}
-        <div className="mb-5 mt-3 flex min-h-6 items-center justify-center">
+        {/* Call Status Label */}
+        <div className="mb-6">
           {callStatus === 'calling' && (
-            <span className="pill pill-warning">
-              <span className="pill-dot animate-pulse" aria-hidden="true" />
-              <span>Memanggil…</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
+              <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+              Memanggil...
             </span>
           )}
           {callStatus === 'ringing' && (
-            <span className="pill pill-active animate-pulse">
-              <span className="pill-dot" aria-hidden="true" />
-              <span>Panggilan masuk…</span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300 animate-bounce">
+              <span className="size-2 rounded-full bg-emerald-500 animate-ping" />
+              Panggilan Masuk...
             </span>
           )}
           {callStatus === 'connected' && (
-            <span className="pill pill-active">
-              <span className="pill-dot" aria-hidden="true" />
-              <span>Tersambung</span>
-              <span className="mono-plate ml-0.5 tabular-nums opacity-80">
-                {formatDuration(callDuration)}
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                <span className="size-2 rounded-full bg-emerald-500" />
+                Tersambung
               </span>
-            </span>
+              <p className="font-mono text-xs font-extrabold text-zinc-700">
+                {formatDuration(callDuration)}
+              </p>
+            </div>
           )}
           {callStatus === 'ended' && (
-            <span className="pill">
-              <span>{errorMessage || 'Panggilan berakhir'}</span>
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border ${
+                errorMessage?.toLowerCase().includes('tidak ada jawaban') ||
+                errorMessage?.toLowerCase().includes('tak terjawab') ||
+                errorMessage?.toLowerCase().includes('ditolak')
+                  ? 'bg-rose-100 text-rose-900 border-rose-300'
+                  : 'bg-zinc-100 text-zinc-700 border-zinc-300'
+              }`}
+            >
+              {errorMessage?.toLowerCase().includes('tak terjawab') ||
+              errorMessage?.toLowerCase().includes('tidak ada jawaban') ? (
+                <Icon name="phoneOff" className="size-3.5 text-rose-600" />
+              ) : null}
+              {errorMessage || 'Panggilan Berakhir'}
             </span>
           )}
         </div>
 
         {errorMessage && callStatus !== 'ended' && (
-          <div
-            role="alert"
-            className="mb-4 rounded-[var(--radius-md)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] p-2.5 text-[0.6875rem] leading-relaxed text-[var(--status-error-fg)]"
-          >
+          <div className="mb-4 p-2.5 bg-rose-50 border border-rose-300 rounded-lg text-xs font-medium text-rose-800">
             {errorMessage}
           </div>
         )}
 
-        {/* Controls */}
-        <div className="flex items-start justify-center gap-5 border-t border-[var(--border-subtle)] pt-5">
+        {/* Action Controls */}
+        <div className="flex items-center justify-center gap-4 pt-2 border-t border-zinc-100">
+          {/* Ringing: Show Accept & Reject */}
           {callStatus === 'ringing' ? (
             <>
-              <button type="button" onClick={onReject} className="flex cursor-pointer flex-col items-center gap-1.5">
-                <span className="grid size-14 place-items-center rounded-full bg-[var(--status-error-fg)] text-white shadow-[var(--shadow-md)] transition-colors hover:bg-[#B91C1C]">
-                  <PhoneOff className="size-6" strokeWidth={1.9} aria-hidden="true" />
+              <button
+                type="button"
+                onClick={onReject}
+                className="flex flex-col items-center gap-1.5 cursor-pointer group"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-black bg-rose-600 text-white shadow-[3px_3px_0px_0px_#000] group-hover:bg-rose-700 transition">
+                  <Icon name="phoneOff" className="size-6" />
                 </span>
-                <span className="text-[0.625rem] font-semibold text-[var(--status-error-fg)]">Tolak</span>
+                <span className="text-[11px] font-black text-rose-700">Tolak</span>
               </button>
 
-              <button type="button" onClick={handleAccept} className="flex cursor-pointer flex-col items-center gap-1.5">
-                <span className="grid size-14 place-items-center rounded-full bg-[var(--status-active-fg)] text-white shadow-[var(--shadow-md)] transition-colors hover:bg-[#047857]">
-                  <Phone className="size-6" strokeWidth={1.9} aria-hidden="true" />
+              <button
+                type="button"
+                onClick={handleAccept}
+                className="flex flex-col items-center gap-1.5 cursor-pointer group"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-black bg-emerald-500 text-black shadow-[3px_3px_0px_0px_#000] group-hover:bg-emerald-400 transition animate-pulse">
+                  <Icon name="phone" className="size-6" />
                 </span>
-                <span className="text-[0.625rem] font-semibold text-[var(--status-active-fg)]">Terima</span>
+                <span className="text-[11px] font-black text-emerald-800">Terima</span>
               </button>
             </>
           ) : (
+            /* Calling or Connected: Show Mute, Speaker, and Hang up */
             <>
               {callStatus === 'connected' && (
                 <>
                   <button
                     type="button"
                     onClick={onToggleMute}
-                    className="flex cursor-pointer flex-col items-center gap-1.5"
-                    title={isMuted ? 'Aktifkan mikrofon' : 'Bisukan mikrofon'}
+                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
+                    title={isMuted ? 'Aktifkan Mikrofon' : 'Bisukan Mikrofon'}
                   >
                     <span
-                      className={`grid size-12 place-items-center rounded-full transition-colors ${
-                        isMuted
-                          ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]'
-                          : 'bg-[var(--canvas-sunken)] text-slate-700 hover:bg-[var(--border)]'
+                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] transition ${
+                        isMuted ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                       }`}
                     >
-                      {isMuted ? (
-                        <MicOff className="size-5" strokeWidth={1.9} aria-hidden="true" />
-                      ) : (
-                        <Mic className="size-5" strokeWidth={1.9} aria-hidden="true" />
-                      )}
+                      <Icon name={isMuted ? 'micOff' : 'mic'} className="size-5" />
                     </span>
-                    <span className="text-[0.625rem] font-medium text-slate-600">
+                    <span className="text-[11px] font-bold text-zinc-700">
                       {isMuted ? 'Unmute' : 'Mute'}
                     </span>
                   </button>
@@ -229,38 +266,40 @@ export function VoiceCallModal({
                   <button
                     type="button"
                     onClick={toggleSpeaker}
-                    className="flex cursor-pointer flex-col items-center gap-1.5"
+                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
                     title={
                       isSinkIdSupported
-                        ? 'Ganti keluaran audio'
-                        : 'Keluaran audio diatur oleh sistem perangkat'
+                        ? isSpeakerOn
+                          ? 'Matikan Loudspeaker'
+                          : 'Aktifkan Loudspeaker'
+                        : 'Output audio dikelola sistem perangkat'
                     }
                   >
                     <span
-                      className={`grid size-12 place-items-center rounded-full border transition-colors ${
-                        isSpeakerActive
-                          ? 'border-[var(--slate-navy)] bg-[var(--slate-navy)] text-white'
-                          : 'border-[var(--border)] bg-white text-slate-600 hover:bg-[var(--canvas)]'
+                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] transition ${
+                        isSpeakerOn
+                          ? 'bg-emerald-400 text-zinc-950 shadow-[3px_3px_0px_0px_#000]'
+                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                       }`}
                     >
-                      {isSpeakerActive ? (
-                        <Volume2 className="size-5" strokeWidth={1.9} aria-hidden="true" />
-                      ) : (
-                        <VolumeX className="size-5" strokeWidth={1.9} aria-hidden="true" />
-                      )}
+                      <Icon name={isSpeakerOn ? 'speaker' : 'speakerOff'} className="size-5" />
                     </span>
-                    <span className="text-[0.625rem] font-medium text-slate-600">
-                      {isSpeakerActive ? 'Speaker aktif' : 'Speaker'}
+                    <span className="text-[11px] font-bold text-zinc-700">
+                      {isSpeakerOn ? 'Speaker On' : 'Speaker Off'}
                     </span>
                   </button>
                 </>
               )}
 
-              <button type="button" onClick={onEndCall} className="flex cursor-pointer flex-col items-center gap-1.5">
-                <span className="grid size-12 place-items-center rounded-full bg-[var(--status-error-fg)] text-white shadow-[var(--shadow-sm)] transition-colors hover:bg-[#B91C1C]">
-                  <PhoneOff className="size-5" strokeWidth={1.9} aria-hidden="true" />
+              <button
+                type="button"
+                onClick={onEndCall}
+                className="flex flex-col items-center gap-1.5 cursor-pointer group"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-rose-600 text-white shadow-[2px_2px_0px_0px_#000] group-hover:bg-rose-700 transition">
+                  <Icon name="phoneOff" className="size-5" />
                 </span>
-                <span className="text-[0.625rem] font-semibold text-[var(--status-error-fg)]">Akhiri</span>
+                <span className="text-[11px] font-black text-rose-700">Akhiri</span>
               </button>
             </>
           )}

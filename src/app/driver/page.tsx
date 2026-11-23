@@ -15,6 +15,7 @@ import { Modal } from '@/components/ui/Modal';
 import { IosInstallHint } from '@/components/providers/InstallPrompt';
 import { OfferCard, DriverOffer } from '@/components/driver/OfferCard';
 import { FleetMap, VehicleMarkerData, RoutePoint } from '@/components/map';
+import { Icon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { fetchJson } from '@/lib/fetch-json';
 import { saveSnapshot, getSnapshot, enqueueOfflineAction, processOfflineQueue } from '@/lib/offline-sync';
@@ -107,6 +108,7 @@ interface DriverSession {
   } | null;
 }
 
+// Offline-first safe cache read/write (storage failures are non-fatal to the driver flow)
 function readSnapshot<T>(key: string): T | null {
   try {
     return getSnapshot<T>(key) ?? null;
@@ -118,14 +120,34 @@ function readSnapshot<T>(key: string): T | null {
 function writeSnapshot<T>(key: string, data: T): void {
   try {
     saveSnapshot<T>(key, data);
-  } catch {}
+  } catch {
+    // Cache writes are best-effort; never block the driver flow.
+  }
 }
 
+// Network failure (fetch TypeError) or the browser reporting itself offline.
 function isOfflineError(error: unknown): boolean {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
   return error instanceof TypeError;
 }
 
+function TripRoute({ pickup, destination }: { pickup: string; destination: string }) {
+  return (
+    <div className="relative space-y-5 py-1 pl-8">
+      <span aria-hidden="true" className="absolute bottom-6 left-[7px] top-4 border-l-2 border-dashed border-zinc-950" />
+      <div className="relative min-w-0">
+        <span aria-hidden="true" className="absolute -left-8 top-0.5 flex h-4 w-4 items-center justify-center rounded-sm border-2 border-black bg-white shadow-[1px_1px_0px_0px_#000]"><span className="h-1.5 w-1.5 bg-black" /></span>
+        <p className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Pickup</p>
+        <p className="mt-0.5 wrap-anywhere text-sm font-bold leading-snug text-zinc-800">{pickup}</p>
+      </div>
+      <div className="relative min-w-0">
+        <span aria-hidden="true" className="absolute -left-8 top-0.5 flex h-4 w-4 items-center justify-center rounded-sm border-2 border-black bg-emerald-400 shadow-[1px_1px_0px_0px_#000]"><span className="h-1.5 w-1.5 bg-black" /></span>
+        <p className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Destination</p>
+        <p className="mt-0.5 wrap-anywhere text-base font-black leading-snug tracking-tight text-zinc-950">{destination}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function DriverDashboardPage() {
   const { data: session, status } = useSession();
@@ -148,7 +170,8 @@ export default function DriverDashboardPage() {
   const [poolVehicles, setPoolVehicles] = useState<VehicleOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
 
-  // Instant render: seed from snapshots
+  // Instant render (stale-while-revalidate): seed from last-known snapshots on mount
+  // so an active trip / assignments never flash as empty; loadDashboardData revalidates.
   useEffect(() => {
     if (status !== 'authenticated') return;
     const cachedTrip = getSnapshot<ActiveTrip>('driver_active_trip');
@@ -164,7 +187,6 @@ export default function DriverDashboardPage() {
     const cachedLocations = getSnapshot<LocationOption[]>('driver_locations');
     if (cachedLocations && cachedLocations.length > 0) setLocations(cachedLocations);
   }, [status]);
-
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleOption | null>(null);
   const [startPhase, setStartPhase] = useState<'gps' | 'request' | null>(null);
@@ -174,7 +196,7 @@ export default function DriverDashboardPage() {
   const dashboardRequest = useRef(0);
   const vehicleSearchRequest = useRef(0);
   const isStartingTrip = startPhase !== null;
-  const startLabel = startPhase === 'gps' ? 'Mengunci GPS…' : 'Memulai trip…';
+  const startLabel = startPhase === 'gps' ? 'Getting GPS…' : 'Starting trip…';
 
   // Elapsed trip duration ticker
   const [elapsedDuration, setElapsedDuration] = useState('');
@@ -201,8 +223,11 @@ export default function DriverDashboardPage() {
     if (status !== 'authenticated') return;
     if (batch.length === 0) return;
     
+    // Check if in backoff period due to server error (e.g. 500)
     const now = Date.now();
-    if (now < uploadBackoffUntil.current) return;
+    if (now < uploadBackoffUntil.current) {
+      return;
+    }
 
     try {
       const result = await fetchJson<{ data?: { accepted: number; rejected: { reason: string }[] }; buffered?: boolean }>('/api/tracking/locations', {
@@ -217,6 +242,7 @@ export default function DriverDashboardPage() {
         setTelemetryWarning(result?.data?.rejected && result.data.rejected.length > 0 ? result.data.rejected[0].reason : null);
       }
     } catch (error) {
+      // Offline: buffer points into the persisted queue (module caps at 200 points)
       if (isOfflineError(error)) {
         enqueueOfflineAction('DRIVER_LOCATION_PING', {
           endpoint: '/api/tracking/locations',
@@ -226,6 +252,7 @@ export default function DriverDashboardPage() {
         });
         return;
       }
+      // Apply 20s backoff to avoid continuous request loops if server is encountering issues
       uploadBackoffUntil.current = Date.now() + 20000;
       setTelemetryWarning(error instanceof Error ? error.message : 'Location upload paused. Retrying in 20s.');
       throw error;
@@ -254,6 +281,7 @@ export default function DriverDashboardPage() {
     onFlush: handleLocationFlush,
   });
 
+  // Signal lost or stale calculation
   const isSignalLostOrStale =
     isStale ||
     signalStatus === 'red' ||
@@ -299,7 +327,12 @@ export default function DriverDashboardPage() {
     }
     const destLat = booking.destinationLat ?? linked?.destinationLat;
     const destLng = booking.destinationLng ?? linked?.destinationLng;
-    if (destLat != null && destLng != null && Number.isFinite(destLat) && Number.isFinite(destLng)) {
+    if (
+      destLat != null &&
+      destLng != null &&
+      Number.isFinite(destLat) &&
+      Number.isFinite(destLng)
+    ) {
       pts.push({
         lat: destLat,
         lng: destLng,
@@ -310,7 +343,7 @@ export default function DriverDashboardPage() {
     return pts;
   }, [activeTrip, assignedBookings]);
 
-  // Fetch driver offers
+  // Fetch driver offers (polling fallback)
   const fetchOffers = useCallback(async () => {
     const version = dashboardRequest.current;
     try {
@@ -321,6 +354,8 @@ export default function DriverDashboardPage() {
         writeSnapshot('driver_offers', fresh);
       }
     } catch {
+      // Offers expire locally; the next polling interval retries delivery.
+      // Offline fallback: restore cached offers so an assigned dispatch never disappears.
       const cached = readSnapshot<DriverOffer[]>('driver_offers');
       if (cached && version === dashboardRequest.current) {
         setOffers(cached.filter((o) => new Date(o.expiresAt).getTime() > Date.now()));
@@ -355,9 +390,12 @@ export default function DriverDashboardPage() {
       if (locId) params.set('locationId', locId);
       const poolRes = await fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?${params.toString()}`);
       setPoolVehicles(poolRes.data || []);
-    } catch {}
+    } catch {
+      // non-fatal
+    }
   }, []);
 
+  // Load config, active session, active trip, assigned bookings
   const loadDashboardData = useCallback(async () => {
     const version = ++dashboardRequest.current;
     try {
@@ -365,7 +403,7 @@ export default function DriverDashboardPage() {
       try {
         config = await fetchJson<DashboardConfig>('/api/tracking/config');
       } catch (cfgErr) {
-        console.error('[Driver Data Fetch Error] config:', cfgErr);
+        console.error('[Driver Data Fetch Error] client /api/tracking/config:', cfgErr);
       }
 
       if (version !== dashboardRequest.current) return;
@@ -379,10 +417,12 @@ export default function DriverDashboardPage() {
         writeSnapshot('driver_active_trip', trip);
         writeSnapshot('driver_session', sess);
       } else {
+        // Offline fallback: restore in-flight trip/session so an active job survives reload
         setActiveTrip(readSnapshot<ActiveTrip | null>('driver_active_trip') ?? null);
         setActiveSession(readSnapshot<DriverSession | null>('driver_session') ?? null);
       }
 
+      // Filter on the server before pagination; history must not hide a pending pickup.
       const bookings: AssignedBooking[] = [];
       let page = 1;
       let totalPages = 1;
@@ -401,7 +441,7 @@ export default function DriverDashboardPage() {
         setAssignedBookings(bookings);
         writeSnapshot('driver_bookings', bookings);
       } catch (bookErr) {
-        console.error('[Driver Data Fetch Error] bookings:', bookErr);
+        console.error('[Driver Data Fetch Error] client /api/bookings:', bookErr);
         setAssignedBookings(readSnapshot<AssignedBooking[]>('driver_bookings') ?? []);
       }
 
@@ -418,17 +458,32 @@ export default function DriverDashboardPage() {
             const pool = poolResult.value?.data || [];
             setPoolVehicles(pool);
             writeSnapshot('driver_vehicle', pool);
+          } else {
+            console.error('[Driver Data Fetch Error] client pool vehicles:', poolResult.reason);
+            const cached = readSnapshot<VehicleOption[]>('driver_vehicle');
+            if (cached) setPoolVehicles(cached);
           }
           if (locsResult.status === 'fulfilled' && locsResult.value?.data) {
             setLocations(locsResult.value.data);
             writeSnapshot('driver_locations', locsResult.value.data);
+          } else if (locsResult.status === 'rejected') {
+            console.error('[Driver Data Fetch Error] client locations:', locsResult.reason);
+            const cached = readSnapshot<LocationOption[]>('driver_locations');
+            if (cached) setLocations(cached);
           }
         }
-      } catch {}
+      } catch (poolErr) {
+        console.error('[Driver Data Fetch Error] client pool vehicles/locations:', poolErr);
+      }
 
       try {
         await fetchOffers();
-      } catch {}
+      } catch (offerErr) {
+        console.error('[Driver Data Fetch Error] client fetchOffers:', offerErr);
+      }
+    } catch (error) {
+      console.error('[Driver Data Fetch Error] loadDashboardData unhandled:', error);
+      // Do not flash red "Internal server error" alert banner on background dashboard refresh
     } finally {
       if (version === dashboardRequest.current) setIsLoading(false);
     }
@@ -442,11 +497,14 @@ export default function DriverDashboardPage() {
       refreshing = true;
       try { await loadDashboardData(); } finally { refreshing = false; }
     };
-    const initialTimer = setTimeout(() => { void refresh(); }, 150);
+    // Stagger initial load so dashboard and offers don't hit pool at exact same millisecond
+    const initialTimer = setTimeout(() => {
+      void refresh();
+    }, 150);
     const interval = setInterval(() => { void refresh(); }, 15000);
     const offerInterval = setInterval(() => {
       if (!actionInFlight.current && document.visibilityState !== 'hidden') void fetchOffers();
-    }, 12000);
+    }, 12000); // Throttled to 12s to prevent serverless connection pool exhaustion
     document.addEventListener('visibilitychange', refresh);
     return () => {
       clearTimeout(initialTimer);
@@ -458,23 +516,29 @@ export default function DriverDashboardPage() {
     };
   }, [loadDashboardData, fetchOffers, status]);
 
-  // Offline sync reconnection
+  // Reconnect & sync: drain the offline queue when back online or after a sync completes.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
     const handleOnline = () => {
-      void processOfflineQueue().then(() => loadDashboardData()).catch(() => loadDashboardData());
+      void processOfflineQueue()
+        .then(() => loadDashboardData())
+        .catch(() => loadDashboardData());
     };
-    const handleSyncComplete = () => { void loadDashboardData(); };
+    const handleSyncComplete = () => {
+      void loadDashboardData();
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline-sync:complete', handleSyncComplete);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline-sync:complete', handleSyncComplete);
     };
   }, [loadDashboardData]);
 
-  // GPS activation when online or on active trip
+  // When active trip exists OR online session is active, activate GPS tracking
   useEffect(() => {
     if (isEndingTrip || isTogglingOnline) return;
     if ((activeTrip || isOnline) && !isTracking && !permissionDenied) {
@@ -484,9 +548,10 @@ export default function DriverDashboardPage() {
     }
   }, [activeTrip, isOnline, isTracking, permissionDenied, startTracking, stopTracking, isEndingTrip, isTogglingOnline]);
 
-  // Duration ticker
+  // Session duration ticker
   useEffect(() => {
     if (!activeTrip) return;
+
     const startMs = new Date(activeTrip.startedAt).getTime();
     const updateTicker = () => {
       const diffMs = Math.max(0, Date.now() - startMs);
@@ -496,14 +561,26 @@ export default function DriverDashboardPage() {
       const pad = (n: number) => String(n).padStart(2, '0');
       setElapsedDuration(`${pad(hrs)}:${pad(mins)}:${pad(secs)}`);
     };
+
     const timer = setInterval(updateTicker, 1000);
     return () => clearInterval(timer);
   }, [activeTrip]);
 
-  // Request location on mount
+  // Proactively check and request location on mount (Location is mandatory for Driver)
   useEffect(() => {
     if (typeof window === 'undefined' || !navigator.geolocation) return;
-    void getCurrentPosition().catch(() => {});
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+        if (status.state === 'prompt' || status.state === 'granted') {
+          void getCurrentPosition().catch(() => {});
+        }
+      }).catch(() => {
+        void getCurrentPosition().catch(() => {});
+      });
+    } else {
+      void getCurrentPosition().catch(() => {});
+    }
   }, [getCurrentPosition]);
 
   // Handle Online / Offline toggle
@@ -535,6 +612,7 @@ export default function DriverDashboardPage() {
           try {
             coords = await getCurrentPosition({ allowCached: true });
           } catch {
+            // GPS can take time or be rejected; fallback to currentPosition without blocking going online
             coords = currentPosition ? { lat: currentPosition.lat, lng: currentPosition.lng } : null;
           }
         }
@@ -559,7 +637,8 @@ export default function DriverDashboardPage() {
         }
       }
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Gagal memperbarui status online.');
+      console.error('[Driver Session Error] handleToggleOnline:', error);
+      setActionError(error instanceof Error ? error.message : 'Unable to change online status.');
       await loadDashboardData();
     } finally {
       actionInFlight.current = false;
@@ -567,8 +646,12 @@ export default function DriverDashboardPage() {
     }
   };
 
+  // Accept offer
   const handleAcceptOffer = async (offerId: string) => {
-    if (actionInFlight.current) return;
+    if (actionInFlight.current) {
+      setActionError('Another action is in progress. Please wait.');
+      return;
+    }
     actionInFlight.current = true;
     dashboardRequest.current += 1;
     setActionError(null);
@@ -585,7 +668,7 @@ export default function DriverDashboardPage() {
         setOffers((prev) => prev.filter((o) => o.id !== offerId));
         setActionError('Penawaran diterima offline — akan disinkronkan.');
       } else {
-        setActionError(error instanceof Error ? error.message : 'Gagal menerima tawaran.');
+        setActionError(error instanceof Error ? error.message : 'Unable to accept offer.');
       }
     } finally {
       await loadDashboardData();
@@ -593,8 +676,12 @@ export default function DriverDashboardPage() {
     }
   };
 
+  // Reject offer
   const handleRejectOffer = async (offerId: string) => {
-    if (actionInFlight.current) return;
+    if (actionInFlight.current) {
+      setActionError('Another action is in progress. Please wait.');
+      return;
+    }
     actionInFlight.current = true;
     dashboardRequest.current += 1;
     setActionError(null);
@@ -602,17 +689,19 @@ export default function DriverDashboardPage() {
       await fetchJson(`/api/driver/offers/${offerId}/reject`, { method: 'POST' });
       setOffers((prev) => prev.filter((o) => o.id !== offerId));
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Gagal menolak tawaran.');
+      setActionError(error instanceof Error ? error.message : 'Unable to reject offer.');
     } finally {
       await loadDashboardData();
       actionInFlight.current = false;
     }
   };
 
+  // Dismiss expired offer
   const handleExpireOffer = (offerId: string) => {
     setOffers((prev) => prev.filter((o) => o.id !== offerId));
   };
 
+  // Vehicle plate search autocomplete
   const searchVehicle = async (term: string, locId = selectedLocationId) => {
     const version = ++vehicleSearchRequest.current;
     setManualPlate(term);
@@ -628,16 +717,17 @@ export default function DriverDashboardPage() {
         const available = json.data.filter((vehicle) => ['AVAILABLE', 'RESERVED'].includes(vehicle.status));
         setMatchingVehicles(available);
         if (available.length === 0) {
-          setStartError(locId ? 'Tidak ada armada tersedia di hub yang dipilih.' : 'Tidak ada armada yang cocok.');
+          setStartError(locId ? 'No available vehicle matches this plate at the selected hub.' : 'No available vehicle matches this plate.');
         }
       }
     } catch (error) {
       if (version === vehicleSearchRequest.current) {
-        setStartError(error instanceof Error ? error.message : 'Gagal mencari armada.');
+        setStartError(error instanceof Error ? error.message : 'Unable to search vehicles.');
       }
     }
   };
 
+  // Both entry points share GPS consent, pending feedback and duplicate-click protection.
   const startTripWith = async (target: { vehicleId?: string; bookingId?: string }) => {
     if (actionInFlight.current || activeTrip) return;
     actionInFlight.current = true;
@@ -648,6 +738,7 @@ export default function DriverDashboardPage() {
     let submitted = false;
     let coords: { lat: number; lng: number } | null = null;
     try {
+      // Fast path: if currentPosition is already known, use it immediately without waiting for a new GPS lock
       if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {
         coords = { lat: currentPosition.lat, lng: currentPosition.lng };
       } else {
@@ -707,9 +798,10 @@ export default function DriverDashboardPage() {
         });
         setActionError('Trip dimulai offline — akan disinkronkan saat online.');
       } else {
-        const message = error instanceof Error ? error.message : 'Gagal memulai trip. Silakan coba lagi.';
+        const message = error instanceof Error ? error.message : 'Unable to start trip. Please try again.';
         setStartError(message);
         setActionError(message);
+        // A lost HTTP response does not prove a mutation failed. Reconcile before retry.
         if (submitted) await loadDashboardData();
       }
     } finally {
@@ -718,8 +810,7 @@ export default function DriverDashboardPage() {
     }
   };
 
-  const handleStartBookingTrip = (booking: AssignedBooking) =>
-    startTripWith({ bookingId: booking.id, vehicleId: booking.vehicle?.id });
+  const handleStartBookingTrip = (booking: AssignedBooking) => startTripWith({ bookingId: booking.id, vehicleId: booking.vehicle?.id });
 
   const advanceTrip = async (url: string, passengerBoarded = false) => {
     if (actionInFlight.current) return;
@@ -732,7 +823,7 @@ export default function DriverDashboardPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS' }),
       } : { method: 'POST' });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Gagal memperbarui status perjalanan.');
+      setActionError(error instanceof Error ? error.message : 'Unable to advance trip.');
     } finally {
       await loadDashboardData();
       actionInFlight.current = false;
@@ -742,8 +833,10 @@ export default function DriverDashboardPage() {
 
   const handleArriveAtPickup = () => activeTrip && advanceTrip(`/api/trips/${activeTrip.id}/arrived`);
   const handleStartPassengerTrip = (bookingId: string) => advanceTrip(`/api/bookings/${bookingId}/status`, true);
+
   const handleStartVehicleTrip = () => selectedVehicle && startTripWith({ vehicleId: selectedVehicle.id });
 
+  // End trip action
   const handleEndTrip = async () => {
     if (!activeTrip || actionInFlight.current) return;
     actionInFlight.current = true;
@@ -751,6 +844,7 @@ export default function DriverDashboardPage() {
     setIsEndingTrip(true);
     setActionError(null);
 
+    // Drain pending telemetry while the trip is ending
     let telemetryUploaded = true;
     try { await flushBuffer(); } catch { telemetryUploaded = false; }
     const endPayload: { endLat?: number; endLng?: number } = {};
@@ -767,6 +861,7 @@ export default function DriverDashboardPage() {
         body: JSON.stringify(endPayload),
       });
       const trip = json.data;
+      // Optimistic UI: Immediately clear active trip, close confirmation modal, and stop loading
       setActiveTrip(null);
       writeSnapshot('driver_active_trip', null);
       setShowEndConfirm(false);
@@ -780,9 +875,11 @@ export default function DriverDashboardPage() {
         pendingSync: false,
       });
       startTracking();
+      // Non-blocking background refresh
       void loadDashboardData();
     } catch (error) {
       if (isOfflineError(error)) {
+        // Optimistic offline end: queue the mutation, clear the trip, and don't trap the driver
         enqueueOfflineAction('DRIVER_END_TRIP', {
           endpoint: `/api/trips/${activeTrip.id}/${aborted ? 'abort' : 'end'}`,
           method: aborted ? 'POST' : 'PATCH',
@@ -803,7 +900,7 @@ export default function DriverDashboardPage() {
           pendingSync: true,
         });
       } else {
-        setActionError(error instanceof Error ? error.message : 'Gagal mengakhiri trip.');
+        setActionError(error instanceof Error ? error.message : 'Unable to end trip.');
         void loadDashboardData();
       }
     } finally {
@@ -812,180 +909,193 @@ export default function DriverDashboardPage() {
     }
   };
 
+  // Find linked booking for the active trip if available
   const activeBooking = assignedBookings.find((b) => b.id === activeTrip?.booking?.id);
   const currentBookingStatus = activeTrip?.booking?.status || activeBooking?.status;
   const stoppingPickup = Boolean(activeTrip?.booking && currentBookingStatus !== 'IN_PROGRESS');
 
   return (
-    <div className="w-full min-w-0 space-y-5">
+    <div className="min-w-0 space-y-6 text-zinc-900">
       <GreetingClock userName={session?.user?.name} roleLabel="Driver" />
 
-      {/* Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">
-            <span className="size-1.5 rounded-full bg-[var(--kcic-red)]" aria-hidden="true" />
-            KCIC Driver Console
-          </span>
-          <h1 className="page-heading mt-2">Jadwal &amp; tugas mengemudi</h1>
-          <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
-            Ketersediaan tugas, navigasi rute penjemputan, dan telemetri langsung.
-          </p>
+      <header className="page-intro">
+        <div>
+          <p className="eyebrow">KCIC Fleet / Driver workspace</p>
+          <h1 className="page-heading mt-2">Your driving day.</h1>
+          <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-zinc-600">Your availability, assigned journeys, and live trip details, in one place.</p>
         </div>
-
-        <div className="flex flex-col gap-1.5 sm:items-end">
+        <div className="flex flex-col items-start gap-2 sm:items-end">
           <button
             type="button"
             disabled={isTogglingOnline || isStartingTrip || isLoading || Boolean(activeTrip)}
             onClick={handleToggleOnline}
-            className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-xs font-semibold shadow-xs transition-colors disabled:opacity-50 ${
+            className={`${
               isOnline
-                ? 'cursor-pointer border border-[var(--status-active-border)] bg-[var(--status-active-bg)] text-[var(--status-active-fg)] hover:bg-[var(--status-active-border)]/40'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-black shadow-[3px_3px_0px_0px_#000]'
                 : 'button-primary'
-            }`}
+            } min-h-12 w-full disabled:cursor-not-allowed sm:w-auto font-black flex items-center justify-center gap-2 px-5 rounded-xl transition cursor-pointer`}
           >
-            {isTogglingOnline ? (
-              <Spinner size="sm" />
-            ) : isOnline ? (
-              <span className="relative flex size-2">
-                <span className="live-ping absolute inset-0 rounded-full bg-current" aria-hidden="true" />
-                <span className="relative size-2 rounded-full bg-current" aria-hidden="true" />
-              </span>
-            ) : (
-              <SignalGlyph />
-            )}
-            <span>{isOnline ? 'Online — klik untuk offline' : 'Aktifkan mode online'}</span>
+            {isTogglingOnline ? <Spinner size="sm" /> : <Icon name={isOnline ? 'check' : 'signal'} />}
+            {isOnline ? 'Online (Go offline)' : 'Go online'}
           </button>
-          <span className="text-[0.6875rem] text-slate-400">
-            {activeTrip
-              ? 'Selesaikan trip sebelum mengganti status.'
-              : isOnline
-                ? 'Siap menerima tawaran dispatch.'
-                : 'Nyalakan untuk menerima order.'}
-          </span>
+          <p className="text-xs font-semibold leading-relaxed text-zinc-600">{activeTrip ? 'Finish your trip before changing availability.' : isOnline ? 'Location sharing is on.' : 'Share your location to receive offers.'}</p>
         </div>
       </header>
 
-      {/* Live active trip banner */}
+      {/* Live tracking remains in the page flow, clear of the navigation dock. */}
       {activeTrip && (
-        <div className="card overflow-hidden">
-          <div className="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center md:justify-between">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="relative flex size-2.5 shrink-0">
+        <div
+          className={`driver-live-banner ${
+            isSignalLostOrStale
+              ? 'bg-amber-100 text-amber-950 border-amber-950!'
+              : 'bg-emerald-100 text-emerald-950 border-emerald-950!'
+          }`}
+        >
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3">
+              <span className="relative flex h-4 w-4 shrink-0 mt-0.5 sm:mt-0">
                 <span
-                  className={`absolute inset-0 rounded-full ${
-                    isSignalLostOrStale
-                      ? 'bg-[var(--status-warning-fg)]'
-                      : 'live-ping bg-[var(--status-active-fg)]'
+                  className={`relative inline-flex rounded-full h-4 w-4 border-2 border-black ${
+                    isSignalLostOrStale ? 'bg-amber-400' : 'bg-emerald-500'
                   }`}
-                  aria-hidden="true"
-                />
-                <span
-                  className={`relative size-2.5 rounded-full ${
-                    isSignalLostOrStale ? 'bg-[var(--status-warning-fg)]' : 'bg-[var(--status-active-fg)]'
-                  }`}
-                  aria-hidden="true"
                 />
               </span>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[0.8125rem] font-semibold text-slate-900">
-                    {isSignalLostOrStale ? 'Sinyal GPS terputus' : 'Perjalanan berlangsung'}
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-base font-black text-zinc-950">
+                    {isSignalLostOrStale ? 'GPS signal interrupted' : 'Tracking active'}
                   </span>
-                  <span className={`pill ${isSignalLostOrStale ? 'pill-warning' : 'pill-active'}`}>
-                    <span className="pill-dot" aria-hidden="true" />
-                    <span>{isSignalLostOrStale ? 'Sinyal terjeda' : 'GPS aktif'}</span>
+                  <span
+                    className={`rounded-md border-2 border-black px-2.5 py-0.5 text-xs font-black shadow-[2px_2px_0px_0px_#000] ${
+                      isSignalLostOrStale
+                        ? 'bg-amber-300 text-zinc-950'
+                        : 'bg-emerald-300 text-zinc-950'
+                    }`}
+                  >
+                    {isSignalLostOrStale ? 'Signal lost / paused' : 'Broadcasting live'}
                   </span>
-                  {currentBookingStatus && <StatusBadge status={currentBookingStatus} />}
+                  {currentBookingStatus && (
+                    <span className="rounded-md border-2 border-black bg-white px-2.5 py-0.5 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000]">
+                      Status: {currentBookingStatus.replace(/_/g, ' ').toLowerCase()}
+                    </span>
+                  )}
                 </div>
-                <p className="mt-0.5 truncate text-[0.6875rem] text-slate-500">
-                  Armada{' '}
-                  <span className="mono-plate font-semibold text-slate-900">
-                    {activeTrip.vehicle.plateNumber}
-                  </span>{' '}
-                  · {activeTrip.vehicle.brand} {activeTrip.vehicle.model}
-                </p>
+                {isSignalLostOrStale ? (
+                  <p className="mt-1 max-w-xl text-xs font-medium leading-relaxed text-amber-900">
+                    Location updates pause when this tab is backgrounded or screen locks — reopen to resume
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-emerald-900">
+                    Transmitting telemetry every {tripIntervalSec} seconds
+                  </p>
+                )}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-1.5 text-center">
-                <span className="metric-label block">Durasi</span>
-                <span className="mono-plate mt-0.5 block text-xs font-semibold tabular-nums text-slate-900">
-                  {elapsedDuration || '00:00:00'}
+            <div className="driver-trip-actions flex-wrap border-t-2 border-black/10 pt-4 text-sm md:border-0 md:pt-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-md border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] capitalize ${
+                    signalStatus === 'green'
+                      ? 'bg-emerald-300 text-zinc-950'
+                      : signalStatus === 'amber'
+                      ? 'bg-amber-300 text-zinc-950'
+                      : 'bg-rose-300 text-zinc-950'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full border border-black ${
+                      signalStatus === 'green'
+                        ? 'bg-emerald-500'
+                        : signalStatus === 'amber'
+                        ? 'bg-amber-500'
+                        : 'bg-rose-500'
+                    }`}
+                  />
+                  {confidenceScore > 0 ? `${confidenceScore}% Akurat` : signalStatus}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-black bg-white px-2 py-0.5 text-[11px] font-bold text-zinc-900 shadow-[2px_2px_0px_0px_#000]">
+                  <Icon name={locationSource === 'wifi_cell_triangulation' ? 'wifi' : 'satellite'} className="size-3 text-zinc-700" />
+                  <span>{locationSource === 'wifi_cell_triangulation' ? 'Wi-Fi/Cell' : 'GPS Presisi'}</span>
+                </span>
+
+                {jumpyDiscardCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-black bg-teal-200 px-2 py-0.5 text-[11px] font-bold text-teal-950 shadow-[2px_2px_0px_0px_#000]" title="Titik jumpy akibat sinyal dipantulkan telah dibersihkan otomatis">
+                    <Icon name="shield" className="size-3 text-teal-900" />
+                    <span>{jumpyDiscardCount} jumpy difilter</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="rounded-md border-2 border-black bg-white px-3 py-1 shadow-[2px_2px_0px_0px_#000]">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Duration</span>
+                <span className="font-mono text-base font-black tabular-nums text-zinc-950">{elapsedDuration || '00:00:00'}</span>
+              </div>
+
+              <div className="rounded-md border-2 border-black bg-white px-3 py-1 shadow-[2px_2px_0px_0px_#000]">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Last update</span>
+                <span className="text-xs font-bold text-zinc-900">
+                  {lastUpdated ? <RelativeTime date={lastUpdated} /> : 'Waiting...'}
                 </span>
               </div>
 
+              {/* Arrival Action when DRIVER_EN_ROUTE */}
               {currentBookingStatus === 'DRIVER_EN_ROUTE' && (
                 <button
                   type="button"
                   onClick={handleArriveAtPickup}
                   disabled={isAdvancingTrip || isEndingTrip}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--status-active-border)] bg-[var(--status-active-bg)] px-4 py-2 text-xs font-semibold text-[var(--status-active-fg)] transition-colors hover:bg-[var(--status-active-border)]/40 disabled:opacity-50"
+                  className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-5 py-3 text-sm font-black text-zinc-950 shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000]"
                 >
-                  <CheckGlyph />
-                  <span>Tiba di titik jemput</span>
-                </button>
-              )}
-
-              {currentBookingStatus === 'ARRIVED' && (
-                <button
-                  type="button"
-                  onClick={() => handleStartPassengerTrip(activeTrip.booking!.id)}
-                  disabled={isAdvancingTrip || isEndingTrip}
-                  className="button-primary px-4 py-2"
-                >
-                  <ArrowRightGlyph />
-                  <span>Penumpang naik</span>
+                  <Icon name="check" /><span>Mark arrived</span>
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={() => setShowEndConfirm(true)}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-3.5 py-2 text-xs font-semibold text-[var(--status-error-fg)] transition-colors hover:bg-[var(--status-error-border)]/40"
+                className="hidden min-h-12 cursor-pointer items-center justify-center rounded-xl border-2 border-black bg-rose-500 px-5 py-3 text-sm font-black text-white shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] sm:inline-flex"
               >
-                <span>{stoppingPickup ? 'Batalkan jemput' : 'Akhiri perjalanan'}</span>
+                {stoppingPickup ? 'Stop pickup trip' : 'End trip'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Standby banner */}
+      {/* Persistent Online Banner when NOT on active trip */}
       {!activeTrip && isOnline && (
-        <div className="flex flex-col gap-3 rounded-[var(--radius-xl)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-start gap-2.5">
-            <span className="relative mt-1 flex size-2 shrink-0">
-              <span className="live-ping absolute inset-0 rounded-full bg-[var(--status-active-fg)]" aria-hidden="true" />
-              <span className="relative size-2 rounded-full bg-[var(--status-active-fg)]" aria-hidden="true" />
+        <div className="flex flex-col gap-4 rounded-2xl border-2.5 border-black bg-emerald-100 p-5 shadow-[4px_4px_0px_0px_#000] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3.5 w-3.5 shrink-0">
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 border border-black bg-emerald-500" />
             </span>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-[var(--status-active-fg)]">
-                Mode siaga aktif — siap menerima order dispatch
-              </p>
+            <div>
+              <span className="block text-sm font-black text-emerald-950">
+                Online and sharing location
+              </span>
               {activeSession?.vehicle && (
-                <p className="mt-0.5 text-[0.6875rem] text-[var(--status-active-fg)]/80">
-                  Unit operasional{' '}
-                  <span className="mono-plate font-semibold text-slate-900">
-                    {activeSession.vehicle.plateNumber}
-                  </span>{' '}
-                  · {activeSession.vehicle.brand} {activeSession.vehicle.model}
+                <p className="mt-0.5 text-xs font-bold text-emerald-900">
+                  Vehicle: <span className="font-mono font-black text-zinc-950">{activeSession.vehicle.plateNumber}</span> · {activeSession.vehicle.brand} {activeSession.vehicle.model}
                 </p>
               )}
+              <p className="mt-1 text-xs font-medium leading-relaxed text-emerald-900">
+                Eligible for auto-dispatch offers. Keep this browser tab open.
+              </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3 sm:self-center">
             <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
             <button
               type="button"
               disabled={isTogglingOnline || isStartingTrip}
               onClick={handleToggleOnline}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-[0.6875rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)] disabled:opacity-50"
+              className="button-secondary"
             >
-              {isTogglingOnline ? <Spinner size="xs" /> : null}
-              <span>Off duty</span>
+              {isTogglingOnline ? <Spinner size="sm" /> : 'Go offline'}
             </button>
           </div>
         </div>
@@ -993,74 +1103,68 @@ export default function DriverDashboardPage() {
 
       {!activeTrip && <IosInstallHint />}
 
-      {actionError && <ErrorBanner message={actionError} onDismiss={() => setActionError(null)} />}
-      {geoError && <ErrorBanner message={geoError} onDismiss={() => clearGeoError()} />}
+
+      {actionError && (
+        <ErrorBanner
+          message={actionError}
+          className="rounded-2xl! p-4! [&_button]:min-h-11 [&_button]:min-w-11"
+          onDismiss={() => setActionError(null)}
+        />
+      )}
+      {geoError && (
+        <ErrorBanner
+          message={geoError}
+          className="rounded-2xl! p-4!"
+          onDismiss={() => clearGeoError()}
+        />
+      )}
       {telemetryWarning && (
         <ErrorBanner
-          message={`Peringatan GPS: ${telemetryWarning}`}
+          message={`GPS upload warning: ${telemetryWarning}`}
+          className="rounded-2xl! p-4!"
           onDismiss={() => setTelemetryWarning(null)}
         />
       )}
+      {isStartingTrip && <p role="status" aria-live="polite" className="flex items-center gap-3 text-sm font-bold text-emerald-950"><Spinner size="sm" />{startLabel} Please allow location access when prompted.</p>}
 
-      {isStartingTrip && (
-        <div
-          role="status"
-          className="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3.5 py-2.5 text-xs text-slate-600"
-        >
-          <Spinner size="sm" className="mt-px text-[var(--kcic-red)]" />
-          <span className="min-w-0 leading-relaxed">
-            <span className="font-semibold text-slate-900">{startLabel}</span> Mohon setujui akses
-            lokasi jika muncul permohonan izin di browser.
-          </span>
-        </div>
-      )}
-
-      {/* Permission denied */}
+      {/* Permission Denied Banner with instructions */}
       {permissionDenied && (
-        <div className="rounded-[var(--radius-xl)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--status-warning-fg)]">
-              <MapPinGlyph />
-              <span>Akses GPS wajib diaktifkan</span>
+        <div className="space-y-3 rounded-2xl border-2.5 border-black bg-amber-100 p-5 text-sm leading-relaxed text-zinc-950 shadow-[4px_4px_0px_0px_#000]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 font-black text-zinc-950">
+              <Icon name="pin" className="shrink-0 text-amber-700" /><span>Izin Lokasi (GPS) Wajib Diaktifkan</span>
             </div>
             <button
               type="button"
               onClick={() => void getCurrentPosition().catch(() => {})}
-              className="cursor-pointer rounded-full border border-[var(--status-warning-border)] bg-white px-3 py-1 text-[0.6875rem] font-semibold text-[var(--status-warning-fg)]"
+              className="px-3.5 py-1.5 text-xs font-black bg-amber-400 hover:bg-amber-500 text-zinc-950 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000]"
             >
-              Aktifkan lokasi
+              Aktifkan Lokasi Sekarang
             </button>
           </div>
-          <p className="mt-2 text-[0.6875rem] leading-relaxed text-[var(--status-warning-fg)]/85">
-            Browser Anda belum memberi izin GPS. Pengemudi wajib menyalakan lokasi agar dapat menerima
-            tawaran perjalanan dan menyiarkan status armada.
+          <p className="text-xs font-semibold text-zinc-800">
+            Browser Anda menolak atau belum memberikan akses GPS. Pengemudi wajib menyalakan lokasi agar dapat menerima penawaran trip dan menyiarkan armada.
           </p>
+          <ul className="list-disc list-inside text-zinc-800 space-y-1 text-xs font-medium">
+            <li>Klik ikon gembok / izin situs di address bar browser.</li>
+            <li>Ubah opsi Lokasi (Location) menjadi &quot;Izinkan&quot; (Allow).</li>
+            <li>Klik tombol &quot;Aktifkan Lokasi Sekarang&quot; di atas atau muat ulang halaman.</li>
+          </ul>
         </div>
       )}
 
-      {/* Incoming offers */}
+      {/* DISPATCH OFFERS PANEL (Realtime + Polling) */}
       {offers.length > 0 && (
-        <section className="card overflow-hidden" aria-labelledby="driver-offers-heading">
-          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--border-subtle)] px-4 py-3.5 sm:px-5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="icon-tile-accent">
-                <BellGlyph />
-              </span>
-              <div className="min-w-0">
-                <span className="eyebrow eyebrow-accent">Perlu respons</span>
-                <h2 id="driver-offers-heading" className="section-title mt-0.5">
-                  Tawaran masuk{' '}
-                  <span className="font-normal text-slate-400 tabular-nums">({offers.length})</span>
-                </h2>
-              </div>
-            </div>
-            <span className="pill pill-warning">
-              <TimerGlyph />
-              <span>Batas respons 60 detik</span>
-            </span>
+        <div className="surface space-y-5 p-5 sm:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="section-title flex items-center gap-2 text-zinc-900">
+              <Icon name="bell" className="text-emerald-800" />
+              Incoming offers ({offers.length})
+            </h2>
+            <span className="text-xs font-bold text-zinc-600">Respond before the 1-minute timer expires</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {offers.map((offer) => (
               <OfferCard
                 key={offer.id}
@@ -1071,347 +1175,478 @@ export default function DriverDashboardPage() {
               />
             ))}
           </div>
-        </section>
+        </div>
       )}
 
-      {/* Active trip: map + telemetry + passenger panel */}
+      {/* MAIN VIEW: ACTIVE TRIP TELEMETRY */}
       {activeTrip ? (
-        <div className="tracking-layout">
-          <div className="min-w-0 space-y-3">
-            <div className="card overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4 py-2.5">
-                <span className="eyebrow">
-                  <NavigationGlyph />
-                  Navigasi rute langsung
-                </span>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                    currentBookingStatus === 'DRIVER_EN_ROUTE'
-                      ? activeTrip.booking?.pickupLocation || ''
-                      : activeTrip.booking?.destination || ''
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)]"
-                >
-                  <span>Buka Google Maps</span>
-                  <ChevronRightGlyph />
-                </a>
+        <section className="surface space-y-6 p-5 sm:p-8" aria-label="Active trip">
+          <div className="flex flex-col justify-between gap-4 border-b-2 border-black/10 pb-6 sm:flex-row sm:items-start">
+            <div className="min-w-0">
+              <p className="eyebrow">Current journey</p>
+              <h2 className="mt-2 wrap-anywhere text-2xl font-black tracking-tight sm:text-3xl text-zinc-950">{activeTrip.vehicle.brand} {activeTrip.vehicle.model}</h2>
+              <p className="mt-2 flex items-center gap-2 font-mono text-sm font-bold text-zinc-700"><Icon name="car" className="shrink-0 text-emerald-800" />{activeTrip.vehicle.plateNumber}</p>
+            </div>
+            <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
+              <StatusBadge status={activeTrip.status} />
+              {activeTrip.booking && (
+                <div className="rounded-lg border-2 border-black bg-zinc-50 p-2.5 shadow-[2px_2px_0px_0px_#000] text-left sm:text-right">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Booking reference</span>
+                  <p className="mt-0.5 wrap-anywhere font-mono text-xs font-black text-zinc-900">{activeTrip.booking.bookingNumber}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {activeTrip.booking ? (
+            <div className="space-y-4">
+              {/* PASSENGER PROFILE & CONTACT CARD (Gojek-style for Driver) */}
+              <div className="rounded-xl border-2 border-black bg-emerald-50 p-4 space-y-3 shadow-[3px_3px_0px_0px_#000]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-emerald-400 text-zinc-950 font-black text-base shadow-[2px_2px_0px_0px_#000]">
+                      {(activeTrip.booking.user?.name || 'Penumpang').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-black text-zinc-950 text-base">
+                          {activeTrip.booking.user?.name || 'Penumpang KCIC'}
+                        </h4>
+                        <span className="rounded-md border-1.5 border-black bg-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase text-zinc-950 shadow-[1px_1px_0px_0px_#000]">
+                          Penumpang
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-zinc-600 mt-0.5">
+                        {activeTrip.booking.passengerCount ? `${activeTrip.booking.passengerCount} Penumpang` : '1 Penumpang'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* In-App Real-time Chat & Voice Call (Gojek Style) */}
+                  <div className="pt-2 border-t-2 border-black/10">
+                    <TripCommunicationWidget
+                      bookingId={activeTrip.booking?.id}
+                      tripId={activeTrip.id}
+                      currentUserId={(session?.user as any)?.id || 'driver-user'}
+                      currentUserName={session?.user?.name || 'Driver KCIC'}
+                      currentUserRole="DRIVER"
+                      partnerId={activeTrip.booking?.user?.id}
+                      partnerName={activeTrip.booking?.user?.name || 'Penumpang'}
+                      partnerRole="USER"
+                      variant="buttons"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <FleetMap
-                vehicles={driverVehicleMarker}
-                selectedVehicleId={activeTrip.vehicle.id}
-                routePoints={driverRoutePoints}
-                zoom={15}
-                className="h-[320px] w-full sm:h-[420px]"
-              />
-            </div>
+              {/* Route details */}
+              <TripRoute pickup={activeTrip.booking.pickupLocation} destination={activeTrip.booking.destination} />
 
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <div className="card p-3.5">
-                <span className="metric-label block">Sinyal GPS</span>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span
-                    className={`size-2 rounded-full ${
-                      signalStatus === 'green'
-                        ? 'bg-[var(--status-active-fg)]'
-                        : signalStatus === 'amber'
-                          ? 'bg-[var(--status-warning-fg)]'
-                          : 'bg-[var(--status-error-fg)]'
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="text-xs font-semibold capitalize text-slate-900">{signalStatus}</span>
+              {/* DRIVER LIVE NAVIGATION MAP */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                    Navigasi & Posisi Langsung Armada
+                  </span>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                      currentBookingStatus === 'DRIVER_EN_ROUTE'
+                        ? activeTrip.booking.pickupLocation
+                        : activeTrip.booking.destination
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-amber-200 px-3 py-1.5 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000] transition"
+                  >
+                    <span>Buka Google Maps</span>
+                    <Icon name="arrowUp" className="size-3.5" />
+                  </a>
                 </div>
-                {confidenceScore > 0 && (
-                  <p className="mt-1 text-[0.625rem] font-medium tabular-nums text-slate-400">
-                    {confidenceScore}% akurasi sinyal
-                  </p>
+
+                <div className="bezel overflow-hidden rounded-xl">
+                  <FleetMap
+                    vehicles={driverVehicleMarker}
+                    selectedVehicleId={activeTrip.vehicle.id}
+                    routePoints={driverRoutePoints}
+                    zoom={15}
+                    className="h-[320px] sm:h-[380px] w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 rounded-xl border-2 border-black bg-zinc-50 p-5 shadow-[3px_3px_0px_0px_#000]">
+              <Icon name="route" className="mt-0.5 shrink-0 text-emerald-800" />
+              <div><h3 className="text-base font-black text-zinc-950">Ad-hoc vehicle trip</h3><p className="mt-1 text-xs font-medium leading-relaxed text-zinc-600">This journey is not linked to a booking. Your live trip telemetry appears below.</p></div>
+            </div>
+          )}
+
+          {/* Workflow Stage Action Buttons for Driver */}
+          {activeTrip.booking && (
+            <div className="flex flex-col justify-between gap-4 rounded-xl border-2 border-black bg-emerald-100 p-5 shadow-[3px_3px_0px_0px_#000] lg:flex-row lg:items-center">
+              <div>
+                <span className="block text-xs font-black uppercase tracking-wider text-emerald-900">Current trip stage</span>
+                <span className="mt-1 block text-base font-black leading-relaxed text-zinc-950">
+                  {currentBookingStatus === 'DRIVER_EN_ROUTE'
+                    ? 'En route to pickup location'
+                    : currentBookingStatus === 'ARRIVED'
+                    ? 'Arrived at pickup — awaiting passenger boarding'
+                    : currentBookingStatus === 'IN_PROGRESS'
+                    ? 'Trip in progress to destination'
+                    : currentBookingStatus?.replace(/_/g, ' ').toLowerCase()}
+                </span>
+              </div>
+
+              <div className="driver-trip-actions shrink-0">
+                {currentBookingStatus === 'DRIVER_EN_ROUTE' && (
+                  <button
+                    type="button"
+                    onClick={handleArriveAtPickup}
+                    disabled={isAdvancingTrip || isEndingTrip}
+                    className="button-primary"
+                  >
+                    <Icon name="check" /><span>Arrived at pickup</span>
+                  </button>
+                )}
+
+                {currentBookingStatus === 'ARRIVED' && (
+                  <button
+                    type="button"
+                    onClick={() => handleStartPassengerTrip(activeTrip.booking!.id)}
+                    disabled={isAdvancingTrip || isEndingTrip}
+                    className="button-primary"
+                  >
+                    <Icon name="arrow" /><span>Passengers boarded — start trip</span>
+                  </button>
                 )}
               </div>
+            </div>
+          )}
 
-              <div className="card p-3.5">
-                <span className="metric-label block">Akurasi</span>
-                <div className="mt-1.5">
-                  <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
-                </div>
-                <p className="mt-1 text-[0.625rem] font-medium text-slate-400">
-                  {locationSource === 'wifi_cell_triangulation' ? 'Wi-Fi / Cell' : 'GPS presisi'}
+          {/* Warning banner when GPS is stale or signal lost */}
+          {isSignalLostOrStale && (
+            <div className="flex items-start gap-3 rounded-xl border-2 border-black bg-amber-100 p-5 text-sm leading-relaxed text-zinc-950 shadow-[3px_3px_0px_0px_#000]">
+              <Icon name="signal" className="mt-0.5 shrink-0 text-amber-700" />
+              <div>
+                <span className="block font-black text-amber-950">GPS signal paused</span>
+                <p className="mt-0.5 text-xs font-semibold text-amber-900 leading-relaxed">
+                  Location updates pause when this tab is backgrounded or screen locks — reopen to resume.
                 </p>
               </div>
+            </div>
+          )}
 
-              <div className="card p-3.5">
-                <span className="metric-label block">Pergerakan</span>
-                <div className="mt-1.5">
+          {/* Realtime Telemetry Grid */}
+          <div>
+            <h3 className="section-title mb-4 text-zinc-950">
+              Live telemetry
+            </h3>
+
+            <div className="grid grid-cols-1 gap-3 text-sm min-[380px]:grid-cols-2 lg:grid-cols-4">
+              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
+                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">Signal</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span
+                    className={`w-3.5 h-3.5 rounded-full border border-black ${
+                      signalStatus === 'green'
+                        ? 'bg-emerald-400'
+                        : signalStatus === 'amber'
+                        ? 'bg-amber-400'
+                        : 'bg-rose-400'
+                    }`}
+                  />
+                  <span className="font-black capitalize text-zinc-950">{signalStatus}</span>
+                </div>
+              </div>
+
+              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
+                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">GPS accuracy</span>
+                <div className="mt-1">
+                  <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
+                </div>
+              </div>
+
+              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
+                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">Movement</span>
+                <div className="mt-1">
                   <MovementBadge movement={movement} />
                 </div>
               </div>
 
-              <div className="card p-3.5">
-                <span className="metric-label block">Update terakhir</span>
-                <div className="mt-1.5 text-xs font-semibold text-slate-700">
+              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
+                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">Last update</span>
+                <div className="mt-2 text-sm font-bold text-zinc-900">
                   <RelativeTime date={lastUpdated} />
                 </div>
               </div>
             </div>
 
-            {jumpyDiscardCount > 0 && (
-              <p className="flex items-center gap-1.5 px-1 text-[0.625rem] font-medium text-slate-400">
-                <ShieldGlyph />
-                <span className="tabular-nums">{jumpyDiscardCount} titik jumpy difilter otomatis</span>
-              </p>
-            )}
-          </div>
-
-          <div className="tracking-panel space-y-3">
-            {activeTrip.booking && (
-              <div className="card overflow-hidden">
-                <div className="flex items-center gap-3 border-b border-[var(--border-subtle)] px-4 py-3.5">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--slate-navy)] text-xs font-semibold text-white">
-                    {(activeTrip.booking.user?.name || 'P').slice(0, 2).toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[0.8125rem] font-semibold text-slate-900">
-                      {activeTrip.booking.user?.name || 'Penumpang KCIC'}
-                    </p>
-                    <p className="text-[0.6875rem] text-slate-500">
-                      {activeTrip.booking.passengerCount
-                        ? `${activeTrip.booking.passengerCount} penumpang`
-                        : '1 penumpang'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="px-4 py-3">
-                  <TripCommunicationWidget
-                    bookingId={activeTrip.booking?.id}
-                    tripId={activeTrip.id}
-                    currentUserId={(session?.user as any)?.id || 'driver-user'}
-                    currentUserName={session?.user?.name || 'Driver KCIC'}
-                    currentUserRole="DRIVER"
-                    partnerId={activeTrip.booking?.user?.id}
-                    partnerName={activeTrip.booking?.user?.name || 'Penumpang'}
-                    partnerRole="USER"
-                    variant="buttons"
-                  />
-                </div>
-
-                <div className="border-t border-[var(--border-subtle)] px-4 py-3.5">
-                  <TripRoute
-                    pickup={activeTrip.booking.pickupLocation}
-                    destination={activeTrip.booking.destination}
-                  />
-                </div>
+            {currentPosition && (
+              <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border-2 border-black bg-zinc-100 p-4 font-mono text-xs font-bold text-zinc-800 shadow-[2px_2px_0px_0px_#000] min-[380px]:grid-cols-2 lg:grid-cols-4">
+                <span>Lat: {currentPosition.lat.toFixed(5)}</span>
+                <span>Lng: {currentPosition.lng.toFixed(5)}</span>
+                <span>
+                  Speed:{' '}
+                  {currentPosition.speedMps !== null
+                    ? `${(currentPosition.speedMps * 3.6).toFixed(1)} km/h`
+                    : '0 km/h'}
+                </span>
+                <span>
+                  Heading:{' '}
+                  {currentPosition.headingDeg !== null
+                    ? `${Math.round(currentPosition.headingDeg)}°`
+                    : '—'}
+                </span>
               </div>
             )}
           </div>
-        </div>
+
+          <div className="driver-trip-actions justify-end border-t-2 border-black/10 pt-6">
+            <button
+              type="button"
+              onClick={() => setShowEndConfirm(true)}
+              className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-rose-500 px-6 py-3 text-sm font-black text-white shadow-[4px_4px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] sm:w-auto"
+            >
+              <Icon name="check" />{stoppingPickup ? 'Stop pickup trip' : 'Finish and end trip'}
+            </button>
+          </div>
+        </section>
       ) : (
-        /* No active trip */
-        <div className="space-y-5">
-          {/* Assigned bookings */}
-          <section className="card overflow-hidden" aria-labelledby="assigned-bookings-heading">
-            <div className="border-b border-[var(--border-subtle)] px-4 py-3.5 sm:px-5">
-              <span className="eyebrow">Jadwal penjemputan</span>
-              <h2 id="assigned-bookings-heading" className="section-title mt-1">
-                Tugas perjalanan ditugaskan{' '}
-                <span className="font-normal text-slate-400 tabular-nums">
-                  ({assignedBookings.length})
-                </span>
-              </h2>
+        /* NO ACTIVE TRIP: START TRIP INTERFACE */
+        <div className="space-y-6">
+          {/* Assigned Bookings Section */}
+          <section className="surface space-y-5 p-5 sm:p-7" aria-label="Assigned bookings">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="eyebrow">Your next pickup</p>
+                <h2 className="section-title mt-2 text-zinc-900">
+                  Assigned bookings <span className="ml-2 rounded-md border-2 border-black bg-emerald-200 px-2.5 py-0.5 text-xs font-black text-zinc-950 shadow-[1px_1px_0px_0px_#000]">{assignedBookings.length}</span>
+                </h2>
+                <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">Start an assigned trip to begin the drive to pickup.</p>
+              </div>
             </div>
 
             {assignedBookings.length === 0 ? (
-              <div className="flex flex-col items-center px-6 py-10 text-center">
+              <div className="flex flex-col items-center rounded-2xl border-2 border-black bg-zinc-50 px-5 py-10 text-center shadow-[3px_3px_0px_0px_#000]">
                 {isLoading ? (
-                  <div role="status" className="flex items-center gap-2 text-xs text-slate-500">
-                    <Spinner size="sm" className="text-[var(--kcic-red)]" />
-                    <span>Memuat daftar penugasan…</span>
-                  </div>
+                  <div role="status" className="flex items-center gap-3 text-sm font-bold text-zinc-700"><Spinner size="md" />Loading your assigned bookings...</div>
                 ) : (
                   <>
-                    <span className="mb-3 grid size-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--canvas)] text-slate-400">
-                      <RouteGlyph />
-                    </span>
-                    <p className="text-xs font-semibold text-slate-900">Belum ada tugas penjemputan</p>
-                    <p className="mt-1 max-w-sm text-[0.6875rem] leading-relaxed text-slate-500">
-                      Aktifkan mode online untuk menerima penawaran dispatch otomatis di stasiun atau hub
-                      Anda.
-                    </p>
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-emerald-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]"><Icon name="route" /></div>
+                    <h3 className="text-base font-black text-zinc-900">Ready for your next assignment.</h3>
+                    <p className="mt-2 max-w-sm text-xs font-medium leading-relaxed text-zinc-600">No active bookings are assigned to you. Go online above to receive dispatch offers.</p>
                   </>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {assignedBookings.map((b) => (
                   <div
                     key={b.id}
-                    className="flex flex-col justify-between gap-3.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-4 transition-colors hover:border-[var(--border-strong)]"
+                    className="flex min-w-0 flex-col justify-between gap-5 rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]"
                   >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="mono-plate truncate rounded-[var(--radius-xs)] bg-[var(--canvas)] px-1.5 py-0.5 text-[0.6875rem] font-semibold text-slate-700">
-                          #{b.bookingNumber}
-                        </span>
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="wrap-anywhere font-mono text-xs font-bold text-zinc-800 bg-zinc-100 px-2 py-1 rounded border border-black">{b.bookingNumber}</span>
                         <StatusBadge status={b.status} />
                       </div>
 
                       <TripRoute pickup={b.pickupLocation} destination={b.destination} />
 
-                      <p className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-slate-500">
-                        <ClockGlyph />
-                        <span>Berangkat</span>
-                        <strong className="font-semibold tabular-nums text-slate-800">
-                          {new Date(b.departureAt).toLocaleDateString([], {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </strong>
-                        <span className="text-slate-300">·</span>
-                        <span className="tabular-nums">{b.passengerCount} penumpang</span>
-                      </p>
+                      <div className="rounded-lg border border-black bg-zinc-50 p-2.5 text-xs font-semibold text-zinc-700">
+                        Departure:{' '}
+                        {new Date(b.departureAt).toLocaleDateString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}{' '}
+                        • {b.passengerCount} passengers
+                      </div>
 
                       {b.vehicle && (
-                        <p className="flex items-center gap-1.5 border-t border-[var(--border-subtle)] pt-2 text-[0.6875rem] text-slate-600">
-                          <CarGlyph />
-                          <span className="mono-plate font-semibold text-slate-900">
-                            {b.vehicle.plateNumber}
-                          </span>
-                          <span className="truncate">
-                            {b.vehicle.brand} {b.vehicle.model}
-                          </span>
-                        </p>
+                        <div className="wrap-anywhere flex items-center gap-1.5 border-t-2 border-black/10 pt-3 text-sm font-bold text-zinc-800">
+                          <Icon name="car" className="size-4 shrink-0 text-zinc-700" />
+                          <span>{b.vehicle.plateNumber} ({b.vehicle.brand} {b.vehicle.model})</span>
+                        </div>
                       )}
                     </div>
 
                     <button
                       type="button"
                       onClick={() => handleStartBookingTrip(b)}
-                      disabled={
-                        isStartingTrip ||
-                        isTogglingOnline ||
-                        isLoading ||
-                        !['APPROVED', 'DRIVER_ASSIGNED'].includes(b.status)
-                      }
-                      className="button-primary w-full py-2.5"
+                      disabled={isStartingTrip || isTogglingOnline || isLoading || !['APPROVED', 'DRIVER_ASSIGNED'].includes(b.status)}
+                      aria-busy={isStartingTrip}
+                      className="button-primary w-full"
                     >
-                      {isStartingTrip ? (
-                        <Spinner size="sm" className="text-white" />
-                      ) : (
-                        <ArrowRightGlyph />
-                      )}
-                      <span>{isStartingTrip ? startLabel : 'Mulai menuju penjemputan'}</span>
+                      {isStartingTrip ? <Spinner size="sm" /> : <Icon name="arrow" />}
+                      <span>{isStartingTrip ? startLabel : 'Start trip to pickup'}</span>
                     </button>
+                    {startError && <ErrorBanner message={startError} />}
                   </div>
                 ))}
               </div>
             )}
           </section>
 
-          {/* Vehicle pool */}
-          <section id="vehicle-selection" className="card overflow-hidden">
-            <div className="border-b border-[var(--border-subtle)] px-4 py-3.5 sm:px-5">
-              <span className="eyebrow">Pool kendaraan KCIC</span>
-              <h2 className="section-title mt-1">Pilih armada siap operasi</h2>
-              <p className="mt-1 text-[0.6875rem] leading-relaxed text-slate-500">
-                Pilih armada dari stasiun hub Anda untuk memulai mode online atau perjalanan operasional.
+          {/* Ad-hoc Vehicle Trip Start & Pool Selection */}
+          <section id="vehicle-selection" className="surface space-y-5 p-5 sm:p-7" aria-label="Vehicle selection and trip start">
+            <div>
+              <h2 className="section-title text-zinc-900">
+                Select vehicle from pool
+              </h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">
+                Pick an available vehicle to go online for dispatches or start an ad-hoc trip immediately.
               </p>
             </div>
 
-            <div className="space-y-3.5 p-4 sm:p-5">
-              {/* Hub filter */}
-              <div className="no-scrollbar -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedLocationId('');
-                    void fetchPoolVehicles('');
-                  }}
-                  aria-pressed={!selectedLocationId}
-                  className="chip shrink-0"
-                >
-                  Semua hub
-                </button>
-                {locations.map((loc) => {
-                  const isSelected = selectedLocationId === loc.id;
-                  return (
+            <div className="max-w-md space-y-3">
+              {/* Hub Location Filter */}
+              <div className="rounded-xl border-2 border-black bg-zinc-50 p-3 shadow-[2px_2px_0px_0px_#000] space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                    <Icon name="pin" className="h-3.5 w-3.5 text-[#be123c]" />
+                    Filter Lokasi Hub:
+                  </span>
+                  {selectedLocationId && (
                     <button
-                      key={loc.id}
                       type="button"
                       onClick={() => {
-                        const next = isSelected ? '' : loc.id;
-                        setSelectedLocationId(next);
-                        void fetchPoolVehicles(next);
+                        setSelectedLocationId('');
+                        void fetchPoolVehicles('');
                       }}
-                      aria-pressed={isSelected}
-                      className="chip shrink-0"
+                      className="text-[11px] font-black text-[#be123c] hover:underline cursor-pointer"
                     >
-                      <span>{loc.name}</span>
-                      <span className="mono-plate text-[0.625rem] opacity-60">{loc.code}</span>
+                      Reset Filter
                     </button>
-                  );
-                })}
-              </div>
-
-              <div className="max-w-md">
-                <label className="sr-only" htmlFor="driver-vehicle-search">
-                  Cari armada
-                </label>
-                <div className="relative">
-                  <SearchGlyph />
-                  <input
-                    id="driver-vehicle-search"
-                    type="text"
-                    placeholder="Cari plat nomor, merek, atau tipe armada…"
-                    value={manualPlate}
-                    disabled={isStartingTrip || isTogglingOnline}
-                    onChange={(e) => searchVehicle(e.target.value)}
-                    className="pl-9"
-                  />
+                  )}
                 </div>
-              </div>
 
-              {poolVehicles.length > 0 && !selectedVehicle && !manualPlate && (
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                  {poolVehicles.map((v) => {
-                    const hub = v.currentOperationalLocation || v.homeLocation;
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLocationId('');
+                      void fetchPoolVehicles('');
+                    }}
+                    className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black transition-all cursor-pointer ${
+                      !selectedLocationId
+                        ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                        : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                    }`}
+                  >
+                    Semua Hub
+                  </button>
+                  {locations.map((loc) => {
+                    const isSelected = selectedLocationId === loc.id;
                     return (
                       <button
-                        key={v.id}
+                        key={loc.id}
                         type="button"
                         onClick={() => {
-                          vehicleSearchRequest.current += 1;
-                          setStartError(null);
-                          setSelectedVehicle(v);
-                          setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
-                          setMatchingVehicles([]);
+                          const next = isSelected ? '' : loc.id;
+                          setSelectedLocationId(next);
+                          void fetchPoolVehicles(next);
                         }}
-                        className="flex cursor-pointer flex-col items-start gap-1.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3.5 text-left transition-colors hover:border-[var(--border-strong)]"
+                        className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                            : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                        }`}
                       >
-                        <span className="flex w-full items-center justify-between gap-2">
-                          <span className="mono-plate rounded-[var(--radius-xs)] bg-[var(--canvas)] px-1.5 py-0.5 text-[0.6875rem] font-semibold text-slate-900">
-                            {v.plateNumber}
-                          </span>
-                          {hub && (
-                            <span className="truncate text-[0.625rem] font-medium text-slate-400">
-                              {hub.name}
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[0.6875rem] text-slate-600">
-                          {v.brand} {v.model} · {v.seatingCapacity} kursi
+                        <span>{loc.name}</span>
+                        <span className={`ml-1 text-[10px] font-mono px-1 py-0.2 rounded border ${
+                          isSelected ? 'border-white/40 bg-white/20 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
+                        }`}>
+                          {loc.code}
                         </span>
                       </button>
                     );
                   })}
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="vehicle-plate" className="mb-2 block text-xs font-black uppercase tracking-wider text-zinc-700">
+                  Search license plate {selectedLocationId && `(di ${locations.find((l) => l.id === selectedLocationId)?.name || 'hub'})`}
+                </label>
+                <input
+                  id="vehicle-plate"
+                  type="text"
+                  placeholder="e.g. B 1234 CD or T 2020 AB"
+                  value={manualPlate}
+                  disabled={isStartingTrip || isTogglingOnline}
+                  onChange={(e) => searchVehicle(e.target.value)}
+                  className="min-h-14 w-full rounded-xl border-2 border-black bg-white px-4 py-3 font-mono text-base font-bold text-zinc-950 shadow-[3px_3px_0px_0px_#000] outline-none placeholder:font-sans placeholder:font-normal placeholder:text-zinc-400 focus:shadow-[4px_4px_0px_0px_#be123c]"
+                />
+              </div>
+
+              {poolVehicles.length > 0 && !selectedVehicle && !manualPlate && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                      Available in pool ({poolVehicles.length})
+                    </p>
+                    {selectedLocationId && (
+                      <span className="text-[11px] font-bold text-zinc-600">
+                        Hub: {locations.find((l) => l.id === selectedLocationId)?.name}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {poolVehicles.map((v) => {
+                      const hub = v.currentOperationalLocation || v.homeLocation;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            vehicleSearchRequest.current += 1;
+                            setStartError(null);
+                            setSelectedVehicle(v);
+                            setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
+                            setMatchingVehicles([]);
+                          }}
+                          className="flex flex-col items-start gap-1 rounded-xl border-2 border-black bg-white p-3 text-left shadow-[2px_2px_0px_0px_#000] transition hover:bg-rose-50 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000] cursor-pointer"
+                        >
+                          <div className="flex w-full items-center justify-between gap-1">
+                            <span className="font-mono text-sm font-black text-zinc-950">{v.plateNumber}</span>
+                            {hub && (
+                              <span className="rounded border border-black/30 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-800">
+                                {hub.name} ({hub.code})
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-zinc-600">
+                            {v.brand} {v.model} • {v.seatingCapacity} seats
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {poolVehicles.length === 0 && !selectedVehicle && !manualPlate && selectedLocationId && (
+                <div className="rounded-xl border-2 border-dashed border-zinc-300 p-4 text-center">
+                  <p className="text-xs font-bold text-zinc-600">
+                    Tidak ada armada AVAILABLE di hub {locations.find((l) => l.id === selectedLocationId)?.name || 'ini'}.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLocationId('');
+                      void fetchPoolVehicles('');
+                    }}
+                    className="mt-2 text-xs font-black text-[#be123c] underline cursor-pointer"
+                  >
+                    Tampilkan armada di semua hub
+                  </button>
+                </div>
               )}
 
               {matchingVehicles.length > 0 && !selectedVehicle && (
-                <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-white">
+                <div className="overflow-hidden rounded-xl border-2 border-black bg-white divide-y-2 divide-black shadow-[4px_4px_0px_0px_#000]">
                   {matchingVehicles.map((v) => {
                     const hub = v.currentOperationalLocation || v.homeLocation;
                     return (
@@ -1425,21 +1660,22 @@ export default function DriverDashboardPage() {
                           setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
                           setMatchingVehicles([]);
                         }}
-                        className="list-row w-full cursor-pointer text-left"
+                        className="flex min-h-14 w-full cursor-pointer flex-wrap items-center justify-between gap-3 p-4 text-left text-sm hover:bg-zinc-50"
                       >
-                        <span className="mono-plate shrink-0 rounded-[var(--radius-xs)] bg-[var(--canvas)] px-2 py-1 text-[0.6875rem] font-semibold text-slate-900">
-                          {v.plateNumber}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[0.8125rem] font-medium text-slate-900">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-zinc-950">{v.plateNumber}</span>
+                            {hub && (
+                              <span className="rounded border border-black/30 bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-zinc-800">
+                                {hub.name} ({hub.code})
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-zinc-600 text-xs font-medium">
                             {v.brand} {v.model}
                           </span>
-                          <span className="block truncate text-[0.625rem] text-slate-400">
-                            {hub ? `${hub.name} · ${v.seatingCapacity} kursi` : `${v.seatingCapacity} kursi`}
-                          </span>
-                        </span>
+                        </div>
                         <StatusBadge status={v.status} />
-                        <ChevronRightGlyph />
                       </button>
                     );
                   })}
@@ -1447,21 +1683,19 @@ export default function DriverDashboardPage() {
               )}
 
               {selectedVehicle && (
-                <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="mono-plate text-[0.9375rem] font-semibold text-slate-900">
-                          {selectedVehicle.plateNumber}
-                        </span>
-                        <span className="pill pill-active">
-                          <span className="pill-dot" aria-hidden="true" />
-                          <span>Armada terpilih</span>
-                        </span>
+                <div className="space-y-4 rounded-xl border-2 border-black bg-rose-50 p-5 text-sm shadow-[4px_4px_0px_0px_#000]">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-zinc-950 text-base">{selectedVehicle.plateNumber}</span>
+                        {(selectedVehicle.currentOperationalLocation || selectedVehicle.homeLocation) && (
+                          <span className="rounded border border-black bg-amber-200 px-1.5 py-0.5 text-[10px] font-black text-zinc-900 shadow-[1px_1px_0px_0px_#000]">
+                            {(selectedVehicle.currentOperationalLocation || selectedVehicle.homeLocation)?.name}
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-0.5 text-[0.6875rem] text-slate-600">
-                        {selectedVehicle.brand} {selectedVehicle.model} ·{' '}
-                        {selectedVehicle.seatingCapacity} kursi
+                      <p className="text-xs font-semibold text-zinc-700">
+                        {selectedVehicle.brand} {selectedVehicle.model} ({selectedVehicle.seatingCapacity} seats)
                       </p>
                     </div>
                     <button
@@ -1473,202 +1707,120 @@ export default function DriverDashboardPage() {
                         setSelectedVehicle(null);
                         setManualPlate('');
                       }}
-                      className="shrink-0 cursor-pointer rounded-full px-2 py-1 text-[0.6875rem] font-semibold text-slate-500 underline decoration-slate-300 underline-offset-2 transition-colors hover:text-slate-900"
+                      className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border-2 border-black bg-white px-3 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000]"
                     >
-                      Ganti
+                      Change
                     </button>
                   </div>
-
-                  <div className="driver-trip-actions mt-3.5">
+                  <div className="flex flex-col sm:flex-row gap-3">
                     {!isOnline && (
                       <button
                         type="button"
                         onClick={handleToggleOnline}
                         disabled={isTogglingOnline || isStartingTrip || isLoading}
-                        className="button-secondary px-4 py-2.5"
+                        className="button-secondary flex-1"
                       >
-                        {isTogglingOnline ? <Spinner size="sm" /> : <SignalGlyph />}
-                        <span>Online dengan unit ini</span>
+                        {isTogglingOnline ? <Spinner size="sm" /> : <Icon name="signal" />}
+                        <span>Go online with this unit</span>
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={handleStartVehicleTrip}
                       disabled={isStartingTrip || isTogglingOnline || isLoading}
-                      className="button-primary px-4 py-2.5"
+                      aria-busy={isStartingTrip}
+                      className="button-primary flex-1"
                     >
-                      {isStartingTrip && <Spinner size="sm" className="text-white" />}
-                      <span>
-                        {isStartingTrip
-                          ? startLabel
-                          : `Mulai trip operasional (${selectedVehicle.plateNumber})`}
-                      </span>
+                      {isStartingTrip && <Spinner size="sm" />}
+                      <span>{isStartingTrip ? startLabel : `Start trip with ${selectedVehicle.plateNumber}`}</span>
                     </button>
                   </div>
+                  <p role="status" aria-live="polite" className="text-xs font-semibold leading-relaxed text-emerald-950">
+                    {startPhase === 'gps' ? 'Allow location access in the browser prompt. GPS can take up to 15 seconds.' : startPhase === 'request' ? 'Saving your trip. Please wait without closing this screen.' : 'GPS permission and HTTPS (or localhost) are required. Keep this screen open while driving.'}
+                  </p>
                 </div>
               )}
-
               {startError && <ErrorBanner message={startError} />}
             </div>
           </section>
         </div>
       )}
 
-      {/* End trip confirm */}
+      {/* Confirmation Dialog to End Trip */}
       <ConfirmDialog
         isOpen={showEndConfirm}
         onClose={() => setShowEndConfirm(false)}
         onConfirm={handleEndTrip}
-        title={stoppingPickup ? 'Batalkan penjemputan ini?' : 'Akhiri dan selesaikan perjalanan?'}
-        message={
-          stoppingPickup
-            ? 'Tracking akan dihentikan dan booking kembali ke antrean penugasan.'
-            : 'Perjalanan akan diselesaikan dan ringkasan jarak tempuh GPS dicatat.'
-        }
-        confirmLabel={stoppingPickup ? 'Hentikan penjemputan' : 'Selesaikan trip'}
+        title={stoppingPickup ? 'Stop this pickup trip?' : 'Finish and end trip?'}
+        message={stoppingPickup ? 'This will stop tracking and take you offline. The booking stays assigned for retry; it will not be marked completed.' : 'This will finish the trip and take you offline. Any standing vehicle assignment remains reserved for you.'}
+        confirmLabel={stoppingPickup ? 'Stop pickup trip' : 'End trip now'}
         isDestructive={true}
         isLoading={isEndingTrip}
       />
 
-      {/* Completed summary */}
+      {/* Trip Completed Summary Modal */}
       {completedTripSummary && (
         <Modal
           isOpen={Boolean(completedTripSummary)}
           onClose={() => setCompletedTripSummary(null)}
-          title={
-            completedTripSummary.pendingSync
-              ? 'Trip selesai (menunggu sinkronisasi)'
-              : completedTripSummary.aborted
-                ? 'Penjemputan dihentikan'
-                : 'Perjalanan berhasil diselesaikan'
-          }
-          description={
-            completedTripSummary.pendingSync
-              ? 'Perjalanan selesai offline — akan disinkronkan otomatis saat online'
-              : completedTripSummary.aborted
-                ? 'Booking tetap tersimpan untuk penugasan ulang'
-                : 'Sesi pelacakan GPS telah difinalisasi'
-          }
+          title={completedTripSummary.pendingSync
+            ? 'Trip selesai (Menunggu Sinkronisasi)'
+            : completedTripSummary.aborted ? 'Pickup trip stopped' : 'Trip completed successfully'}
+          description={completedTripSummary.pendingSync
+            ? 'Perjalanan selesai offline — akan disinkronkan otomatis saat online'
+            : completedTripSummary.aborted ? 'The booking remains assigned for retry' : 'GPS tracking session finalized'}
           footer={
             <button
               type="button"
               onClick={() => setCompletedTripSummary(null)}
-              className="button-primary w-full"
+              className="button-primary"
             >
-              Selesai
+              Done
             </button>
           }
         >
-          <div className="space-y-3 text-xs">
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] p-3">
-                <span className="metric-label block">Durasi</span>
-                <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
-                  {completedTripSummary.durationMinutes} menit
+          <div className="space-y-5 text-sm">
+            {completedTripSummary.pendingSync && (
+              <div className="rounded-xl border-2 border-black bg-amber-50 p-3.5 text-xs text-amber-950 shadow-[2px_2px_0px_0px_#000]">
+                <span className="font-black block mb-0.5">Trip selesai (Menunggu Sinkronisasi)</span>
+                <p className="text-[11px] font-medium text-amber-900">
+                  Perjalanan selesai offline. Data akan dikirim otomatis saat koneksi kembali.
                 </p>
               </div>
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] p-3">
-                <span className="metric-label block">Jarak tempuh</span>
-                <p className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
+            )}
+            <div className="rounded-xl border-2 border-black bg-emerald-100 p-4 leading-relaxed text-zinc-950 shadow-[3px_3px_0px_0px_#000]">
+              <span className="block font-black">{completedTripSummary.aborted ? 'Trip stopped, booking not completed' : 'Trip closed'}</span>
+              <p className="mt-1 text-xs font-medium text-emerald-950">{completedTripSummary.telemetryUploaded ? 'Trip and online session closed. Valid GPS updates received by the server are retained.' : 'Trip closed, but some final GPS updates could not be uploaded. Your earlier stored updates are retained.'}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="rounded-xl border-2 border-black bg-zinc-50 p-3 shadow-[2px_2px_0px_0px_#000]">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Duration</span>
+                <span className="font-black text-sm text-zinc-950">
+                  {completedTripSummary.durationMinutes} minutes
+                </span>
+              </div>
+              <div className="rounded-xl border-2 border-black bg-zinc-50 p-3 shadow-[2px_2px_0px_0px_#000]">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Distance</span>
+                <span className="font-black text-sm text-zinc-950">
                   {completedTripSummary.distanceMeters
                     ? `${(completedTripSummary.distanceMeters / 1000).toFixed(2)} km`
-                    : 'Terdata via GPS'}
-                </p>
+                    : 'Tracked via GPS'}
+                </span>
               </div>
             </div>
 
             {!completedTripSummary.aborted && (
-              <div className="rounded-[var(--radius-md)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-3.5">
-                <span className="block text-[0.6875rem] font-semibold text-[var(--status-warning-fg)]">
-                  Verifikasi dokumen nota dinas
-                </span>
-                <p className="mt-1 text-[0.6875rem] leading-relaxed text-[var(--status-warning-fg)]/85">
-                  Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum
-                  diselesaikan resmi oleh dispatcher KCIC.
+              <div className="rounded-xl border-2 border-black bg-amber-50 p-3.5 text-xs text-amber-950 shadow-[2px_2px_0px_0px_#000]">
+                <span className="font-black block mb-0.5">Status: Menunggu Approval Nota Dinas</span>
+                <p className="text-[11px] font-medium text-amber-900">
+                  Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum diselesaikan resmi oleh admin KCIC.
                 </p>
               </div>
             )}
           </div>
         </Modal>
       )}
-    </div>
-  );
-}
-
-/* -- Small local glyphs --------------------------------------------------- */
-import {
-  ArrowRight,
-  Bell,
-  Car,
-  Check,
-  ChevronRight,
-  Clock,
-  MapPin,
-  Navigation,
-  Route,
-  Search,
-  ShieldCheck,
-  Signal,
-  Timer,
-} from 'lucide-react';
-
-function ArrowRightGlyph() {
-  return <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden="true" />;
-}
-function BellGlyph() {
-  return <Bell className="size-4" strokeWidth={1.9} aria-hidden="true" />;
-}
-function CarGlyph() {
-  return <Car className="size-3.5" strokeWidth={1.9} aria-hidden="true" />;
-}
-function CheckGlyph() {
-  return <Check className="size-3.5" strokeWidth={2.3} aria-hidden="true" />;
-}
-function ChevronRightGlyph() {
-  return <ChevronRight className="size-3" strokeWidth={2.4} aria-hidden="true" />;
-}
-function ClockGlyph() {
-  return <Clock className="size-3" strokeWidth={2} aria-hidden="true" />;
-}
-function MapPinGlyph() {
-  return <MapPin className="size-3.5" strokeWidth={2} aria-hidden="true" />;
-}
-function NavigationGlyph() {
-  return <Navigation className="size-3" strokeWidth={2} aria-hidden="true" />;
-}
-function RouteGlyph() {
-  return <Route className="size-4" strokeWidth={1.85} aria-hidden="true" />;
-}
-function SignalGlyph() {
-  return <Signal className="size-3.5" strokeWidth={2} aria-hidden="true" />;
-}
-function TimerGlyph() {
-  return <Timer className="size-3" strokeWidth={2} aria-hidden="true" />;
-}
-function SearchGlyph() {
-  return (
-    <Search
-      className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
-      strokeWidth={2}
-      aria-hidden="true"
-    />
-  );
-}
-function ShieldGlyph() {
-  return <ShieldCheck className="size-3 shrink-0" strokeWidth={2} aria-hidden="true" />;
-}
-
-function TripRoute({ pickup, destination }: { pickup: string; destination: string }) {
-  return (
-    <div className="route-stepper">
-      <div className="route-point" data-kind="pickup">
-        <p className="route-label">Titik jemput</p>
-        <p className="route-value">{pickup}</p>
-      </div>
-      <div className="route-point" data-kind="destination">
-        <p className="route-label">Tujuan</p>
-        <p className="route-value">{destination}</p>
-      </div>
     </div>
   );
 }

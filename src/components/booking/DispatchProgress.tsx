@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Check, Clock, Timer } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Icon } from '@/components/ui/Icon';
 
 export interface DispatchProgressProps {
   status: string;
@@ -19,27 +19,18 @@ export function formatEta(
   if (etaSeconds === null || etaSeconds === undefined || etaSeconds < 0) return null;
   const mins = Math.max(1, Math.round(etaSeconds / 60));
   if (etaEstimated) {
-    return `~${mins} mnt (estimasi)`;
+    return `~${mins} min (estimate)`;
   }
-  return `${mins} mnt`;
+  return `${mins} min`;
 }
 
 const STEPS = [
-  { key: 'SEARCHING_DRIVER', label: 'Mencari driver' },
-  { key: 'DRIVER_NOTIFIED', label: 'Driver dinotifikasi' },
-  { key: 'DRIVER_ASSIGNED', label: 'Driver ditugaskan' },
-  { key: 'DRIVER_EN_ROUTE', label: 'Menuju penjemputan' },
-  { key: 'ARRIVED', label: 'Tiba di lokasi' },
+  { key: 'SEARCHING_DRIVER', label: 'Searching for driver…' },
+  { key: 'DRIVER_NOTIFIED', label: 'Driver notified' },
+  { key: 'DRIVER_ASSIGNED', label: 'Driver assigned' },
+  { key: 'DRIVER_EN_ROUTE', label: 'Driver en route' },
+  { key: 'ARRIVED', label: 'Driver arrived' },
 ];
-
-function EtaPill({ text }: { text: string }) {
-  return (
-    <span className="pill pill-standby">
-      <Timer className="size-2.5" strokeWidth={2.4} aria-hidden="true" />
-      <span className="tabular-nums">ETA {text}</span>
-    </span>
-  );
-}
 
 export function DispatchProgress({
   status,
@@ -51,20 +42,19 @@ export function DispatchProgress({
   const normStatus = status?.toUpperCase() || '';
   const etaText = formatEta(etaSeconds, etaEstimated);
 
+  // If status is one of the failure or cancellation states
   if (normStatus === 'NO_DRIVER_AVAILABLE') {
     return (
-      <div
-        className={`rounded-[var(--radius-lg)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] p-3.5 text-xs ${className}`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={`p-4 bg-zinc-100 border-[2.5px] border-black rounded-xl text-xs shadow-[3px_3px_0px_0px_#000] ${className}`}>
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="pill-dot text-[var(--status-error-fg)]" aria-hidden="true" />
-            <span className="font-semibold text-[var(--status-error-fg)]">Driver tidak ditemukan</span>
+            <span className="w-2.5 h-2.5 rounded-full border border-black bg-zinc-500" />
+            <span className="font-extrabold text-black">No Driver Available</span>
           </div>
           <StatusBadge status="NO_DRIVER_AVAILABLE" />
         </div>
-        <p className="mt-1.5 leading-relaxed text-[var(--status-error-fg)]/85">
-          Sistem auto-dispatch tidak menemukan driver online yang tersedia di hub lokasi ini.
+        <p className="text-zinc-700 font-medium mt-1.5 leading-relaxed">
+          Auto-dispatch could not find an available online driver at this location.
         </p>
       </div>
     );
@@ -72,19 +62,16 @@ export function DispatchProgress({
 
   if (normStatus === 'ADMIN_INTERVENTION') {
     return (
-      <div
-        className={`rounded-[var(--radius-lg)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-3.5 text-xs ${className}`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={`p-4 bg-orange-100 border-[2.5px] border-black rounded-xl text-xs shadow-[3px_3px_0px_0px_#000] ${className}`}>
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="pill-dot animate-pulse text-[var(--status-warning-fg)]" aria-hidden="true" />
-            <span className="font-semibold text-[var(--status-warning-fg)]">Eskalasi penugasan admin</span>
+            <span className="w-2.5 h-2.5 rounded-full border border-black bg-orange-500 animate-pulse" />
+            <span className="font-extrabold text-black">Dispatch Escalated to Admin</span>
           </div>
           <StatusBadge status="ADMIN_INTERVENTION" />
         </div>
-        <p className="mt-1.5 leading-relaxed text-[var(--status-warning-fg)]/85">
-          Percobaan auto-dispatch selesai. Admin operasional akan menugaskan driver dan mobil secara
-          manual.
+        <p className="text-orange-950 font-medium mt-1.5 leading-relaxed">
+          Auto-dispatch retries exhausted. A fleet manager will assign a driver manually.
         </p>
       </div>
     );
@@ -107,110 +94,125 @@ export function DispatchProgress({
     const isSearching = normStatus === 'SEARCHING_DRIVER';
     return (
       <div className={`flex flex-wrap items-center gap-2 text-xs ${className}`}>
-        <span className="relative flex size-2.5 shrink-0">
+        <span className="relative flex h-3 w-3 shrink-0">
           {isSearching && (
-            <span className="live-ping absolute inset-0 rounded-full bg-[var(--status-standby-fg)]" aria-hidden="true" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
           )}
           <span
-            className={`relative size-2.5 rounded-full ${
+            className={`relative inline-flex rounded-full h-3 w-3 border border-black ${
               isSearching
-                ? 'bg-[var(--status-standby-fg)]'
+                ? 'bg-amber-400'
                 : currentIdx >= 3
-                  ? 'bg-[var(--status-active-fg)]'
-                  : 'bg-slate-400'
+                ? 'bg-emerald-500'
+                : 'bg-sky-400'
             }`}
-            aria-hidden="true"
           />
         </span>
-        <span className="font-medium text-slate-700">
+        <span className="font-bold text-black">
           {normStatus === 'SEARCHING_DRIVER'
-            ? 'Mencari driver…'
+            ? 'Searching for driver…'
             : normStatus === 'DRIVER_NOTIFIED'
-              ? 'Driver dinotifikasi'
-              : normStatus === 'DRIVER_ASSIGNED'
-                ? 'Driver ditugaskan'
-                : normStatus === 'DRIVER_EN_ROUTE'
-                  ? 'Menuju lokasi jemput'
-                  : normStatus === 'ARRIVED'
-                    ? 'Driver tiba di lokasi'
-                    : normStatus.replace(/_/g, ' ')}
+            ? 'Driver notified'
+            : normStatus === 'DRIVER_ASSIGNED'
+            ? 'Driver assigned'
+            : normStatus === 'DRIVER_EN_ROUTE'
+            ? 'Driver en route'
+            : normStatus === 'ARRIVED'
+            ? 'Driver arrived'
+            : normStatus.replace(/_/g, ' ')}
         </span>
-        {etaText && <EtaPill text={etaText} />}
+        {etaText && (
+          <span className="font-mono text-[11px] font-black text-black bg-amber-300 px-2 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
+            ETA: {etaText}
+          </span>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={`card space-y-3.5 p-4 ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className={`p-4 bg-white border-[2.5px] border-black rounded-xl space-y-3.5 shadow-[4px_4px_0px_0px_#000] ${className}`}>
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {normStatus === 'SEARCHING_DRIVER' ? (
-            <span className="relative flex size-2.5">
-              <span className="live-ping absolute inset-0 rounded-full bg-[var(--status-standby-fg)]" aria-hidden="true" />
-              <span className="relative size-2.5 rounded-full bg-[var(--status-standby-fg)]" aria-hidden="true" />
+            <span className="relative flex h-3.5 w-3.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 border border-black bg-amber-400" />
             </span>
           ) : (
             <span
-              className={`size-2.5 rounded-full ${
+              className={`w-3 h-3 rounded-full border border-black ${
                 currentIdx >= 4
-                  ? 'bg-[var(--status-active-fg)]'
+                  ? 'bg-emerald-500'
                   : currentIdx >= 2
-                    ? 'bg-[var(--status-standby-fg)]'
-                    : 'bg-slate-300'
+                  ? 'bg-sky-400'
+                  : 'bg-zinc-300'
               }`}
-              aria-hidden="true"
             />
           )}
-          <span className="eyebrow">Status dispatch</span>
+          <span className="text-xs font-black uppercase tracking-wider text-black">
+            Dispatch Status
+          </span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {etaText && <EtaPill text={etaText} />}
+        <div className="flex items-center gap-2">
+          {etaText && (
+            <span className="text-xs font-mono font-black text-black bg-amber-300 px-2 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
+              ETA: {etaText}
+            </span>
+          )}
           <StatusBadge status={status} />
         </div>
       </div>
 
-      <ol className="grid grid-cols-1 gap-1.5 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-5">
+      {/* Visual step timeline */}
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-2 border-t-2 border-black/15">
         {STEPS.map((step, idx) => {
           const stepTargetIdx = stepOrder.indexOf(step.key);
           const isDone = currentIdx > stepTargetIdx;
           const isCurrent = currentIdx === stepTargetIdx;
 
           return (
-            <li
+            <div
               key={step.key}
-              aria-current={isCurrent ? 'step' : undefined}
-              className={`flex items-center gap-1.5 rounded-[var(--radius-md)] border px-2 py-1.5 text-[0.6875rem] transition-colors ${
+              className={`p-2 rounded-lg border-2 border-black transition-all ${
                 isCurrent
-                  ? 'border-[var(--slate-navy)] bg-[var(--slate-navy)] font-medium text-white'
+                  ? isCurrent && step.key === 'SEARCHING_DRIVER'
+                    ? 'bg-amber-300 text-black font-extrabold shadow-[2px_2px_0px_0px_#000]'
+                    : 'bg-sky-300 text-black font-extrabold shadow-[2px_2px_0px_0px_#000]'
                   : isDone
-                    ? 'border-[var(--status-active-border)] bg-[var(--status-active-bg)] text-[var(--status-active-fg)]'
-                    : 'border-[var(--border-subtle)] bg-[var(--canvas)] text-slate-400'
+                  ? 'bg-emerald-300 text-black font-bold shadow-[2px_2px_0px_0px_#000]'
+                  : 'bg-zinc-100 text-zinc-500 font-medium'
               }`}
             >
-              <span
-                className={`grid size-4 shrink-0 place-items-center rounded-full text-[0.625rem] font-semibold tabular-nums ${
-                  isCurrent
-                    ? 'bg-white text-[var(--slate-navy)]'
-                    : isDone
-                      ? 'bg-[var(--status-active-fg)] text-white'
-                      : 'bg-[var(--border-strong)]/40 text-slate-500'
-                }`}
-                aria-hidden="true"
-              >
-                {isDone ? <Check className="size-2.5" strokeWidth={3} /> : idx + 1}
-              </span>
-              <span className="truncate">{step.label}</span>
-            </li>
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span
+                  className={`w-4 h-4 rounded-md border border-black flex items-center justify-center text-[10px] shrink-0 font-black ${
+                    isCurrent
+                      ? step.key === 'SEARCHING_DRIVER'
+                        ? 'bg-black text-white animate-pulse'
+                        : 'bg-black text-white'
+                      : isDone
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black'
+                  }`}
+                >
+                  {isDone ? (
+                    <Icon name="check" className="size-2.5 text-white" />
+                  ) : (
+                    idx + 1
+                  )}
+                </span>
+                <span className="truncate">{step.label}</span>
+              </div>
+            </div>
           );
         })}
-      </ol>
+      </div>
 
       {normStatus === 'PENDING_COMPLETION' && (
-        <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-3 text-xs text-[var(--status-warning-fg)]">
-          <Clock className="mt-px size-4 shrink-0" strokeWidth={1.9} aria-hidden="true" />
-          <span className="leading-relaxed">
-            Perjalanan telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi admin.
-          </span>
+        <div className="p-3 bg-amber-100 border-2 border-black rounded-lg text-xs font-semibold text-amber-950 flex items-center gap-2">
+          <Icon name="clock" className="size-4 shrink-0 text-amber-700" />
+          <span>Perjalanan telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi & persetujuan admin.</span>
         </div>
       )}
     </div>

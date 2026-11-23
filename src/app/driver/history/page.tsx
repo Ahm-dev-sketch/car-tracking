@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Pagination } from '@/components/ui/Pagination';
+import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Drawer } from '@/components/ui/Drawer';
 
@@ -54,10 +55,10 @@ export default function DriverTripHistoryPage() {
         setPage(targetPage);
       } else {
         const err = await res.json();
-        setError(err.error?.message || 'Gagal memuat riwayat perjalanan');
+        setError(err.error?.message || 'Failed to load trip history');
       }
     } catch {
-      setError('Kendala jaringan saat memuat data perjalanan');
+      setError('Network error loading trips');
     } finally {
       setIsLoading(false);
     }
@@ -69,77 +70,59 @@ export default function DriverTripHistoryPage() {
 
   const columns: Column<TripItem>[] = [
     {
-      header: 'Waktu',
+      header: 'Date & Time',
       cell: (t) => (
-        <div className="whitespace-nowrap text-xs">
-          <div className="tabular-nums font-medium text-slate-800">
+        <div className="text-xs">
+          <div className="font-semibold text-zinc-900">
             {new Date(t.startedAt).toLocaleDateString([], {
               month: 'short',
               day: 'numeric',
               year: 'numeric',
             })}
           </div>
-          <div className="tabular-nums text-slate-500">
+          <div className="text-zinc-500">
             {new Date(t.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       ),
     },
     {
-      header: 'Armada',
+      header: 'Vehicle',
       cell: (t) => (
-        <div className="min-w-0 max-w-[11rem]">
-          <span className="mono-plate block text-[0.6875rem] font-semibold text-slate-900">
-            {t.vehicle.plateNumber}
-          </span>
-          <span className="block truncate text-[0.6875rem] text-slate-500">
-            {t.vehicle.brand} {t.vehicle.model}
-          </span>
+        <div className="text-xs">
+          <span className="font-mono font-semibold text-zinc-900">{t.vehicle.plateNumber}</span>
+          <span className="text-zinc-500 block">{t.vehicle.brand} {t.vehicle.model}</span>
         </div>
       ),
     },
     {
-      header: 'Reservasi',
+      header: 'Booking',
       cell: (t) =>
         t.booking ? (
-          <div className="min-w-0 max-w-[12rem]">
-            <span className="mono-plate block text-[0.6875rem] font-semibold text-slate-800">
-              {t.booking.bookingNumber}
-            </span>
-            <span className="block truncate text-[0.6875rem] text-slate-500">
-              {t.booking.purpose}
-            </span>
+          <div className="text-xs">
+            <span className="font-semibold text-zinc-800">{t.booking.bookingNumber}</span>
+            <span className="text-zinc-500 block truncate max-w-[150px]">{t.booking.purpose}</span>
           </div>
         ) : (
-          <span className="text-xs text-slate-400">Trip ad-hoc</span>
+          <span className="text-xs text-zinc-400 italic">Ad-hoc trip</span>
         ),
     },
     {
-      header: 'Durasi',
+      header: 'Duration',
       cell: (t) => {
-        if (!t.endedAt)
-          return (
-            <span className="pill pill-active">
-              <span className="pill-dot animate-pulse" aria-hidden="true" />
-              <span>Berlangsung</span>
-            </span>
-          );
+        if (!t.endedAt) return <span className="text-xs text-emerald-600 font-semibold">Active</span>;
         const diffMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
         const mins = Math.round(diffMs / 60000);
-        return (
-          <span className="tabular-nums whitespace-nowrap text-xs text-slate-700">
-            {mins} menit
-          </span>
-        );
+        return <span className="text-xs text-zinc-700">{mins} mins</span>;
       },
     },
     {
-      header: 'Jarak GPS',
+      header: 'Distance',
       cell: (t) => (
-        <span className="tabular-nums whitespace-nowrap text-xs font-medium text-slate-700">
+        <span className="text-xs font-mono text-zinc-700">
           {t.distanceMeters !== null && t.distanceMeters !== undefined
             ? `${(t.distanceMeters / 1000).toFixed(1)} km`
-            : '\u2014'}
+            : '—'}
         </span>
       ),
     },
@@ -148,28 +131,25 @@ export default function DriverTripHistoryPage() {
       cell: (t) => <StatusBadge status={t.status} />,
     },
     {
-      header: 'Aksi',
+      header: 'Actions',
       cell: (t) => (
         <button
           type="button"
           onClick={() => setSelectedTrip(t)}
-          className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
+          className="px-2.5 py-1 text-xs border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
         >
-          Detail
+          View
         </button>
       ),
     },
   ];
 
   return (
-    <div className="w-full min-w-0 space-y-5">
-      <header className="min-w-0">
-        <span className="eyebrow eyebrow-accent">Log pengemudi</span>
-        <h1 className="page-heading mt-2">Riwayat perjalanan</h1>
-        <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-          Rekapitulasi log tugas, jarak tempuh GPS, dan status operasional armada.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <div className="pb-4 border-b border-zinc-200">
+        <h1 className="text-xl font-bold tracking-tight text-zinc-900">Trip History</h1>
+        <p className="text-xs text-zinc-500 mt-0.5">Log of completed and active vehicle trips</p>
+      </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
@@ -177,7 +157,7 @@ export default function DriverTripHistoryPage() {
         columns={columns}
         data={trips}
         isLoading={isLoading}
-        emptyMessage="Belum ada riwayat perjalanan yang tercatat"
+        emptyMessage="No trip records found"
         onRowClick={(t) => setSelectedTrip(t)}
       />
 
@@ -188,74 +168,56 @@ export default function DriverTripHistoryPage() {
         onPageChange={(p) => fetchTrips(p)}
       />
 
+      {/* Details Drawer */}
       <Drawer
         isOpen={Boolean(selectedTrip)}
         onClose={() => setSelectedTrip(null)}
-        title="Rincian perjalanan"
-        description={selectedTrip ? `Armada ${selectedTrip.vehicle.plateNumber}` : ''}
+        title="Trip Record"
+        description={selectedTrip ? `Vehicle: ${selectedTrip.vehicle.plateNumber}` : ''}
       >
         {selectedTrip && (
-          <div className="space-y-3">
-            <section className="card p-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="eyebrow">Status</span>
-                <StatusBadge status={selectedTrip.status} />
-              </div>
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <span className="text-zinc-400 uppercase font-semibold">Status</span>
+              <StatusBadge status={selectedTrip.status} />
+            </div>
 
-              <dl className="mt-3.5 grid grid-cols-2 gap-2 border-t border-[var(--border-subtle)] pt-3.5">
-                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--canvas)] p-2.5">
-                  <dt className="metric-label">Mulai</dt>
-                  <dd className="tabular-nums mt-0.5 text-xs font-medium text-slate-800">
-                    {new Date(selectedTrip.startedAt).toLocaleString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </dd>
+            <div className="space-y-2 pb-3 border-b border-zinc-100">
+              <span className="text-zinc-400 uppercase font-semibold">Timestamps</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-zinc-400 block text-[10px]">Started</span>
+                  <span className="font-medium text-zinc-800">
+                    {new Date(selectedTrip.startedAt).toLocaleString()}
+                  </span>
                 </div>
-                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--canvas)] p-2.5">
-                  <dt className="metric-label">Selesai</dt>
-                  <dd className="tabular-nums mt-0.5 text-xs font-medium text-slate-800">
-                    {selectedTrip.endedAt
-                      ? new Date(selectedTrip.endedAt).toLocaleString('id-ID', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : 'Berlangsung'}
-                  </dd>
+                <div>
+                  <span className="text-zinc-400 block text-[10px]">Ended</span>
+                  <span className="font-medium text-zinc-800">
+                    {selectedTrip.endedAt ? new Date(selectedTrip.endedAt).toLocaleString() : 'In Progress'}
+                  </span>
                 </div>
-              </dl>
-            </section>
-
-            <section className="card p-4">
-              <span className="eyebrow">Jarak tempuh</span>
-              <div className="mt-2.5 flex items-baseline justify-between gap-3 border-t border-[var(--border-subtle)] pt-3">
-                <span className="text-xs text-slate-500">Total jarak</span>
-                <span className="metric-value text-base">
-                  {selectedTrip.distanceMeters !== null &&
-                  selectedTrip.distanceMeters !== undefined
-                    ? `${(selectedTrip.distanceMeters / 1000).toFixed(2)} km`
-                    : 'Belum terdata'}
-                </span>
               </div>
-              <p className="mono-plate mt-2 border-t border-[var(--border-subtle)] pt-2 text-[0.6875rem] text-slate-500">
-                {selectedTrip.startLat.toFixed(4)}, {selectedTrip.startLng.toFixed(4)}
-              </p>
-            </section>
+            </div>
+
+            <div className="space-y-2 pb-3 border-b border-zinc-100">
+              <span className="text-zinc-400 uppercase font-semibold">Coordinates</span>
+              <div className="p-2.5 bg-zinc-50 rounded border border-zinc-200 font-mono text-[11px] space-y-1">
+                <div>Start: {selectedTrip.startLat.toFixed(5)}, {selectedTrip.startLng.toFixed(5)}</div>
+                {selectedTrip.endLat !== null && selectedTrip.endLat !== undefined && (
+                  <div>End: {selectedTrip.endLat.toFixed(5)}, {selectedTrip.endLng?.toFixed(5)}</div>
+                )}
+              </div>
+            </div>
 
             {selectedTrip.booking && (
-              <section className="card p-4">
-                <span className="eyebrow">Reservasi terhubung</span>
-                <p className="mono-plate mt-1.5 text-sm font-semibold text-slate-900">
-                  {selectedTrip.booking.bookingNumber}
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-slate-600 wrap-anywhere">
-                  {selectedTrip.booking.purpose}
-                </p>
-              </section>
+              <div className="p-3 bg-zinc-50 rounded border border-zinc-200 space-y-1">
+                <span className="text-zinc-400 uppercase font-semibold block text-[10px]">
+                  Linked Booking
+                </span>
+                <div className="font-bold text-zinc-900">{selectedTrip.booking.bookingNumber}</div>
+                <div className="text-zinc-600">{selectedTrip.booking.purpose}</div>
+              </div>
             )}
           </div>
         )}

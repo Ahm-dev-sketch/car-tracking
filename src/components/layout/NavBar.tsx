@@ -1,10 +1,9 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { Bell, ChevronRight, Ellipsis, LogOut, Route, Settings2 } from 'lucide-react';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Drawer } from '@/components/ui/Drawer';
 import { Icon } from '@/components/ui/Icon';
@@ -37,8 +36,6 @@ export function NavBar() {
   const initials = name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase();
   const moreActive = role === 'ADMIN' && links.slice(3).some((link) => isNavigationActive(pathname, link.href));
   const hasMoreButton = role === 'ADMIN' || role === 'DRIVER';
-  const roleLabel = role === 'ADMIN' ? 'Admin' : role === 'DRIVER' ? 'Driver' : 'User';
-  const roleLong = role === 'ADMIN' ? 'Fleet Administrator' : role === 'DRIVER' ? 'Driver Operasional' : 'Staf / Penumpang';
 
   useEffect(() => {
     if (!session?.user) return;
@@ -114,34 +111,25 @@ export function NavBar() {
     <>
       <header className="app-header">
         <div className="header-island">
-          <Link
-            href={links[0].href}
-            className="flex min-h-9 shrink-0 items-center gap-2.5 rounded-[var(--radius-md)]"
-            aria-label="KCIC Fleet — beranda"
-          >
-            <span className="brand-mark">
-              <Route className="size-4" strokeWidth={2.1} aria-hidden="true" />
-            </span>
-            <span className="brand-word hidden sm:block">
-              KCIC <span>Fleet</span>
-            </span>
+          <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="KCIC Fleet home">
+            <span className="brand-mark"><Icon name="route" className="size-6 text-black" /></span>
+            <span className="text-xl font-black tracking-tight text-black">KCIC <span className="text-emerald-700 underline decoration-black decoration-2">Fleet</span></span>
           </Link>
-
-          <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Navigasi utama">
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
             {links.map((link) => {
               const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="desktop-link inline-flex items-center gap-1.5"
+                  className="desktop-link relative inline-flex items-center gap-1.5"
                   aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}
                 >
                   <span>{link.label}</span>
                   {showBadge && (
                     <span
                       aria-label={`${pendingActionCount} pesanan butuh aksi`}
-                      className="count-badge"
+                      className="inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full border border-black bg-rose-500 text-white text-[10px] font-black leading-none shadow-[1px_1px_0px_0px_#000]"
                     >
                       {pendingActionCount > 99 ? '99+' : pendingActionCount}
                     </span>
@@ -150,42 +138,21 @@ export function NavBar() {
               );
             })}
           </nav>
-
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-2">
             <GreetingClock variant="navbar" />
-            <button
-              type="button"
-              onClick={() => setNotificationsOpen(true)}
-              className="header-icon-button relative"
-              aria-label={`Notifikasi${unreadCount ? `, ${unreadCount} belum dibaca` : ''}`}
-              aria-haspopup="dialog"
-            >
-              <Bell className="size-[1.125rem]" strokeWidth={1.75} aria-hidden="true" />
-              {unreadCount > 0 && (
-                <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-[#C8102E] px-1 text-[0.625rem] font-bold leading-4 text-white tabular-nums">
-                  {unreadCount}
-                </span>
-              )}
+            <button type="button" onClick={() => setNotificationsOpen(true)} className="icon-button relative rounded-xl border-2 border-black bg-white shadow-[2px_2px_0px_0px_#000]" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-haspopup="dialog">
+              <Icon name="bell" />
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 size-3.5 rounded-full border-1.5 border-black bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">{unreadCount}</span>}
             </button>
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-[var(--radius-full)] border border-[var(--border)] bg-white pl-1 pr-1 text-slate-800 transition-colors hover:bg-[var(--canvas)] xl:pr-2.5"
-              aria-label="Buka menu akun dan navigasi"
-              aria-haspopup="dialog"
-              aria-expanded={menuOpen}
-            >
-              <span className="grid size-7 place-items-center rounded-full bg-[var(--slate-navy)] text-[0.6875rem] font-semibold text-white">
-                {initials}
-              </span>
-              <span className="hidden text-[0.75rem] font-medium text-slate-600 xl:inline">{roleLabel}</span>
+            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-10 min-w-10 cursor-pointer items-center justify-center gap-2.5 rounded-xl border-2 border-black bg-amber-300 p-1 text-black shadow-[2px_2px_0px_0px_#000] transition-all hover:bg-amber-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none" aria-label="Open account and navigation" aria-haspopup="dialog" aria-expanded={menuOpen}>
+              <span className="grid size-8 place-items-center rounded-lg border-1.5 border-black bg-white text-xs font-black">{initials}</span>
+              <span className="hidden pr-2 text-xs font-black uppercase tracking-wider xl:inline">{role === 'ADMIN' ? 'Admin' : role === 'DRIVER' ? 'Driver' : 'Workspace'}</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Mobile bottom dock */}
-      <nav className="mobile-dock" aria-label="Navigasi seluler">
+      <nav className="mobile-dock" aria-label="Mobile navigation">
         {dockLinks.map((link) => {
           const isActive = isNavigationActive(pathname, link.href);
           const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
@@ -202,7 +169,7 @@ export function NavBar() {
                 {showBadge && (
                   <span
                     aria-label={`${pendingActionCount} pesanan butuh aksi`}
-                    className="absolute -right-1 -top-1 grid min-w-3.5 place-items-center rounded-full bg-[#C8102E] px-0.5 text-[0.5rem] font-bold leading-3.5 text-white tabular-nums"
+                    className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full border border-black bg-rose-500 text-white text-[9px] font-black flex items-center justify-center leading-none shadow-[1px_1px_0px_0px_#000]"
                   >
                     {pendingActionCount > 99 ? '99+' : pendingActionCount}
                   </span>
@@ -216,149 +183,84 @@ export function NavBar() {
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
-            className="dock-tab"
+            className="dock-tab dock-tab--more"
             aria-expanded={menuOpen}
             aria-current={moreActive ? 'page' : undefined}
             aria-haspopup="dialog"
             aria-label="Buka menu navigasi lainnya"
           >
             <span className="dock-tab-icon">
-              <Ellipsis className="size-5" strokeWidth={2} aria-hidden="true" />
+              <Icon name="more" className="size-5" />
             </span>
             <span className="dock-tab-label" aria-hidden="true">More</span>
           </button>
         )}
       </nav>
 
-      {/* Account menu */}
-      <Drawer
-        isOpen={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        title="Menu akun"
-        description="Navigasi kerja dan pengaturan Anda."
-      >
+      <Drawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} title="Your workspace" description="Everything you need for the road ahead.">
         <GreetingClock variant="compact" userName={session?.user?.name} className="w-full justify-between" />
-
-        <div className="card flex items-center gap-3 p-3.5">
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--slate-navy)] text-[0.8125rem] font-semibold text-white">
-            {initials}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[0.8125rem] font-semibold text-slate-900">{name}</p>
-            <p className="mt-0.5 text-[0.6875rem] uppercase tracking-[0.06em] text-slate-400">{roleLong}</p>
-          </div>
+        <div className="flex items-center gap-3 rounded-xl border-2 border-black bg-emerald-300 p-4 shadow-[3px_3px_0px_0px_#000]">
+          <span className="grid size-12 shrink-0 place-items-center rounded-lg border-2 border-black bg-white text-base font-black text-black">{initials}</span>
+          <div className="min-w-0"><p className="break-words text-sm font-extrabold text-black">{name}</p><p className="mt-0.5 text-xs font-bold uppercase tracking-wider text-emerald-950">{role === 'ADMIN' ? 'Fleet administrator' : role === 'DRIVER' ? 'Driver workspace' : 'Employee workspace'}</p></div>
         </div>
-
-        <nav aria-label="Navigasi ruang kerja" className="card overflow-hidden p-1.5">
+        <nav aria-label="Workspace navigation" className="space-y-2">
           {links.map((link) => {
             const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
-            const isActive = isNavigationActive(pathname, link.href);
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                aria-current={isActive ? 'page' : undefined}
-                className={`flex min-h-11 items-center gap-3 rounded-[var(--radius-md)] px-3 text-[0.8125rem] font-medium transition-colors ${
-                  isActive
-                    ? 'bg-[var(--canvas)] text-slate-900'
-                    : 'text-slate-600 hover:bg-[var(--canvas)] hover:text-slate-900'
+                aria-current={isNavigationActive(pathname, link.href) ? 'page' : undefined}
+                className={`flex min-h-12 items-center gap-3 rounded-xl border-2 border-black px-4 text-sm font-bold shadow-[2.5px_2.5px_0px_0px_#000] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${
+                  isNavigationActive(pathname, link.href) ? 'bg-amber-300 text-black' : 'bg-white text-black hover:bg-amber-100'
                 }`}
               >
-                <Icon
-                  name={link.icon}
-                  className={`size-[1.125rem] shrink-0 ${isActive ? 'text-[#C8102E]' : 'text-slate-400'}`}
-                />
+                <Icon name={link.icon} />
                 <span className="flex-1">{link.label}</span>
                 {showBadge && (
-                  <span aria-label={`${pendingActionCount} pesanan butuh aksi`} className="count-badge">
+                  <span
+                    aria-label={`${pendingActionCount} pesanan butuh aksi`}
+                    className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full border border-black bg-rose-500 text-white text-xs font-black shadow-[1px_1px_0px_0px_#000]"
+                  >
                     {pendingActionCount > 99 ? '99+' : pendingActionCount}
                   </span>
                 )}
-                <ChevronRight className="size-3.5 shrink-0 text-slate-300" strokeWidth={2} aria-hidden="true" />
+                <Icon name="arrow" className="size-4 opacity-75" />
               </Link>
             );
           })}
         </nav>
-
-        <div className="card overflow-hidden p-1.5">
+        <div className="border-t-2 border-black pt-4">
           <button
             type="button"
-            disabled
-            className="flex w-full min-h-11 cursor-not-allowed items-center gap-3 rounded-[var(--radius-md)] px-3 text-left text-[0.8125rem] font-medium text-slate-400"
-            aria-disabled="true"
+            onClick={() => {
+              resetInstallDismissal();
+              onExplicitLogout();
+              signOut({ callbackUrl: '/login' });
+            }}
+            className="button-secondary w-full rounded-xl border-2 border-black bg-rose-200 text-black font-extrabold shadow-[3px_3px_0px_0px_#000] hover:bg-rose-300"
           >
-            <Settings2 className="size-[1.125rem] shrink-0" strokeWidth={1.75} aria-hidden="true" />
-            <span className="flex-1">Pengaturan akun</span>
-            <span className="pill text-[0.625rem]">Segera</span>
+            <Icon name="logout" />Sign out
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            resetInstallDismissal();
-            onExplicitLogout();
-            signOut({ callbackUrl: '/login' });
-          }}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-4 py-2.5 text-[0.8125rem] font-semibold text-[#B91C1C] transition-colors hover:border-[#FECACA] hover:bg-[#FEF2F2]"
-        >
-          <LogOut className="size-4" strokeWidth={1.9} aria-hidden="true" />
-          <span>Keluar akun</span>
-        </button>
       </Drawer>
 
-      {/* Notifications */}
-      <Drawer
-        isOpen={notificationsOpen}
-        onClose={() => setNotificationsOpen(false)}
-        title="Notifikasi"
-        description={unreadCount ? `${unreadCount} pemberitahuan belum dibaca.` : 'Semua notifikasi telah dibaca.'}
-      >
+      <Drawer isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Notifications" description={unreadCount ? `${unreadCount} unread updates from your workspace.` : 'You’re all caught up.'}>
         {notifications.length === 0 ? (
-          <div className="flex flex-col items-center rounded-[var(--radius-xl)] border border-[var(--border)] bg-white px-5 py-12 text-center">
-            <span className="mb-3 grid size-11 place-items-center rounded-full border border-[var(--border)] bg-[var(--canvas)] text-slate-400">
-              <Bell className="size-[1.125rem]" strokeWidth={1.75} aria-hidden="true" />
-            </span>
-            <p className="text-[0.8125rem] font-semibold text-slate-900">Belum ada notifikasi</p>
-            <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-500">
-              Pembaruan pesanan dan status armada akan muncul di sini.
-            </p>
+          <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-black bg-amber-50/50 px-5 py-12 text-center">
+            <span className="grid size-14 place-items-center rounded-xl border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000]"><Icon name="bell" className="size-6" /></span>
+            <p className="text-base font-extrabold text-black">A little quiet here.</p><p className="max-w-60 text-xs font-medium leading-relaxed text-zinc-600">Booking and trip updates will appear here.</p>
           </div>
         ) : (
-          <ul className="card divide-y divide-[var(--border-subtle)] overflow-hidden">
-            {notifications.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => !item.readAt && void markNotificationRead(item.id)}
-                  className={`flex w-full cursor-pointer gap-3 p-3.5 text-left transition-colors hover:bg-[var(--canvas)] ${
-                    !item.readAt ? 'bg-[#FDF2F4]/60' : 'bg-white'
-                  }`}
-                >
-                  <span
-                    className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full ${
-                      !item.readAt ? 'bg-[#FDF2F4] text-[#C8102E]' : 'bg-[var(--canvas)] text-slate-400'
-                    }`}
-                  >
-                    <Bell className="size-3.5" strokeWidth={2} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-start justify-between gap-2">
-                      <span className="text-[0.8125rem] font-semibold leading-snug text-slate-900">{item.title}</span>
-                      {!item.readAt && (
-                        <span className="mt-1 size-1.5 shrink-0 rounded-full bg-[#C8102E]">
-                          <span className="sr-only">Belum dibaca</span>
-                        </span>
-                      )}
-                    </span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{item.body}</span>
-                    <RelativeTime date={item.createdAt} className="mt-1.5 block" />
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <ul className="space-y-3">{notifications.map((item) => (
+            <li key={item.id}>
+              <button type="button" onClick={() => !item.readAt && void markNotificationRead(item.id)} className={`w-full rounded-xl border-2 border-black p-4 text-left shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-amber-50 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none ${!item.readAt ? 'bg-amber-200/70' : 'bg-white'}`}>
+                <span className="flex items-start justify-between gap-3"><span className="text-sm font-extrabold text-black">{item.title}</span>{!item.readAt && <span className="mt-1 size-2.5 shrink-0 rounded-full border border-black bg-emerald-500"><span className="sr-only">Unread</span></span>}</span>
+                <span className="mt-1.5 block text-xs font-medium leading-relaxed text-zinc-800">{item.body}</span><RelativeTime date={item.createdAt} className="mt-2.5 block font-mono text-[11px] font-bold text-zinc-600" />
+              </button>
+            </li>
+          ))}</ul>
         )}
       </Drawer>
     </>

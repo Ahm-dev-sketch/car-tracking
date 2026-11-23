@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, Download, Route, UserRound } from 'lucide-react';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Pagination } from '@/components/ui/Pagination';
 import { Drawer } from '@/components/ui/Drawer';
+import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
 import { ExportReportModal } from '@/components/admin/ExportReportModal';
 
 interface AdminTrip {
@@ -82,10 +83,10 @@ export default function AdminTripsPage() {
         setPage(targetPage);
       } else {
         const err = await res.json();
-        setError(err.error?.message || 'Gagal memuat riwayat perjalanan');
+        setError(err.error?.message || 'Failed to load trips');
       }
     } catch {
-      setError('Kendala jaringan saat memuat riwayat perjalanan');
+      setError('Network error loading trips');
     } finally {
       setIsLoading(false);
     }
@@ -97,62 +98,56 @@ export default function AdminTripsPage() {
 
   const columns: Column<AdminTrip>[] = [
     {
-      header: 'Tanggal',
+      header: 'Trip Date',
       cell: (t) => (
         <div className="text-xs">
-          <div className="font-semibold tabular-nums text-slate-900">
-            {new Date(t.startedAt).toLocaleDateString([], {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+          <div className="font-semibold text-zinc-900">
+            {new Date(t.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
-          <div className="tabular-nums text-slate-500">
+          <div className="text-zinc-500">
             {new Date(t.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       ),
     },
     {
-      header: 'Armada',
+      header: 'Vehicle',
       cell: (t) => (
         <div className="text-xs">
-          <span className="mono-plate block font-semibold text-slate-900">{t.vehicle.plateNumber}</span>
-          <span className="block truncate text-slate-500">
-            {t.vehicle.brand} {t.vehicle.model}
-          </span>
+          <span className="font-mono font-bold text-zinc-900">{t.vehicle.plateNumber}</span>
+          <span className="text-zinc-500 block">{t.vehicle.brand} {t.vehicle.model}</span>
         </div>
       ),
     },
     {
-      header: 'Pengemudi',
+      header: 'Driver',
       cell: (t) => (
         <div className="text-xs">
-          <span className="block font-medium text-slate-800">{t.driver.user.name}</span>
-          <span className="mono-plate block text-[0.6875rem] text-slate-500">{t.driver.user.phone}</span>
+          <span className="font-semibold text-zinc-800">{t.driver.user.name}</span>
+          <span className="text-zinc-500 block font-mono text-[11px]">{t.driver.user.phone}</span>
         </div>
       ),
     },
     {
-      header: 'Referensi booking',
+      header: 'Booking Ref',
       cell: (t) =>
         t.booking ? (
           <div className="text-xs">
-            <span className="mono-plate block font-medium text-slate-800">{t.booking.bookingNumber}</span>
-            <span className="block max-w-[150px] truncate text-slate-500">{t.booking.purpose}</span>
+            <span className="font-medium text-zinc-800">{t.booking.bookingNumber}</span>
+            <span className="text-zinc-500 block truncate max-w-[150px]">{t.booking.purpose}</span>
           </div>
         ) : (
-          <span className="text-xs italic text-slate-400">Ad-hoc dispatch</span>
+          <span className="text-xs text-zinc-400 italic">Ad-hoc dispatch</span>
         ),
     },
     {
-      header: 'Durasi & jarak',
+      header: 'Duration & Dist',
       cell: (t) => {
-        let durationText = 'Berjalan';
+        let durationText = 'Active';
         if (t.endedAt) {
           const diffMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
           const mins = Math.round(diffMs / 60000);
-          durationText = `${mins} mnt`;
+          durationText = `${mins} mins`;
         }
         const distText =
           t.distanceMeters !== null && t.distanceMeters !== undefined
@@ -161,8 +156,8 @@ export default function AdminTripsPage() {
 
         return (
           <div className="text-xs">
-            <span className="block font-medium tabular-nums text-slate-800">{durationText}</span>
-            <span className="mono-plate block text-[0.6875rem] tabular-nums text-slate-500">{distText}</span>
+            <span className="font-medium text-zinc-800">{durationText}</span>
+            <span className="text-zinc-500 block font-mono text-[11px]">{distText}</span>
           </div>
         );
       },
@@ -172,72 +167,60 @@ export default function AdminTripsPage() {
       cell: (t) => <StatusBadge status={t.status} />,
     },
     {
-      header: '',
+      header: 'Actions',
       cell: (t) => (
         <button
           type="button"
           onClick={() => setSelectedTrip(t)}
-          aria-label={`Detail perjalanan ${t.vehicle.plateNumber}`}
-          className="grid size-8 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-white text-slate-400 transition-colors hover:border-[var(--border-strong)] hover:text-slate-700"
+          className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
         >
-          <ChevronRight className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+          Details
         </button>
       ),
     },
   ];
 
   return (
-    <div className="w-full min-w-0 space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">Audit &amp; log telemetri</span>
-          <h1 className="page-heading mt-2">Riwayat perjalanan armada</h1>
-          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-            Rekam jejak seluruh sesi dinas, rute telemetri GPS, dan audit jarak tempuh.
-          </p>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Trip Audit & Records</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">Comprehensive history of all vehicle tracking sessions and routes</p>
         </div>
         <button
           type="button"
           onClick={() => setIsExportModalOpen(true)}
-          className="button-primary self-start sm:self-auto"
+          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border-2 border-black text-xs font-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 self-start sm:self-auto transition-transform active:translate-y-0.5"
         >
-          <Download className="size-4" strokeWidth={1.9} aria-hidden="true" />
-          <span>Unduh laporan Excel</span>
+          <Icon name="download" className="size-4" />
+          <span>Download Laporan Excel</span>
         </button>
-      </header>
+      </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      <div className="card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <label
-            htmlFor="trip-status-filter"
-            className="metric-label"
-          >
-            Status perjalanan
-          </label>
+      {/* Filter */}
+      <div className="surface p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
           <select
-            id="trip-status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-auto min-w-0 rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
+            className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
           >
-            <option value="">Semua status</option>
-            <option value="ACTIVE">Aktif (sedang berjalan)</option>
-            <option value="COMPLETED">Selesai</option>
-            <option value="ABORTED">Dibatalkan</option>
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="COMPLETED">COMPLETED</option>
+            <option value="ABORTED">ABORTED</option>
           </select>
         </div>
-        <span className="text-[0.6875rem] tabular-nums text-slate-400">
-          {totalRecords} perjalanan tercatat
-        </span>
       </div>
 
       <DataTable
         columns={columns}
         data={trips}
         isLoading={isLoading}
-        emptyMessage="Tidak ada riwayat perjalanan ditemukan"
+        emptyMessage="No trip records found"
         onRowClick={(t) => setSelectedTrip(t)}
       />
 
@@ -248,74 +231,60 @@ export default function AdminTripsPage() {
         onPageChange={(p) => fetchTrips(p)}
       />
 
+      {/* Trip Detail Drawer */}
       <Drawer
         isOpen={Boolean(selectedTrip)}
         onClose={() => setSelectedTrip(null)}
-        title="Detail audit perjalanan"
-        description={selectedTrip ? `Kendaraan ${selectedTrip.vehicle.plateNumber}` : ''}
+        title="Trip Record Details"
+        description={selectedTrip ? `Vehicle: ${selectedTrip.vehicle.plateNumber}` : ''}
       >
         {selectedTrip && (
           <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
-              <span className="metric-label">Status</span>
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <span className="text-zinc-400 uppercase font-semibold">Status</span>
               <StatusBadge status={selectedTrip.status} />
             </div>
 
-            <div className="space-y-2 border-b border-[var(--border-subtle)] pb-3">
-              <span className="metric-label">Pengemudi &amp; armada</span>
-              <div className="space-y-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3.5">
-                <p className="flex items-center gap-1.5 font-semibold text-slate-900">
-                  <UserRound className="size-3.5" strokeWidth={2} aria-hidden="true" />
-                  {selectedTrip.driver.user.name}
-                </p>
-                <p className="mono-plate text-[0.6875rem] text-slate-500">
-                  SIM {selectedTrip.driver.licenseNumber}
-                </p>
-                <p className="mono-plate text-[0.6875rem] text-slate-500">
-                  Telp {selectedTrip.driver.user.phone}
-                </p>
+            <div className="space-y-2 pb-3 border-b border-zinc-100">
+              <span className="text-zinc-400 uppercase font-semibold">Operator & Vehicle</span>
+              <div className="p-3 bg-zinc-50 rounded border border-zinc-200 space-y-1">
+                <div className="font-bold text-zinc-900">{selectedTrip.driver.user.name}</div>
+                <div className="text-zinc-600 font-mono">License: {selectedTrip.driver.licenseNumber}</div>
+                <div className="text-zinc-600 font-mono">Phone: {selectedTrip.driver.user.phone}</div>
               </div>
-              <div className="space-y-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3.5">
-                <p className="mono-plate font-semibold text-slate-900">
-                  {selectedTrip.vehicle.plateNumber}
-                </p>
-                <p className="text-slate-600">
-                  {selectedTrip.vehicle.brand} {selectedTrip.vehicle.model}
-                </p>
+              <div className="p-3 bg-zinc-50 rounded border border-zinc-200 space-y-1">
+                <div className="font-mono font-bold text-zinc-900">{selectedTrip.vehicle.plateNumber}</div>
+                <div className="text-zinc-600">{selectedTrip.vehicle.brand} {selectedTrip.vehicle.model}</div>
               </div>
             </div>
 
-            <div className="space-y-2 border-b border-[var(--border-subtle)] pb-3">
-              <span className="metric-label">Telemetri koordinat GPS</span>
-              <div className="mono-plate space-y-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3 text-[0.6875rem] tabular-nums">
-                <p>
-                  Titik mulai {selectedTrip.startLat.toFixed(5)}, {selectedTrip.startLng.toFixed(5)}
-                </p>
+            <div className="space-y-2 pb-3 border-b border-zinc-100">
+              <span className="text-zinc-400 uppercase font-semibold">GPS Telemetry Range</span>
+              <div className="p-2.5 bg-zinc-50 rounded border border-zinc-200 font-mono text-[11px] space-y-1">
+                <div>Start Point: {selectedTrip.startLat.toFixed(5)}, {selectedTrip.startLng.toFixed(5)}</div>
                 {selectedTrip.endLat !== null && selectedTrip.endLat !== undefined && (
-                  <p>
-                    Titik akhir {selectedTrip.endLat.toFixed(5)}, {selectedTrip.endLng?.toFixed(5)}
-                  </p>
+                  <div>End Point: {selectedTrip.endLat.toFixed(5)}, {selectedTrip.endLng?.toFixed(5)}</div>
                 )}
                 {selectedTrip.distanceMeters !== null && selectedTrip.distanceMeters !== undefined && (
-                  <p>Total jarak {(selectedTrip.distanceMeters / 1000).toFixed(2)} km</p>
+                  <div>Distance: {(selectedTrip.distanceMeters / 1000).toFixed(2)} km</div>
                 )}
               </div>
             </div>
 
             {selectedTrip.booking && (
-              <div className="space-y-1 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3.5">
-                <span className="metric-label">Reservasi dinas terkait</span>
-                <p className="mono-plate flex items-center gap-1.5 font-semibold text-slate-900">
-                  <Route className="size-3.5" strokeWidth={2} aria-hidden="true" />
-                  {selectedTrip.booking.bookingNumber}
-                </p>
-                <p className="text-slate-600">{selectedTrip.booking.purpose}</p>
+              <div className="p-3 bg-zinc-50 rounded border border-zinc-200 space-y-1">
+                <span className="text-zinc-400 uppercase font-semibold block text-[10px]">
+                  Associated Reservation
+                </span>
+                <div className="font-bold text-zinc-900">{selectedTrip.booking.bookingNumber}</div>
+                <div className="text-zinc-600">{selectedTrip.booking.purpose}</div>
               </div>
             )}
           </div>
         )}
       </Drawer>
 
+      {/* Export Report Excel Modal */}
       <ExportReportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}

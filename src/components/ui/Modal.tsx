@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useId, useLayoutEffect, useRef } from "react";
-import { X } from "lucide-react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -40,6 +39,7 @@ function lockScroll() {
   const htmlOverflowPriority =
     documentElement.style.getPropertyPriority("overflow");
 
+  // A fixed body also prevents background scrolling on mobile Safari.
   body.style.setProperty("position", "fixed");
   body.style.setProperty("top", `-${scrollY}px`);
   body.style.setProperty("left", `-${scrollX}px`);
@@ -90,6 +90,7 @@ function focusDialog(dialog: HTMLDialogElement) {
   (focusableElements(dialog)[0] ?? dialog).focus({ preventScroll: true });
 }
 
+// Shared by Modal and Drawer so overlapping dialogs own a single scroll lock.
 export function useDialog(isOpen: boolean) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -143,15 +144,31 @@ export function useDialog(isOpen: boolean) {
     return () => {
       document.removeEventListener("focusin", containFocus);
       dialog.removeEventListener("keydown", handleTab);
+      const wasTop = openDialogs.at(-1) === dialog;
       const index = openDialogs.indexOf(dialog);
-      if (index >= 0) openDialogs.splice(index, 1);
+      const previousFocus = returnFocus.get(dialog);
+      const next = openDialogs[index + 1];
+      // Preserve the original trigger when a lower dialog closes first.
+      if (next && dialog.contains(returnFocus.get(next) ?? null)) {
+        returnFocus.set(next, previousFocus ?? null);
+      }
+      if (index !== -1) openDialogs.splice(index, 1);
+      returnFocus.delete(dialog);
       dialog.close();
-      if (openDialogs.length === 0 && restoreScroll) {
-        restoreScroll();
+      if (openDialogs.length === 0) {
+        restoreScroll?.();
         restoreScroll = undefined;
       }
-      returnFocus.get(dialog)?.focus({ preventScroll: true });
-      returnFocus.delete(dialog);
+      const top = openDialogs.at(-1);
+      if (
+        wasTop &&
+        previousFocus?.isConnected &&
+        !previousFocus.closest("[inert], dialog:not([open])") &&
+        (!top || top.contains(previousFocus))
+      ) {
+        previousFocus.focus({ preventScroll: true });
+      }
+      if (top && !top.contains(document.activeElement)) focusDialog(top);
     };
   }, [isOpen]);
 
@@ -175,11 +192,11 @@ export function Modal({
   if (!isOpen) return null;
 
   const maxWidthClasses = {
-    sm: "max-w-sm",
-    md: "max-w-md",
-    lg: "max-w-lg",
-    xl: "max-w-xl",
-    "2xl": "max-w-2xl",
+    sm: "sm:max-w-sm",
+    md: "sm:max-w-md",
+    lg: "sm:max-w-lg",
+    xl: "sm:max-w-xl",
+    "2xl": "sm:max-w-2xl",
   };
 
   return (
@@ -202,24 +219,28 @@ export function Modal({
           onClose();
         backdropPress.current = false;
       }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-center justify-center overflow-y-auto border-0 bg-transparent p-4 text-slate-900 outline-none open:flex backdrop:bg-slate-900/35 backdrop:backdrop-blur-[2px]"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-center justify-end overflow-hidden border-0 bg-transparent p-0 pt-[max(1rem,env(safe-area-inset-top))] text-black outline-none open:flex backdrop:bg-black/50 sm:justify-center sm:p-6 sm:pt-[max(1.5rem,env(safe-area-inset-top))] sm:pb-[max(1.5rem,env(safe-area-inset-bottom))]"
     >
       <div
-        className={`my-auto flex max-h-[calc(100dvh-2rem)] min-h-0 w-full flex-col overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-float)] transition-[transform,opacity] duration-200 ease-out starting:scale-[0.97] starting:opacity-0 motion-reduce:transition-none ${maxWidthClasses[maxWidth]}`}
+        className={`flex max-h-full min-h-0 w-full flex-col rounded-t-2xl sm:rounded-2xl border-t-[3px] sm:border-[3px] border-black bg-white shadow-[8px_8px_0px_0px_#000] transition-[transform,opacity] duration-200 ease-out starting:translate-y-4 starting:opacity-0 motion-reduce:transition-none sm:max-h-[90dvh] ${maxWidthClasses[maxWidth]}`}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] bg-white/95 px-5 py-4 backdrop-blur-sm sm:px-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white pb-[env(safe-area-inset-bottom)] sm:pb-0">
+          <div
+            className="mx-auto mb-1 mt-2 h-1.5 w-12 shrink-0 rounded-full bg-black sm:hidden"
+            aria-hidden="true"
+          />
+          <div className="flex shrink-0 items-center justify-between gap-4 border-b-[2.5px] border-black bg-amber-100/60 px-5 py-4 sm:px-6">
             <div className="min-w-0">
               <h2
                 id={titleId}
-                className="text-[0.9375rem] font-semibold tracking-[-0.015em] text-slate-900"
+                className="text-xl font-extrabold tracking-tight text-black"
               >
                 {title}
               </h2>
               {description && (
                 <p
                   id={descriptionId}
-                  className="mt-0.5 text-xs leading-relaxed text-slate-500"
+                  className="mt-1 text-xs font-semibold text-zinc-700 leading-relaxed"
                 >
                   {description}
                 </p>
@@ -228,19 +249,32 @@ export function Modal({
             <button
               type="button"
               onClick={onClose}
-              className="-mr-1 -mt-1 grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-slate-400 transition-colors hover:bg-[var(--canvas-sunken)] hover:text-slate-700"
+              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border-2 border-black bg-rose-200 text-black shadow-[2px_2px_0px_0px_#000] transition-all hover:bg-rose-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
               aria-label="Close dialog"
             >
-              <X className="size-4" strokeWidth={2} aria-hidden="true" />
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="m7 7 10 10M17 7 7 17" />
+              </svg>
             </button>
           </div>
-          <div className="space-y-4 px-5 py-5 sm:px-6">{children}</div>
-        </div>
-        {footer && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-[var(--canvas)] px-5 py-3.5 sm:px-6">
-            {footer}
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">
+            {children}
           </div>
-        )}
+          {footer && (
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t-[2.5px] border-black bg-zinc-50 px-5 py-4 sm:px-6">
+              {footer}
+            </div>
+          )}
+        </div>
       </div>
     </dialog>
   );

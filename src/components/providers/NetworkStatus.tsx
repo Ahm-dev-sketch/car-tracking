@@ -1,23 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
-import { RefreshCw, Wifi, WifiOff, X } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getOfflineQueueCount, processOfflineQueue } from '@/lib/offline-sync';
 
-function subscribeToNetwork(onChange: () => void) {
-  window.addEventListener('online', onChange);
-  window.addEventListener('offline', onChange);
-  return () => {
-    window.removeEventListener('online', onChange);
-    window.removeEventListener('offline', onChange);
-  };
-}
-
-const readOnline = () => navigator.onLine;
-const readOnlineOnServer = () => true;
-
 export function NetworkStatus() {
-  const isOnline = useSyncExternalStore(subscribeToNetwork, readOnline, readOnlineOnServer);
+  const [isOnline, setIsOnline] = useState(true);
   const [hasChanged, setHasChanged] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -31,11 +18,13 @@ export function NetworkStatus() {
   }, []);
 
   useEffect(() => {
-    // Queued so the effect itself only subscribes; the first read lands in a
-    // callback rather than synchronously in the effect body.
-    const firstRead = setTimeout(refreshPending, 0);
+    if (typeof window === 'undefined') return;
+
+    setIsOnline(navigator.onLine);
+    refreshPending();
 
     const handleOnline = () => {
+      setIsOnline(true);
       setHasChanged(true);
       setDismissed(false);
       refreshPending();
@@ -44,6 +33,7 @@ export function NetworkStatus() {
     };
 
     const handleOffline = () => {
+      setIsOnline(false);
       setHasChanged(true);
       setDismissed(false);
       refreshPending();
@@ -58,7 +48,6 @@ export function NetworkStatus() {
     window.addEventListener('offline-sync:complete', handleSyncComplete);
 
     return () => {
-      clearTimeout(firstRead);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('offline-sync:complete', handleSyncComplete);
@@ -83,52 +72,53 @@ export function NetworkStatus() {
   }
 
   const message = !isOnline
-    ? pending
-      ? `Mode offline · ${pendingCount} data menunggu`
-      : 'Koneksi terputus — pembaruan dijeda'
-    : pending
-      ? `Menyinkronkan ${pendingCount} data tertunda…`
-      : 'Kembali online';
-
-  const StatusIcon = isOnline ? Wifi : WifiOff;
+    ? (pending ? `Mode Offline • ${pendingCount} data menunggu dikirim` : 'Connection lost — updates paused')
+    : (pending ? `Menyinkronkan ${pendingCount} data tertunda ke server...` : 'Back online');
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,env(safe-area-inset-top))] z-[var(--layer-toast)] flex justify-center px-4"
+      className="fixed top-[max(0.5rem,env(safe-area-inset-top))] inset-x-0 z-[var(--layer-toast)] flex justify-center px-4 pointer-events-none"
     >
       <div
-        className={`pointer-events-auto flex items-center gap-2 rounded-[var(--radius-full)] border py-1.5 pl-2.5 pr-1 text-xs font-medium shadow-[var(--shadow-lg)] backdrop-blur-sm ${
+        className={`pointer-events-auto flex items-center gap-2.5 pl-4 pr-1.5 py-1.5 rounded-full shadow-[0_8px_32px_-12px_rgba(25,76,60,0.15)] border text-xs font-medium ${
           !isOnline
-            ? 'border-[#FECACA] bg-[#FEF2F2]/95 text-[#991B1B]'
-            : 'border-[#A7F3D0] bg-[#ECFDF5]/95 text-[#065F46]'
+            ? 'bg-rose-600/95 text-white border-rose-700 shadow-rose-950/20'
+            : 'bg-emerald-600/95 text-white border-emerald-700 shadow-emerald-950/20'
         }`}
       >
-        <span className="relative flex size-4 shrink-0 items-center justify-center">
-          <StatusIcon className="size-3.5" strokeWidth={2} aria-hidden="true" />
-          {isOnline && pending && (
-            <span className="live-ping absolute inset-0 rounded-full bg-[#059669]/30" aria-hidden="true" />
+        <span className="relative flex h-2 w-2 shrink-0">
+          {!isOnline ? (
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+          ) : (
+            <>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+            </>
           )}
         </span>
-        <span className="tabular-nums">{message}</span>
+        <span>
+          {message}
+        </span>
         {isOnline && pending && (
           <button
             type="button"
             onClick={() => void processOfflineQueue().catch(() => {})}
-            className="ml-0.5 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-[var(--radius-full)] px-2 font-semibold transition-colors hover:bg-black/5"
+            className="ml-1 min-h-11 px-3 flex items-center justify-center hover:bg-white/20 rounded-full text-white/90 hover:text-white cursor-pointer font-semibold"
           >
-            <RefreshCw className="size-3" strokeWidth={2.2} aria-hidden="true" />
-            <span>Sync</span>
+            Sync Sekarang
           </button>
         )}
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          className="grid size-7 cursor-pointer place-items-center rounded-full opacity-60 transition-opacity hover:bg-black/5 hover:opacity-100"
-          aria-label="Tutup pemberitahuan jaringan"
+          className="ml-1 min-h-11 min-w-11 flex items-center justify-center hover:bg-white/20 rounded-full text-white/80 hover:text-white cursor-pointer"
+          aria-label="Dismiss network notice"
         >
-          <X className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
     </div>

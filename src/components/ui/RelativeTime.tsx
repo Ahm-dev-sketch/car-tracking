@@ -7,23 +7,17 @@ function formatRelative(date: Date | string | number): string {
   if (isNaN(time)) return '—';
 
   const diffSeconds = Math.round((Date.now() - time) / 1000);
-  if (diffSeconds < 5) return 'baru saja';
-  if (diffSeconds < 60) return `${diffSeconds} dtk lalu`;
+  if (diffSeconds < 5) return 'just now';
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
   const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes} mnt lalu`;
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} jam lalu`;
+  if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} hr lalu`;
+  return `${diffDays}d ago`;
 }
 
-export function RelativeTime({
-  date,
-  className = '',
-}: {
-  date: Date | string | number | null | undefined;
-  className?: string;
-}) {
+export function RelativeTime({ date, className = '' }: { date: Date | string | number | null | undefined; className?: string }) {
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -39,8 +33,8 @@ export function RelativeTime({
   return (
     <time
       dateTime={new Date(date).toISOString()}
-      title={new Date(date).toLocaleString('id-ID')}
-      className={`text-[0.6875rem] tabular-nums text-slate-400 ${className}`}
+      title={new Date(date).toLocaleString()}
+      className={`text-xs text-zinc-500 ${className}`}
     >
       {formatRelative(date)}
     </time>

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Route } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 
 export interface LocationStatItem {
   locationId: string;
@@ -27,13 +27,6 @@ interface LocationCapacityChartProps {
   onSelectLocation: (locationId: string) => void;
 }
 
-const BARS = [
-  { key: 'max', label: 'Maks kapasitas', color: '#C8102E', text: 'fill-[#C8102E]' },
-  { key: 'avail', label: 'Tersedia', color: '#10b981', text: 'fill-emerald-600' },
-  { key: 'inUse', label: 'Digunakan', color: '#f59e0b', text: 'fill-amber-600' },
-  { key: 'reqs', label: 'Order aktif', color: '#0284c7', text: 'fill-sky-600' },
-] as const;
-
 export function LocationCapacityChart({
   locations,
   selectedLocationId,
@@ -45,6 +38,7 @@ export function LocationCapacityChart({
     return null;
   }
 
+  // Calculate highest metric for SVG bar scaling
   const maxVal = Math.max(
     1,
     ...locations.map((loc) =>
@@ -66,323 +60,417 @@ export function LocationCapacityChart({
   const usableHeight = chartHeight - paddingBottom - paddingTop;
 
   return (
-    <section className="card overflow-hidden" aria-labelledby="capacity-chart-heading">
-      <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] px-4 py-3.5 sm:px-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">
-            <Route className="size-3" strokeWidth={2} aria-hidden="true" />
-            Monitoring kapasitas hub
-          </span>
-          <h2 id="capacity-chart-heading" className="section-title mt-1">
-            Kapasitas &amp; beban armada per stasiun
+    <section aria-labelledby="capacity-chart-heading" className="surface min-w-0 space-y-6 p-5 sm:p-7">
+      {/* Header and Controls */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md border-2 border-black bg-rose-200 text-rose-950 shadow-[1px_1px_0px_0px_#000]">
+              <Icon name="route" className="h-3.5 w-3.5" />
+            </span>
+            <p className="eyebrow">Monitoring Kapasitas & Beban Hub</p>
+          </div>
+          <h2 id="capacity-chart-heading" className="section-title mt-2">
+            Kapasitas & Penggunaan Armada per Lokasi
           </h2>
-          <p className="mt-1 max-w-xl text-[0.6875rem] leading-relaxed text-slate-500">
-            Batas maksimal pesanan simultan, unit standby, dan armada yang sedang bertugas di setiap
-            stasiun KCIC.
+          <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-600 sm:text-sm">
+            Pantau batas maksimal penerimaan permintaan, armada yang sedang bertugas, dan unit yang tersedia di setiap stasiun KCIC.
           </p>
         </div>
 
         {/* Legend */}
-        <ul className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 rounded-full border border-[var(--border)] bg-[var(--canvas)] px-3.5 py-1.5">
-          {BARS.map((bar) => (
-            <li key={bar.key} className="flex items-center gap-1.5 text-[0.6875rem] text-slate-600">
-              <span
-                className="size-2 rounded-[2px]"
-                style={{ backgroundColor: bar.color }}
-                aria-hidden="true"
-              />
-              <span>{bar.label}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-black bg-zinc-50 p-2.5 text-xs font-bold shadow-[2px_2px_0px_0px_#000]">
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#be123c]" />
+            <span className="text-zinc-700">Maks Kapasitas</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#10b981]" />
+            <span className="text-zinc-700">Available</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#f59e0b]" />
+            <span className="text-zinc-700">Sedang Digunakan</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-black bg-[#0284c7]" />
+            <span className="text-zinc-700">Permintaan Masuk</span>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-4 p-4 sm:p-5">
-        {/* Hub filter */}
-        <div className="no-scrollbar -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
-          <span className="shrink-0 pr-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
-            Filter
-          </span>
+      {/* Location Filter Pills */}
+      <div className="space-y-1.5">
+        <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500">
+          Filter Lokasi Operasional:
+        </span>
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => onSelectLocation('')}
-            aria-pressed={!selectedLocationId}
-            className="chip shrink-0"
+            className={`cursor-pointer rounded-lg border-2 border-black px-3 py-1.5 text-xs font-black transition-all ${
+              !selectedLocationId
+                ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-zinc-100'
+            }`}
           >
-            <span>Semua hub</span>
-            <span className="tabular-nums opacity-60">{locations.length}</span>
+            Semua Hub ({locations.length})
           </button>
           {locations.map((loc) => {
             const isSelected = selectedLocationId === loc.locationId;
-            const avail = loc.availableVehicles ?? loc.vehicles - (loc.inUseVehicles ?? 0);
+            const avail = loc.availableVehicles ?? (loc.vehicles - (loc.inUseVehicles ?? 0));
             return (
               <button
                 key={loc.locationId}
                 type="button"
                 onClick={() => onSelectLocation(isSelected ? '' : loc.locationId)}
-                aria-pressed={isSelected}
-                className="chip shrink-0"
+                className={`flex cursor-pointer items-center gap-1.5 rounded-lg border-2 border-black px-3 py-1.5 text-xs font-bold transition-all ${
+                  isSelected
+                    ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                    : 'bg-white text-zinc-800 shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-zinc-100'
+                }`}
               >
                 <span>{loc.name}</span>
-                <span className="mono-plate text-[0.625rem] opacity-60">{loc.code}</span>
                 <span
-                  className={`rounded-full px-1.5 text-[0.625rem] font-semibold tabular-nums ${
-                    avail > 0
-                      ? isSelected
-                        ? 'bg-white/20 text-white'
-                        : 'bg-[var(--status-active-bg)] text-[var(--status-active-fg)]'
-                      : isSelected
-                        ? 'bg-white/20 text-white'
-                        : 'bg-[var(--border-subtle)] text-slate-500'
+                  className={`font-mono text-[10px] px-1 py-0.2 rounded border ${
+                    isSelected
+                      ? 'border-white/50 bg-white/20 text-white'
+                      : 'border-zinc-300 bg-zinc-100 text-zinc-600'
                   }`}
                 >
-                  {avail}
+                  {loc.code}
+                </span>
+                <span
+                  className={`text-[10px] font-black rounded-full px-1.5 py-0.2 ${
+                    avail > 0
+                      ? isSelected ? 'bg-[#86efac] text-black' : 'bg-[#dcfce7] text-[#15803d]'
+                      : isSelected ? 'bg-zinc-200 text-black' : 'bg-zinc-200 text-zinc-700'
+                  }`}
+                  title={`${avail} unit siap operasi`}
+                >
+                  {avail} ready
                 </span>
               </button>
             );
           })}
         </div>
+      </div>
 
-        {/* Bar chart */}
-        <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3">
-          <div className="min-w-[560px]">
-            <svg
-              viewBox={`0 0 ${locations.length * 110 + 60} ${chartHeight}`}
-              className="h-52 w-full select-none"
-              role="img"
-              aria-label="Perbandingan kapasitas, ketersediaan, dan pemakaian armada per stasiun"
-            >
-              {/* Grid lines */}
-              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-                const y = paddingTop + usableHeight * (1 - ratio);
-                const val = Math.round(maxVal * ratio);
-                return (
-                  <g key={ratio}>
-                    <line
-                      x1="45"
-                      y1={y}
-                      x2={locations.length * 110 + 50}
-                      y2={y}
-                      stroke="#f1f5f9"
-                      strokeDasharray="4 4"
-                      strokeWidth="1"
-                    />
-                    <text
-                      x="35"
-                      y={y + 4}
-                      textAnchor="end"
-                      className="fill-slate-400 font-mono text-[10px] tabular-nums"
-                    >
-                      {val}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Baseline */}
-              <line
-                x1="45"
-                y1={chartHeight - paddingBottom}
-                x2={locations.length * 110 + 50}
-                y2={chartHeight - paddingBottom}
-                stroke="#e2e8f0"
-                strokeWidth="1.5"
-              />
-
-              {/* Grouped bars */}
-              {locations.map((loc, idx) => {
-                const groupX = 65 + idx * 110;
-                const isSelected = selectedLocationId === loc.locationId;
-                const isHovered = hoveredLocationId === loc.locationId;
-
-                const maxCap = loc.maxCapacity ?? loc.vehicles ?? 0;
-                const avail = loc.availableVehicles ?? Math.max(0, maxCap - (loc.inUseVehicles ?? 0));
-                const inUse = loc.inUseVehicles ?? 0;
-                const reqs = loc.bookings ?? 0;
-
-                const heights = {
-                  max: (maxCap / maxVal) * usableHeight,
-                  avail: (avail / maxVal) * usableHeight,
-                  inUse: (inUse / maxVal) * usableHeight,
-                  reqs: (reqs / maxVal) * usableHeight,
-                };
-                const values = { max: maxCap, avail, inUse, reqs };
-
-                const barW = 14;
-                const baseY = chartHeight - paddingBottom;
-
-                return (
-                  <g
-                    key={loc.locationId}
-                    className="cursor-pointer"
-                    opacity={selectedLocationId && !isSelected ? 0.35 : 1}
-                    onMouseEnter={() => setHoveredLocationId(loc.locationId)}
-                    onMouseLeave={() => setHoveredLocationId(null)}
-                    onClick={() => onSelectLocation(isSelected ? '' : loc.locationId)}
+      {/* SVG Multi-Bar Comparison Chart */}
+      <div className="overflow-x-auto rounded-2xl border-2 border-black bg-white p-4 shadow-[4px_4px_0px_0px_#000]">
+        <div className="min-w-[620px]">
+          <svg
+            viewBox={`0 0 ${locations.length * 110 + 60} ${chartHeight}`}
+            className="w-full h-56 select-none"
+          >
+            {/* Horizontal Grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+              const y = paddingTop + usableHeight * (1 - ratio);
+              const val = Math.round(maxVal * ratio);
+              return (
+                <g key={ratio}>
+                  <line
+                    x1="45"
+                    y1={y}
+                    x2={locations.length * 110 + 50}
+                    y2={y}
+                    stroke="#e4e4e7"
+                    strokeDasharray="4 4"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x="35"
+                    y={y + 4}
+                    textAnchor="end"
+                    className="font-mono text-[10px] fill-zinc-400 font-bold"
                   >
-                    {(isSelected || isHovered) && (
-                      <rect
-                        x={groupX - 8}
-                        y={paddingTop - 10}
-                        width={barW * 4 + 22}
-                        height={usableHeight + 20}
-                        rx="12"
-                        fill={isSelected ? '#fef2f2' : '#f8fafc'}
-                        stroke={isSelected ? '#fecaca' : '#e2e8f0'}
-                        strokeWidth="1"
-                      />
-                    )}
+                    {val}
+                  </text>
+                </g>
+              );
+            })}
 
-                    {BARS.map((bar, barIdx) => {
-                      const h = heights[bar.key];
-                      const x = groupX + (barW + 2) * barIdx;
-                      return (
-                        <g key={bar.key}>
-                          <rect
-                            x={x}
-                            y={baseY - h}
-                            width={barW}
-                            height={Math.max(2, h)}
-                            fill={bar.color}
-                            rx="3"
-                          />
-                          <text
-                            x={x + barW / 2}
-                            y={baseY - h - 5}
-                            textAnchor="middle"
-                            className={`font-mono text-[10px] font-semibold tabular-nums ${bar.text}`}
-                          >
-                            {values[bar.key]}
-                          </text>
-                        </g>
-                      );
-                    })}
+            {/* Baseline */}
+            <line
+              x1="45"
+              y1={chartHeight - paddingBottom}
+              x2={locations.length * 110 + 50}
+              y2={chartHeight - paddingBottom}
+              stroke="#000"
+              strokeWidth="2"
+            />
 
-                    <text
-                      x={groupX + (barW * 4 + 6) / 2}
-                      y={chartHeight - paddingBottom + 18}
-                      textAnchor="middle"
-                      className="fill-slate-700 text-[11px] font-semibold"
-                    >
-                      {loc.name.length > 10 ? `${loc.name.substring(0, 9)}…` : loc.name}
-                    </text>
-                    <text
-                      x={groupX + (barW * 4 + 6) / 2}
-                      y={chartHeight - paddingBottom + 32}
-                      textAnchor="middle"
-                      className="fill-slate-400 font-mono text-[10px]"
-                    >
-                      {loc.code}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+            {/* Per-location grouped bars */}
+            {locations.map((loc, idx) => {
+              const groupX = 65 + idx * 110;
+              const isSelected = selectedLocationId === loc.locationId;
+              const isHovered = hoveredLocationId === loc.locationId;
+
+              const maxCap = loc.maxCapacity ?? loc.vehicles ?? 0;
+              const avail = loc.availableVehicles ?? Math.max(0, maxCap - (loc.inUseVehicles ?? 0));
+              const inUse = loc.inUseVehicles ?? 0;
+              const reqs = loc.bookings ?? 0;
+
+              // Bar heights
+              const hMax = (maxCap / maxVal) * usableHeight;
+              const hAvail = (avail / maxVal) * usableHeight;
+              const hInUse = (inUse / maxVal) * usableHeight;
+              const hReqs = (reqs / maxVal) * usableHeight;
+
+              const barW = 14;
+              const baseY = chartHeight - paddingBottom;
+
+              return (
+                <g
+                  key={loc.locationId}
+                  className="cursor-pointer transition-opacity"
+                  opacity={selectedLocationId && !isSelected ? 0.45 : 1}
+                  onMouseEnter={() => setHoveredLocationId(loc.locationId)}
+                  onMouseLeave={() => setHoveredLocationId(null)}
+                  onClick={() => onSelectLocation(isSelected ? '' : loc.locationId)}
+                >
+                  {/* Highlight pill behind column */}
+                  {(isSelected || isHovered) && (
+                    <rect
+                      x={groupX - 8}
+                      y={paddingTop - 10}
+                      width={barW * 4 + 22}
+                      height={usableHeight + 20}
+                      rx="8"
+                      fill={isSelected ? '#fff1f2' : '#f4f4f5'}
+                      stroke="#000"
+                      strokeWidth="1.5"
+                      strokeDasharray={isSelected ? 'none' : '2 2'}
+                    />
+                  )}
+
+                  {/* Bar 1: Max Capacity (Armada Total) */}
+                  <rect
+                    x={groupX}
+                    y={baseY - hMax}
+                    width={barW}
+                    height={Math.max(2, hMax)}
+                    fill="#be123c"
+                    stroke="#000"
+                    strokeWidth="1.5"
+                    rx="3"
+                  />
+                  <text
+                    x={groupX + barW / 2}
+                    y={baseY - hMax - 5}
+                    textAnchor="middle"
+                    className="font-mono text-[9px] font-black fill-[#be123c]"
+                  >
+                    {maxCap}
+                  </text>
+
+                  {/* Bar 2: Available (Siap Pakai) */}
+                  <rect
+                    x={groupX + barW + 2}
+                    y={baseY - hAvail}
+                    width={barW}
+                    height={Math.max(2, hAvail)}
+                    fill="#10b981"
+                    stroke="#000"
+                    strokeWidth="1.5"
+                    rx="3"
+                  />
+                  <text
+                    x={groupX + barW + 2 + barW / 2}
+                    y={baseY - hAvail - 5}
+                    textAnchor="middle"
+                    className="font-mono text-[9px] font-black fill-[#059669]"
+                  >
+                    {avail}
+                  </text>
+
+                  {/* Bar 3: Sedang Digunakan (In Use) */}
+                  <rect
+                    x={groupX + (barW + 2) * 2}
+                    y={baseY - hInUse}
+                    width={barW}
+                    height={Math.max(2, hInUse)}
+                    fill="#f59e0b"
+                    stroke="#000"
+                    strokeWidth="1.5"
+                    rx="3"
+                  />
+                  <text
+                    x={groupX + (barW + 2) * 2 + barW / 2}
+                    y={baseY - hInUse - 5}
+                    textAnchor="middle"
+                    className="font-mono text-[9px] font-black fill-amber-700"
+                  >
+                    {inUse}
+                  </text>
+
+                  {/* Bar 4: Permintaan Masuk (Active Requests) */}
+                  <rect
+                    x={groupX + (barW + 2) * 3}
+                    y={baseY - hReqs}
+                    width={barW}
+                    height={Math.max(2, hReqs)}
+                    fill="#0284c7"
+                    stroke="#000"
+                    strokeWidth="1.5"
+                    rx="3"
+                  />
+                  <text
+                    x={groupX + (barW + 2) * 3 + barW / 2}
+                    y={baseY - hReqs - 5}
+                    textAnchor="middle"
+                    className="font-mono text-[9px] font-black fill-sky-800"
+                  >
+                    {reqs}
+                  </text>
+
+                  {/* X-axis Hub Label */}
+                  <text
+                    x={groupX + (barW * 4 + 6) / 2}
+                    y={chartHeight - paddingBottom + 18}
+                    textAnchor="middle"
+                    className="text-[11px] font-black fill-zinc-950"
+                  >
+                    {loc.name.length > 10 ? `${loc.name.substring(0, 9)}…` : loc.name}
+                  </text>
+                  <text
+                    x={groupX + (barW * 4 + 6) / 2}
+                    y={chartHeight - paddingBottom + 32}
+                    textAnchor="middle"
+                    className="font-mono text-[10px] font-bold fill-zinc-500"
+                  >
+                    ({loc.code})
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
         </div>
+      </div>
 
-        {/* Hub cards */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(selectedLoc ? [selectedLoc] : locations).map((loc) => {
-            const maxCap = loc.maxCapacity ?? loc.vehicles ?? 0;
-            const avail = loc.availableVehicles ?? Math.max(0, maxCap - (loc.inUseVehicles ?? 0));
-            const inUse = loc.inUseVehicles ?? 0;
-            const reqs = loc.bookings ?? 0;
-            const isSelected = selectedLocationId === loc.locationId;
-            const utilRate = maxCap > 0 ? Math.round((inUse / maxCap) * 100) : 0;
+      {/* Location Details & Capacity Status Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {(selectedLoc ? [selectedLoc] : locations).map((loc) => {
+          const maxCap = loc.maxCapacity ?? loc.vehicles ?? 0;
+          const avail = loc.availableVehicles ?? Math.max(0, maxCap - (loc.inUseVehicles ?? 0));
+          const inUse = loc.inUseVehicles ?? 0;
+          const reqs = loc.bookings ?? 0;
+          const isSelected = selectedLocationId === loc.locationId;
+          const utilRate = maxCap > 0 ? Math.round((inUse / maxCap) * 100) : 0;
 
-            return (
-              <div
-                key={loc.locationId}
-                className={`rounded-[var(--radius-lg)] border p-4 transition-colors ${
-                  isSelected
-                    ? 'border-[var(--kcic-red)]/40 bg-[var(--kcic-red-soft)]'
-                    : 'border-[var(--border)] bg-white hover:border-[var(--border-strong)]'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-[0.8125rem] font-semibold text-slate-900">
-                      {loc.name}
-                    </h3>
-                    <p className="mono-plate mt-0.5 text-[0.625rem] text-slate-400">
-                      Kode {loc.code}
-                    </p>
-                  </div>
-                  <span
-                    className={`pill shrink-0 ${avail > 0 ? 'pill-active' : 'pill-error'}`}
-                  >
-                    <span>{avail > 0 ? `Siap +${avail}` : 'Penuh'}</span>
-                  </span>
+          return (
+            <article
+              key={loc.locationId}
+              className={`rounded-2xl border-2 border-black p-4.5 transition-all shadow-[4px_4px_0px_0px_#000] ${
+                isSelected ? 'bg-amber-50 ring-2 ring-[#be123c]' : 'bg-white'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-black tracking-tight text-zinc-950">
+                    {loc.name}
+                  </h3>
+                  <p className="font-mono text-xs font-bold text-zinc-500">Hub Code: {loc.code}</p>
                 </div>
+                <span
+                  className={`rounded-md border-2 border-black px-2 py-0.5 text-xs font-black shadow-[1px_1px_0px_0px_#000] ${
+                    avail > 0 ? 'bg-[#86efac] text-zinc-950' : 'bg-rose-300 text-rose-950'
+                  }`}
+                >
+                  {avail > 0 ? `Siap +${avail} Order` : 'Kapasitas Penuh'}
+                </span>
+              </div>
 
-                {/* Load bar */}
-                <div className="mt-3.5 space-y-1.5">
-                  <div className="flex items-center justify-between text-[0.6875rem]">
-                    <span className="text-slate-500">Beban hub</span>
-                    <span className="font-semibold tabular-nums text-slate-900">{utilRate}%</span>
-                  </div>
-                  <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
-                    <div
-                      style={{ width: `${maxCap > 0 ? (inUse / maxCap) * 100 : 0}%` }}
-                      className="h-full bg-[var(--status-warning-fg)] transition-all"
-                    />
-                    <div
-                      style={{ width: `${maxCap > 0 ? (avail / maxCap) * 100 : 0}%` }}
-                      className="h-full bg-[var(--status-active-fg)] transition-all"
-                    />
-                  </div>
+              {/* Progress Bar of Capacity */}
+              <div className="mt-4 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-zinc-600">Beban Penggunaan Hub:</span>
+                  <span className="font-mono font-black text-zinc-950">{utilRate}% Terpakai</span>
                 </div>
-
-                <dl className="mt-3.5 grid grid-cols-2 gap-1.5">
-                  {[
-                    { label: 'Maks', value: maxCap, tone: '' },
-                    { label: 'Tersedia', value: avail, tone: 'bg-[var(--status-active-bg)]' },
-                    { label: 'Digunakan', value: inUse, tone: 'bg-[var(--status-warning-bg)]' },
-                    { label: 'Order', value: reqs, tone: 'bg-[var(--status-standby-bg)]' },
-                  ].map((cell) => (
-                    <div
-                      key={cell.label}
-                      className={`rounded-[var(--radius-sm)] py-1.5 text-center ${
-                        cell.tone || 'bg-[var(--canvas)]'
-                      }`}
-                    >
-                      <dt className="metric-label">{cell.label}</dt>
-                      <dd className="mt-0.5 text-sm font-bold tabular-nums text-slate-900">
-                        {cell.value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5">
-                  <button
-                    type="button"
-                    onClick={() => onSelectLocation(isSelected ? '' : loc.locationId)}
-                    className="cursor-pointer text-[0.6875rem] font-semibold text-slate-600 transition-colors hover:text-[var(--kcic-red)]"
-                  >
-                    {isSelected ? 'Batal filter' : 'Fokus hub'}
-                  </button>
-                  <div className="flex items-center gap-1">
-                    <Link
-                      href={`/admin/vehicles?locationId=${loc.locationId}`}
-                      className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border)] bg-white px-2 py-1 text-[0.625rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)]"
-                    >
-                      Armada <span className="tabular-nums opacity-60">{loc.vehicles}</span>
-                    </Link>
-                    <Link
-                      href={`/admin/bookings?locationId=${loc.locationId}`}
-                      className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border)] bg-white px-2 py-1 text-[0.625rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)]"
-                    >
-                      Order <span className="tabular-nums opacity-60">{loc.bookings}</span>
-                      <ArrowRight className="size-2.5" strokeWidth={2.6} aria-hidden="true" />
-                    </Link>
-                  </div>
+                <div className="h-3 w-full overflow-hidden rounded-full border border-black bg-zinc-100 flex">
+                  <div
+                    style={{ width: `${maxCap > 0 ? (inUse / maxCap) * 100 : 0}%` }}
+                    className="bg-amber-400 h-full transition-all"
+                    title={`Sedang digunakan: ${inUse} unit`}
+                  />
+                  <div
+                    style={{ width: `${maxCap > 0 ? (avail / maxCap) * 100 : 0}%` }}
+                    className="bg-[#10b981] h-full transition-all"
+                    title={`Tersedia: ${avail} unit`}
+                  />
                 </div>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Metric Breakdown Grid */}
+              <dl className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
+                <div className="rounded-xl border border-black bg-rose-50 p-2.5 shadow-[1.5px_1.5px_0px_0px_#000]">
+                  <dt className="text-[10px] font-black uppercase tracking-wider text-rose-900">
+                    Maks Kapasitas
+                  </dt>
+                  <dd className="mt-1 font-mono text-xl font-black text-rose-900">
+                    {maxCap} <span className="text-xs font-bold">unit</span>
+                  </dd>
+                  <span className="text-[10px] text-zinc-500 font-medium">Batas order simultan</span>
+                </div>
+
+                <div className="rounded-xl border border-black bg-[#ecfdf5] p-2.5 shadow-[1.5px_1.5px_0px_0px_#000]">
+                  <dt className="text-[10px] font-black uppercase tracking-wider text-[#065f46]">
+                    Sedang Available
+                  </dt>
+                  <dd className="mt-1 font-mono text-xl font-black text-[#047857]">
+                    {avail} <span className="text-xs font-bold">unit</span>
+                  </dd>
+                  <span className="text-[10px] text-zinc-500 font-medium">Siap terima order</span>
+                </div>
+
+                <div className="rounded-xl border border-black bg-amber-50 p-2.5 shadow-[1.5px_1.5px_0px_0px_#000]">
+                  <dt className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                    Sedang Digunakan
+                  </dt>
+                  <dd className="mt-1 font-mono text-xl font-black text-amber-900">
+                    {inUse} <span className="text-xs font-bold">unit</span>
+                  </dd>
+                  <span className="text-[10px] text-zinc-500 font-medium">Dalam perjalanan</span>
+                </div>
+
+                <div className="rounded-xl border border-black bg-sky-50 p-2.5 shadow-[1.5px_1.5px_0px_0px_#000]">
+                  <dt className="text-[10px] font-black uppercase tracking-wider text-sky-900">
+                    Permintaan Masuk
+                  </dt>
+                  <dd className="mt-1 font-mono text-xl font-black text-sky-900">
+                    {reqs} <span className="text-xs font-bold">trip</span>
+                  </dd>
+                  <span className="text-[10px] text-zinc-500 font-medium">Booking aktif</span>
+                </div>
+              </dl>
+
+              {/* Action buttons */}
+              <div className="mt-4 flex items-center justify-between border-t-2 border-black/10 pt-3 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => onSelectLocation(isSelected ? '' : loc.locationId)}
+                  className="text-zinc-800 hover:text-rose-700 underline cursor-pointer"
+                >
+                  {isSelected ? 'Batal Filter Hub' : 'Fokus Hub Ini'}
+                </button>
+                <div className="flex gap-2">
+                  <Link
+                    href={`/admin/vehicles?locationId=${loc.locationId}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-black bg-white px-2 py-1 text-[11px] font-bold text-zinc-900 hover:bg-zinc-100 shadow-[1px_1px_0px_0px_#000]"
+                  >
+                    Armada ({loc.vehicles})
+                  </Link>
+                  <Link
+                    href={`/admin/bookings?locationId=${loc.locationId}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-black bg-white px-2 py-1 text-[11px] font-bold text-zinc-900 hover:bg-zinc-100 shadow-[1px_1px_0px_0px_#000]"
+                  >
+                    Booking ({loc.bookings})
+                  </Link>
+                </div>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

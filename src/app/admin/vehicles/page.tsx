@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -11,7 +11,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Car, Plus, Search, X } from 'lucide-react';
 
 interface OperationalLocation {
   id: string;
@@ -373,37 +372,33 @@ function AdminVehiclesContent() {
 
   const columns: Column<VehicleItem>[] = [
     {
-      header: 'Nomor polisi',
+      header: 'Plate Number',
       accessorKey: 'plateNumber',
-      cell: (v) => <span className="mono-plate font-semibold text-slate-900">{v.plateNumber}</span>,
+      cell: (v) => <span className="font-mono font-bold text-zinc-900">{v.plateNumber}</span>,
     },
     {
-      header: 'Kendaraan',
+      header: 'Vehicle',
       cell: (v) => (
         <div className="flex items-center gap-2.5">
           {v.imageUrl && (
             <img
               src={v.imageUrl}
               alt={`${v.brand} ${v.model}`}
-              className="h-8 w-10 shrink-0 rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--canvas)] object-cover"
+              className="w-10 h-8 object-cover rounded border border-zinc-200 shrink-0 bg-zinc-100"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
           )}
-          <div className="min-w-0">
-            <span className="block truncate font-medium text-slate-800">
-              {v.brand} {v.model}
-            </span>
-            <span className="block text-[0.6875rem] text-slate-500">
-              {v.vehicleType} · {v.seatingCapacity} kursi
-            </span>
+          <div>
+            <span className="font-semibold text-zinc-800">{v.brand} {v.model}</span>
+            <span className="text-zinc-500 block text-xs">{v.vehicleType} • {v.seatingCapacity} seats</span>
           </div>
         </div>
       ),
     },
     {
-      header: 'Hub operasional',
+      header: 'Operational Hub',
       cell: (v) => (
         <div className="flex flex-wrap items-center gap-1">
           {v.homeLocation && (
@@ -421,23 +416,21 @@ function AdminVehiclesContent() {
             />
           )}
           {!v.homeLocation && !v.currentOperationalLocation && (
-            <span className="text-xs italic text-slate-400">—</span>
+            <span className="text-zinc-400 italic text-xs">—</span>
           )}
         </div>
       ),
     },
     {
-      header: 'Pengemudi',
+      header: 'Assigned Driver',
       cell: (v) =>
         v.currentDriver ? (
-          <div className="min-w-0">
-            <span className="block truncate font-medium text-slate-800">{v.currentDriver.user.name}</span>
-            <span className="mono-plate block text-[0.625rem] text-slate-500">
-              {v.currentDriver.licenseNumber}
-            </span>
+          <div>
+            <span className="font-medium text-zinc-800">{v.currentDriver.user.name}</span>
+            <span className="text-[11px] text-zinc-500 block font-mono">{v.currentDriver.licenseNumber}</span>
           </div>
         ) : (
-          <span className="text-xs italic text-slate-400">Belum ditugaskan</span>
+          <span className="text-zinc-400 italic text-xs">Unassigned</span>
         ),
     },
     {
@@ -445,20 +438,20 @@ function AdminVehiclesContent() {
       cell: (v) => <StatusBadge status={v.status} />,
     },
     {
-      header: '',
+      header: 'Actions',
       cell: (v) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => handleOpenAssign(v)}
-            className="cursor-pointer rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)]"
+            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
           >
-            Tugaskan
+            Assign
           </button>
           <button
             type="button"
             onClick={() => handleOpenEdit(v)}
-            className="cursor-pointer rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)]"
+            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
           >
             Edit
           </button>
@@ -466,9 +459,9 @@ function AdminVehiclesContent() {
             <button
               type="button"
               onClick={() => setDeactivatingVehicle(v)}
-              className="cursor-pointer rounded-full border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-2.5 py-1 text-[0.6875rem] font-semibold text-[var(--status-error-fg)] transition-colors hover:bg-[var(--status-error-border)]/40"
+              className="px-2.5 py-1 text-xs font-black text-rose-700 bg-rose-50 border-2 border-black rounded-lg hover:bg-rose-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
             >
-              Nonaktifkan
+              Deactivate
             </button>
           )}
         </div>
@@ -477,71 +470,47 @@ function AdminVehiclesContent() {
   ];
 
   return (
-    <div className="w-full min-w-0 space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">Inventaris armada</span>
-          <h1 className="page-heading mt-2">Armada kendaraan KCIC</h1>
-          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-            Kelola spesifikasi mobil dinas, alokasi pool operasional stasiun, dan status pengemudi.
-          </p>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Vehicle Inventory</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">Manage fleet vehicles, specifications, and driver assignments</p>
         </div>
         <button
           type="button"
           onClick={handleOpenAdd}
-          className="button-primary self-start sm:self-auto"
+          className="button-primary cursor-pointer inline-flex items-center gap-1.5"
         >
-          <Plus className="size-4" strokeWidth={2.2} aria-hidden="true" />
-          <span>Tambah mobil</span>
+          <span>+ Add Vehicle</span>
         </button>
-      </header>
+      </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
-      {/* Search & filters */}
-      <div className="card flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            fetchVehicles(1);
-          }}
-          className="flex w-full gap-2 md:w-80"
-        >
-          <div className="relative min-w-0 flex-1">
-            <label className="sr-only" htmlFor="vehicle-search">
-              Cari armada
-            </label>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-            <input
-              id="vehicle-search"
-              type="text"
-              placeholder="Cari plat, merek, tipe…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <button type="submit" className="button-secondary px-3.5 py-2 text-[0.6875rem]">
-            Cari
+      {/* Filter and Search */}
+      <div className="surface p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <form onSubmit={(e) => { e.preventDefault(); fetchVehicles(1); }} className="w-full sm:w-80 flex gap-2">
+          <input
+            type="text"
+            placeholder="Search plate, brand, model..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
+          />
+          <button type="submit" className="button-primary px-3 py-1.5 text-xs font-black">
+            Search
           </button>
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <label htmlFor="vehicle-hub-filter" className="metric-label shrink-0">
-              Hub
-            </label>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
             <select
-              id="vehicle-hub-filter"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="w-auto min-w-0 rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
+              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
-              <option value="">Semua hub</option>
+              <option value="">All Hubs</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -550,20 +519,17 @@ function AdminVehiclesContent() {
             </select>
           </div>
 
-          <div className="flex min-w-0 items-center gap-1.5">
-            <label htmlFor="vehicle-status-filter" className="metric-label shrink-0">
-              Status
-            </label>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
             <select
-              id="vehicle-status-filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-auto min-w-0 rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
+              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
-              <option value="">Semua status</option>
+              <option value="">All Statuses</option>
               <option value="AVAILABLE">Available</option>
               <option value="RESERVED">Reserved</option>
-              <option value="IN_USE">In use</option>
+              <option value="IN_USE">In Use</option>
               <option value="MAINTENANCE">Maintenance</option>
               <option value="INACTIVE">Inactive</option>
             </select>
@@ -575,7 +541,7 @@ function AdminVehiclesContent() {
         columns={columns}
         data={vehicles}
         isLoading={isLoading}
-        emptyMessage="Belum ada kendaraan terdaftar"
+        emptyMessage="No vehicles found"
       />
 
       <Pagination
@@ -585,72 +551,76 @@ function AdminVehiclesContent() {
         onPageChange={(p) => fetchVehicles(p)}
       />
 
-      {/* Add / edit */}
+      {/* Add / Edit Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingVehicle ? `Edit kendaraan ${editingVehicle.plateNumber}` : 'Tambah armada baru'}
-        description="Kelola spesifikasi teknis dan ketersediaan kendaraan operasional KCIC."
+        title={editingVehicle ? `Edit Vehicle: ${editingVehicle.plateNumber}` : 'Add New Vehicle'}
         maxWidth="lg"
       >
-        {formError && (
-          <ErrorBanner message={formError} className="mb-4" onDismiss={() => setFormError(null)} />
-        )}
+        {formError && <ErrorBanner message={formError} className="mb-4" onDismiss={() => setFormError(null)} />}
 
         <form onSubmit={handleFormSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Nomor polisi (plat)" required>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Plate Number" required>
               <input
                 type="text"
                 required
                 placeholder="B 1234 ABC"
                 value={formPlate}
                 onChange={(e) => setFormPlate(e.target.value.toUpperCase())}
-                className="mono-plate uppercase"
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded font-mono uppercase focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
 
-            <FormField label="Tipe kendaraan" required>
-              <select value={formType} onChange={(e) => setFormType(e.target.value)}>
-                <option value="SEDAN">Sedan</option>
+            <FormField label="Vehicle Type" required>
+              <select
+                value={formType}
+                onChange={(e) => setFormType(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              >
+                <option value="SEDAN">SEDAN</option>
                 <option value="SUV">SUV</option>
                 <option value="MPV">MPV</option>
-                <option value="VAN">Van</option>
-                <option value="TRUCK">Truck</option>
+                <option value="VAN">VAN</option>
+                <option value="TRUCK">TRUCK</option>
               </select>
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Merek" required>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Brand" required>
               <input
                 type="text"
                 required
                 placeholder="Toyota"
                 value={formBrand}
                 onChange={(e) => setFormBrand(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
 
-            <FormField label="Model / seri" required>
+            <FormField label="Model" required>
               <input
                 type="text"
                 required
                 placeholder="Innova Zenix"
                 value={formModel}
                 onChange={(e) => setFormModel(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Pool operasional hub" required>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Operational Hub" required>
               <select
                 value={formLocationId}
                 onChange={(e) => setFormLocationId(e.target.value)}
                 required
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800 font-medium"
               >
-                <option value="">Pilih hub operasional KCIC</option>
+                <option value="">-- Pilih Hub Operasional KCIC --</option>
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name} ({loc.code})
@@ -659,19 +629,23 @@ function AdminVehiclesContent() {
               </select>
             </FormField>
 
-            <FormField label="Status armada" required>
-              <select value={formStatus} onChange={(e) => setFormStatus(e.target.value)}>
-                <option value="AVAILABLE">Available — tersedia di pool</option>
-                <option value="RESERVED">Reserved — telah dipesan</option>
-                <option value="IN_USE">In use — sedang berjalan</option>
-                <option value="MAINTENANCE">Maintenance — perawatan</option>
-                <option value="INACTIVE">Inactive — nonaktif</option>
+            <FormField label="Status" required>
+              <select
+                value={formStatus}
+                onChange={(e) => setFormStatus(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              >
+                <option value="AVAILABLE">AVAILABLE (Aktif di Pool)</option>
+                <option value="RESERVED">RESERVED</option>
+                <option value="IN_USE">IN_USE</option>
+                <option value="MAINTENANCE">MAINTENANCE (Perawatan)</option>
+                <option value="INACTIVE">INACTIVE (Nonaktif)</option>
               </select>
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Kapasitas penumpang" required>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Seats" required>
               <input
                 type="number"
                 min="1"
@@ -679,37 +653,37 @@ function AdminVehiclesContent() {
                 required
                 value={formSeats}
                 onChange={(e) => setFormSeats(parseInt(e.target.value) || 1)}
-                className="tabular-nums"
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
 
-            <FormField label="Transmisi">
+            <FormField label="Transmission">
               <select
                 value={formTransmission}
                 onChange={(e) => setFormTransmission(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
               >
-                <option value="AUTOMATIC">Automatic</option>
-                <option value="MANUAL">Manual</option>
+                <option value="AUTOMATIC">AUTOMATIC</option>
+                <option value="MANUAL">MANUAL</option>
               </select>
             </FormField>
           </div>
 
           <div className="space-y-2 pt-1">
-            <div className="flex flex-wrap items-center justify-between gap-1">
-              <span className="text-xs font-semibold text-slate-700">Foto kendaraan</span>
-              <span className="text-[0.625rem] text-slate-400">Maksimal 5MB (JPG, PNG, WebP)</span>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-zinc-700">Vehicle Photo</label>
+              <span className="text-[11px] text-zinc-400">Max 5MB (JPG, PNG, WebP)</span>
             </div>
 
             {uploadError && (
-              <div className="flex items-start justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-3 py-2.5 text-[0.6875rem] text-[var(--status-error-fg)]">
-                <span className="min-w-0 leading-relaxed">{uploadError}</span>
+              <div className="p-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded flex items-center justify-between">
+                <span>{uploadError}</span>
                 <button
                   type="button"
                   onClick={() => setUploadError(null)}
-                  aria-label="Tutup pesan"
-                  className="shrink-0 cursor-pointer opacity-70 hover:opacity-100"
+                  className="text-rose-500 hover:text-rose-800 font-bold ml-2 cursor-pointer"
                 >
-                  <X className="size-3.5" strokeWidth={2.4} aria-hidden="true" />
+                  ✕
                 </button>
               </div>
             )}
@@ -723,35 +697,35 @@ function AdminVehiclesContent() {
             />
 
             {formImageUrl ? (
-              <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3">
-                <div className="h-12 w-16 shrink-0 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border)] bg-white">
+              <div className="flex items-center gap-3 p-2.5 bg-zinc-50 border border-zinc-200 rounded">
+                <div className="w-16 h-12 bg-zinc-200 rounded overflow-hidden flex-shrink-0 border border-zinc-300">
                   <img
                     src={formImageUrl}
-                    alt="Pratinjau kendaraan"
-                    className="h-full w-full object-cover"
+                    alt="Vehicle preview"
+                    className="w-full h-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="48" fill="%23d4d4d8" viewBox="0 0 24 24"><path fill="%2371717a" d="M5 7 7 3h10l2 4 2 3v8h-3v-2H6v2H3v-8l2-3Z"/></svg>';
                     }}
                   />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="mono-plate truncate text-[0.625rem] text-slate-500">{formImageUrl}</p>
-                  <div className="mt-1 flex items-center gap-1.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-mono text-zinc-600 truncate">{formImageUrl}</p>
+                  <div className="flex items-center gap-2 mt-1">
                     <button
                       type="button"
                       disabled={isUploadingImage || formSubmitting}
                       onClick={() => fileInputRef.current?.click()}
-                      className="cursor-pointer rounded-full border border-[var(--border)] bg-white px-2.5 py-1 text-[0.625rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)]"
+                      className="px-2 py-0.5 text-[11px] font-medium border border-zinc-300 bg-white hover:bg-zinc-100 rounded text-zinc-700 cursor-pointer"
                     >
-                      {isUploadingImage ? 'Mengunggah…' : 'Ganti foto'}
+                      {isUploadingImage ? 'Uploading...' : 'Change Photo'}
                     </button>
                     <button
                       type="button"
                       disabled={isUploadingImage || formSubmitting}
                       onClick={() => setFormImageUrl('')}
-                      className="cursor-pointer rounded-full border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-2.5 py-1 text-[0.625rem] font-semibold text-[var(--status-error-fg)]"
+                      className="px-2 py-0.5 text-[11px] font-medium border border-rose-200 bg-rose-50 hover:bg-rose-100 rounded text-rose-700 cursor-pointer"
                     >
-                      Hapus
+                      Remove
                     </button>
                   </div>
                 </div>
@@ -761,92 +735,87 @@ function AdminVehiclesContent() {
                 type="button"
                 disabled={isUploadingImage || formSubmitting}
                 onClick={() => fileInputRef.current?.click()}
-                className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--canvas)] px-4 py-6 text-xs text-slate-600 transition-colors hover:border-slate-400 hover:bg-[var(--canvas-sunken)]"
+                className="w-full px-3 py-3 border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded bg-zinc-50 hover:bg-zinc-100/80 text-xs text-zinc-700 flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
                 {isUploadingImage ? (
                   <>
                     <Spinner size="sm" />
-                    <span>Mengunggah foto kendaraan…</span>
+                    <span>Uploading photo...</span>
                   </>
                 ) : (
                   <>
-                    <Car className="size-6 text-slate-400" strokeWidth={1.7} aria-hidden="true" />
-                    <span className="font-semibold text-slate-800">Unggah foto kendaraan</span>
-                    <span className="text-[0.625rem] text-slate-400">
-                      Klik untuk memilih file gambar (maks. 5MB)
-                    </span>
+                    <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span className="font-medium">Upload Vehicle Photo (Max 5MB)</span>
                   </>
                 )}
               </button>
             )}
 
             <div className="pt-1">
-              <label htmlFor="vehicle-image-url" className="sr-only">
-                URL gambar kendaraan
-              </label>
               <input
-                id="vehicle-image-url"
                 type="text"
-                placeholder="Atau tempel URL gambar (https://…)"
+                placeholder="Or paste image URL (https://... or /uploads/...)"
                 value={formImageUrl}
                 onChange={(e) => setFormImageUrl(e.target.value)}
-                className="mono-plate"
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
+          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
             <button
               type="button"
               disabled={formSubmitting}
               onClick={() => setIsModalOpen(false)}
-              className="button-secondary"
+              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
             >
-              Batal
+              Cancel
             </button>
-            <button type="submit" disabled={formSubmitting} className="button-primary">
+            <button
+              type="submit"
+              disabled={formSubmitting}
+              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+            >
               {formSubmitting && <Spinner size="sm" className="text-white" />}
-              <span>{editingVehicle ? 'Perbarui kendaraan' : 'Simpan kendaraan'}</span>
+              {editingVehicle ? 'Update Vehicle' : 'Create Vehicle'}
             </button>
           </div>
         </form>
       </Modal>
 
+      {/* Deactivate Confirm */}
       <ConfirmDialog
         isOpen={Boolean(deactivatingVehicle)}
         onClose={() => setDeactivatingVehicle(null)}
         onConfirm={handleDeactivateConfirm}
-        title="Nonaktifkan kendaraan"
-        message={`Apakah Anda yakin ingin menonaktifkan kendaraan ${deactivatingVehicle?.plateNumber}? Mobil ini tidak akan dapat dipilih untuk pesanan dinas.`}
-        confirmLabel="Nonaktifkan"
+        title="Deactivate Vehicle"
+        message={`Are you sure you want to deactivate vehicle ${deactivatingVehicle?.plateNumber}? It will no longer be available for trip reservations.`}
+        confirmLabel="Deactivate"
         isDestructive={true}
         isLoading={isDeactivating}
       />
 
-      {/* Assign driver */}
+      {/* Assign Driver Modal */}
       <Modal
         isOpen={Boolean(assigningVehicle)}
         onClose={() => setAssigningVehicle(null)}
-        title="Tugaskan pengemudi"
-        description={
-          assigningVehicle
-            ? `Tugaskan driver tetap untuk ${assigningVehicle.plateNumber} (${assigningVehicle.brand} ${assigningVehicle.model})`
-            : ''
-        }
+        title="Assign Driver"
+        description={assigningVehicle ? `Assign driver to ${assigningVehicle.plateNumber}` : ''}
         maxWidth="sm"
       >
-        {assignError && (
-          <ErrorBanner message={assignError} className="mb-4" onDismiss={() => setAssignError(null)} />
-        )}
+        {assignError && <ErrorBanner message={assignError} className="mb-4" onDismiss={() => setAssignError(null)} />}
 
         <form onSubmit={handleAssignSubmit} className="space-y-4">
-          <FormField label="Pilih pengemudi" required>
+          <FormField label="Select Driver" required>
             <select
               required
               value={selectedDriverId}
               onChange={(e) => setSelectedDriverId(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
             >
-              <option value="">Pilih pengemudi</option>
+              <option value="">-- Choose Driver --</option>
               {availableDrivers.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.user.name} ({d.licenseNumber})
@@ -855,22 +824,22 @@ function AdminVehiclesContent() {
             </select>
           </FormField>
 
-          <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
+          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
             <button
               type="button"
               disabled={isAssigning}
               onClick={() => setAssigningVehicle(null)}
-              className="button-secondary"
+              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
             >
-              Batal
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isAssigning || !selectedDriverId}
-              className="button-primary"
+              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
             >
               {isAssigning && <Spinner size="sm" className="text-white" />}
-              <span>Tugaskan driver</span>
+              Assign Driver
             </button>
           </div>
         </form>
@@ -883,9 +852,9 @@ export default function AdminVehiclesPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col items-center justify-center gap-2 py-24 text-xs text-slate-500">
-          <Spinner size="md" className="text-[var(--kcic-red)]" />
-          <p>Memuat inventaris kendaraan…</p>
+        <div className="py-24 text-center text-zinc-500 text-xs">
+          <Spinner size="md" className="mb-2" />
+          <p>Loading vehicle inventory...</p>
         </div>
       }
     >

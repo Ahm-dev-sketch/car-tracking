@@ -7,7 +7,6 @@ import { LocationBadge } from '@/components/ui/LocationBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { fetchJson } from '@/lib/fetch-json';
-import { Car, Funnel, Search } from 'lucide-react';
 
 interface VehicleLocation {
   id: string;
@@ -80,6 +79,8 @@ function DriverVehicleContent() {
 
         if (locsRes.status === 'fulfilled' && locsRes.value?.data) {
           setLocations(locsRes.value.data);
+        } else if (locsRes.status === 'rejected') {
+          console.error('[Driver Data Fetch Error] /driver/vehicle locations:', locsRes.reason);
         }
 
         if (meRes.status !== 'fulfilled' || !meRes.value) {
@@ -92,7 +93,7 @@ function DriverVehicleContent() {
 
         if (!meDriver) {
           if (userRole && userRole !== 'DRIVER') {
-            throw new Error(`Akun aktif saat ini (${userRole}) bukan akun Driver. Masuk dengan akun Driver untuk mengelola penugasan armada.`);
+            throw new Error(`Akun aktif saat ini (${userRole}) bukan akun Driver. Silakan masuk dengan akun Driver untuk mengelola penugasan armada.`);
           }
           setDriverStatus('OFFLINE');
           setLicenseNumber('SIM-0001');
@@ -110,7 +111,8 @@ function DriverVehicleContent() {
           }
         }
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Gagal memuat penugasan armada');
+        console.error('[Driver Data Fetch Error] /driver/vehicle loadDriverVehicle:', cause);
+        setError(cause instanceof Error ? cause.message : 'Failed to load vehicle assignment');
       } finally {
         setIsLoading(false);
       }
@@ -132,7 +134,7 @@ function DriverVehicleContent() {
       const json = await fetchJson<{ data: VehicleDetails[] }>(`/api/vehicles?${params.toString()}`);
       if (version === searchVersion.current) setSearchResults(json.data || []);
     } catch (cause) {
-      if (version === searchVersion.current) setError(cause instanceof Error ? cause.message : 'Gagal mencari armada.');
+      if (version === searchVersion.current) setError(cause instanceof Error ? cause.message : 'Unable to search vehicles.');
     } finally {
       if (version === searchVersion.current) setIsSearching(false);
     }
@@ -150,68 +152,55 @@ function DriverVehicleContent() {
     currentVehicle?.currentLocation || currentVehicle?.currentOperationalLocation;
 
   return (
-    <div className="w-full min-w-0 space-y-5">
-      <header className="min-w-0">
-        <span className="eyebrow eyebrow-accent">Penugasan armada</span>
-        <h1 className="page-heading mt-2">Armada ditugaskan</h1>
-        <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-          Informasi aset kendaraan yang terhubung ke profil pengemudi dan pencarian unit pool.
-        </p>
-      </header>
+    <div className="space-y-6">
+      <div className="pb-4 border-b border-zinc-200">
+        <h1 className="text-xl font-bold tracking-tight text-zinc-900">My Assigned Vehicle</h1>
+        <p className="text-xs text-zinc-500 mt-0.5">Fleet asset currently linked to your driver profile</p>
+      </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white py-20 text-xs text-slate-500">
-          <Spinner size="md" className="text-[var(--kcic-red)]" />
-          <p>Memuat profil armada&hellip;</p>
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          <Spinner size="lg" className="mb-2" />
+          <p>Loading vehicle information...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {/* Assigned vehicle */}
-          <section className="card p-4 md:col-span-2">
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
-              <span className="eyebrow">Aset operasional aktif</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Main Vehicle Profile */}
+          <div className="md:col-span-2 bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                Vehicle Assignment
+              </span>
               {currentVehicle ? (
                 <StatusBadge status={currentVehicle.status} />
               ) : (
-                <span className="pill">
-                  <span className="pill-dot" aria-hidden="true" />
-                  <span>Belum ditugaskan</span>
-                </span>
+                <span className="text-xs text-zinc-500 font-medium">Not Assigned</span>
               )}
             </div>
 
             {currentVehicle ? (
-              <div className="mt-3.5 space-y-3.5">
-                {currentVehicle.imageUrl ? (
-                  <div className="h-48 w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)]">
-                    <img
-                      src={currentVehicle.imageUrl}
-                      alt={`${currentVehicle.brand} ${currentVehicle.model}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex h-36 items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)]">
-                    <Car
-                      className="size-9 text-[var(--border-strong)]"
-                      strokeWidth={1.4}
-                      aria-hidden="true"
-                    />
-                  </div>
+              <div className="space-y-4 text-xs">
+                {currentVehicle.imageUrl && (
+                  <img
+                    src={currentVehicle.imageUrl}
+                    alt={currentVehicle.brand}
+                    className="w-full h-44 object-cover rounded border border-zinc-200"
+                  />
                 )}
 
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-semibold tracking-[-0.02em] text-slate-900">
+                <div>
+                  <h2 className="text-lg font-bold text-zinc-900">
                     {currentVehicle.brand} {currentVehicle.model}
                   </h2>
-                  <p className="mono-plate mt-0.5 text-xs font-semibold text-slate-600">
+                  <div className="font-mono text-sm font-semibold text-zinc-700 mt-0.5">
                     {currentVehicle.plateNumber}
-                  </p>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1">
+                {/* Location Badges */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
                   {currentVehicle.homeLocation && (
                     <LocationBadge
                       type="home"
@@ -228,79 +217,88 @@ function DriverVehicleContent() {
                   )}
                 </div>
 
-                <dl className="grid grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-3.5">
-                  {[
-                    { label: 'Tipe', value: currentVehicle.vehicleType },
-                    { label: 'Kapasitas', value: `${currentVehicle.seatingCapacity} kursi` },
-                    { label: 'Transmisi', value: currentVehicle.transmission || 'Otomatis' },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--canvas)] p-2.5"
-                    >
-                      <dt className="metric-label">{item.label}</dt>
-                      <dd className="mt-0.5 truncate text-xs font-semibold text-slate-900">
-                        {item.value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-zinc-100">
+                  <div>
+                    <span className="text-zinc-400 block uppercase font-semibold text-[10px]">
+                      Vehicle Type
+                    </span>
+                    <span className="font-medium text-zinc-800">{currentVehicle.vehicleType}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block uppercase font-semibold text-[10px]">
+                      Capacity
+                    </span>
+                    <span className="font-medium text-zinc-800">{currentVehicle.seatingCapacity} seats</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-400 block uppercase font-semibold text-[10px]">
+                      Transmission
+                    </span>
+                    <span className="font-medium text-zinc-800">{currentVehicle.transmission || 'Automatic'}</span>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="mt-3.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--canvas)] px-4 py-10 text-center text-xs leading-relaxed text-slate-500">
-                Belum ada penugasan unit tetap. Cari di pool bawah untuk memeriksa ketersediaan
-                kendaraan.
+              <div className="py-12 text-center text-zinc-500 text-xs border border-dashed border-zinc-200 rounded">
+                No permanent vehicle assignment. Search below to inspect available vehicles.
               </div>
             )}
-          </section>
+          </div>
 
-          {/* Driver credentials */}
-          <section className="card h-fit space-y-3 p-4">
-            <span className="eyebrow">Kredensial pengemudi</span>
+          {/* Driver Badge & Info */}
+          <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
+              Driver Credentials
+            </span>
 
-            <div className="space-y-2">
-              <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--canvas)] p-3">
-                <span className="metric-label">Status tugas</span>
-                <div className="mt-1.5">
+            <div className="space-y-2 text-xs">
+              <div>
+                <span className="text-zinc-400 text-[10px] uppercase font-semibold">Duty Status</span>
+                <div className="mt-0.5">
                   <StatusBadge status={driverStatus} />
                 </div>
               </div>
 
               {licenseNumber && (
-                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--canvas)] p-3">
-                  <span className="metric-label">Nomor SIM</span>
-                  <p className="mono-plate mt-1 text-xs font-semibold text-slate-900">
-                    {licenseNumber}
-                  </p>
+                <div>
+                  <span className="text-zinc-400 text-[10px] uppercase font-semibold">Driver License</span>
+                  <p className="font-mono font-semibold text-zinc-800 mt-0.5">{licenseNumber}</p>
                 </div>
               )}
             </div>
 
-            <p className="border-t border-[var(--border-subtle)] pt-3 text-xs leading-relaxed text-slate-500">
-              Penugasan unit diatur oleh dispatcher operasional KCIC. Hubungi admin stasiun jika
-              terdapat perubahan data unit.
-            </p>
-          </section>
+            <div className="pt-4 border-t border-zinc-100 text-xs text-zinc-500">
+              <p>
+                Vehicle assignments are authorized by company fleet dispatchers. Contact dispatch if your assignment requires updates.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Pool inspection */}
-      <section className="card space-y-4 p-4">
-        <div className="min-w-0">
-          <h2 className="section-title">Daftar armada di seluruh hub</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Filter ketersediaan armada berdasarkan stasiun operasional KCIC.
+      {/* Fleet Search / Inspection */}
+      <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-800">
+            Inspect Fleet Vehicles
+          </h3>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Filter by operational hub and check vehicle availability
           </p>
         </div>
 
-        <div className="no-scrollbar -mx-0.5 flex items-center gap-1.5 overflow-x-auto px-0.5 pb-0.5">
+        {/* Quick Location Pills */}
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => setLocationFilter('')}
-            aria-pressed={!locationFilter}
-            className="chip shrink-0"
+            className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black transition-all cursor-pointer ${
+              !locationFilter
+                ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+            }`}
           >
-            Semua hub
+            Semua Hub
           </button>
           {locations.map((loc) => {
             const isSelected = locationFilter === loc.id;
@@ -309,82 +307,80 @@ function DriverVehicleContent() {
                 key={loc.id}
                 type="button"
                 onClick={() => setLocationFilter(isSelected ? '' : loc.id)}
-                aria-pressed={isSelected}
-                className="chip shrink-0"
+                className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
+                    : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                }`}
               >
                 <span>{loc.name}</span>
-                <span className="mono-plate text-[0.625rem] opacity-70">{loc.code}</span>
+                <span className={`ml-1 text-[10px] font-mono px-1 py-0.2 rounded border ${
+                  isSelected ? 'border-white/40 bg-white/20 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
+                }`}>
+                  {loc.code}
+                </span>
               </button>
             );
           })}
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative min-w-0 flex-1">
-            <label className="sr-only" htmlFor="pool-search">
-              Cari armada pool
-            </label>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-            <input
-              id="pool-search"
-              type="text"
-              placeholder="Cari plat, merek, model&hellip;"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
+        {/* Filter bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <input
+            type="text"
+            placeholder="Search license plate, brand, model..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+          />
 
-          <div className="min-w-0">
-            <label className="sr-only" htmlFor="pool-status-filter">
-              Filter status armada
-            </label>
-            <select
-              id="pool-status-filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold sm:w-auto"
-            >
-              <option value="">Semua status</option>
-              <option value="AVAILABLE">Tersedia</option>
-              <option value="RESERVED">Dipesan</option>
-              <option value="IN_USE">Sedang digunakan</option>
-            </select>
-          </div>
+          <select
+            value={locationFilter}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+          >
+            <option value="">All Locations</option>
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.name} ({loc.code})
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+          >
+            <option value="">All Statuses</option>
+            <option value="AVAILABLE">Available</option>
+            <option value="RESERVED">Reserved</option>
+            <option value="IN_USE">In Use</option>
+          </select>
 
           <button
             type="button"
             onClick={handleSearch}
-            className="button-secondary shrink-0 px-4 py-2 text-[0.6875rem]"
+            className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer shrink-0"
           >
-            {isSearching ? <Spinner size="xs" /> : <Funnel className="size-3.5" strokeWidth={2} aria-hidden="true" />}
-            <span>Filter</span>
+            {isSearching ? <Spinner size="sm" /> : 'Filter'}
           </button>
         </div>
 
         {searchResults.length > 0 && (
-          <div className="grid grid-cols-1 gap-2.5 border-t border-[var(--border-subtle)] pt-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {searchResults.map((v) => {
               const currentLoc = v.currentLocation || v.currentOperationalLocation;
               return (
-                <article
-                  key={v.id}
-                  className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="mono-plate rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--canvas)] px-1.5 py-0.5 text-[0.6875rem] font-semibold text-slate-800">
-                      {v.plateNumber}
-                    </span>
+                <div key={v.id} className="p-3 bg-zinc-50 border border-zinc-200 rounded text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-zinc-900">{v.plateNumber}</span>
                     <StatusBadge status={v.status} />
                   </div>
-                  <h3 className="mt-2 truncate text-xs font-semibold text-slate-900">
+                  <div className="text-zinc-600 font-medium">
                     {v.brand} {v.model}
-                  </h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
                     {v.homeLocation && (
                       <LocationBadge
                         type="home"
@@ -400,19 +396,15 @@ function DriverVehicleContent() {
                       />
                     )}
                   </div>
-                  <p className="tabular-nums mt-2 border-t border-[var(--border-subtle)] pt-2 text-[0.6875rem] text-slate-500">
-                    {v.seatingCapacity} kursi{' '}
-                    <span aria-hidden="true" className="text-slate-300">
-                      &middot;
-                    </span>{' '}
-                    {v.vehicleType}
-                  </p>
-                </article>
+                  <div className="text-zinc-400 text-[11px] pt-1">
+                    {v.seatingCapacity} seats • {v.vehicleType}
+                  </div>
+                </div>
               );
             })}
           </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }
@@ -421,9 +413,9 @@ export default function DriverVehiclePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col items-center justify-center gap-2 py-24 text-xs text-slate-500">
-          <Spinner size="md" className="text-[var(--kcic-red)]" />
-          <p>Memuat profil armada&hellip;</p>
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          <Spinner size="lg" className="mb-2" />
+          <p>Loading vehicle profile...</p>
         </div>
       }
     >

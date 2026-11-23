@@ -14,46 +14,54 @@ export default function OpengraphImage() {
         style={{
           width: '100%',
           height: '100%',
-          background: '#F8FAFC',
-          color: '#0F172A',
+          background: '#faf9f5',
+          color: '#000',
           display: 'flex',
           flexDirection: 'column',
-          padding: 64,
+          padding: 56,
           position: 'relative',
           fontFamily: 'Geist, sans-serif',
         }}
       >
+        {/* thick black frame */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            border: '12px solid #000',
+            boxSizing: 'border-box',
+          }}
+        />
+
         {/* header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
             <div
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                background: '#C8102E',
-                display: 'flex',
+                width: 32,
+                height: 32,
+                background: '#be123c',
+                border: '3px solid #000',
+                boxShadow: '5px 5px 0 0 #000',
               }}
             />
-            <div style={{ fontSize: 24, fontWeight: 650, letterSpacing: -0.4 }}>KCIC Fleet</div>
+            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -1 }}>KCIC FLEET</div>
           </div>
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 18,
-              fontWeight: 600,
-              letterSpacing: 0.4,
-              color: '#059669',
-              border: '1px solid #A7F3D0',
-              background: '#ECFDF5',
-              borderRadius: 999,
-              padding: '8px 18px',
+              fontSize: 22,
+              fontWeight: 800,
+              letterSpacing: 3,
+              border: '3px solid #000',
+              background: '#fff',
+              padding: '8px 20px',
+              boxShadow: '6px 6px 0 0 #000',
             }}
           >
-            <div style={{ width: 8, height: 8, borderRadius: 999, background: '#059669' }} />
-            Live tracking
+            LIVE
           </div>
         </div>
 
@@ -64,102 +72,31 @@ export default function OpengraphImage() {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            gap: 22,
-            paddingTop: 24,
+            gap: 28,
           }}
         >
-          <div style={{ fontSize: 116, fontWeight: 700, letterSpacing: -4.6, lineHeight: '112px' }}>
-            Armada Whoosh,
+          <div style={{ fontSize: 128, fontWeight: 900, letterSpacing: -7, lineHeight: '120px' }}>
+            KCIC FLEET
           </div>
-          <div style={{ fontSize: 116, fontWeight: 700, letterSpacing: -4.6, lineHeight: '112px' }}>
-            terpantau tiap detik.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 14 }}>
-            <div style={{ width: 40, height: 2, background: '#C8102E', display: 'flex' }} />
-            <div style={{ fontSize: 24, fontWeight: 500, color: '#64748B', letterSpacing: 0.2 }}>
-              Telemetri GPS · Dispatch pengemudi · Operasional stasiun
+          <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
+            <div style={{ width: 88, height: 18, background: '#be123c', border: '3px solid #000' }} />
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: 6 }}>
+              WORKPLACE MOBILITY · LIVE TRACKING
             </div>
           </div>
         </div>
 
         {/* footer */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderTop: '1px solid #E2E8F0',
-            paddingTop: 28,
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 18, fontWeight: 500, color: '#0F172A' }}>
-              PT Kereta Cepat Indonesia China
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 400, color: '#94A3B8' }}>
-              Workplace mobility · 2026
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 18,
-              border: '1px solid #E2E8F0',
-              background: '#FFFFFF',
-              borderRadius: 16,
-              padding: '16px 22px',
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: 1.2,
-                  color: '#94A3B8',
-                  textTransform: 'uppercase',
-                }}
-              >
-                GPS precision
-              </div>
-              <div
-                style={{
-                  fontSize: 26,
-                  fontWeight: 700,
-                  letterSpacing: -0.8,
-                  color: '#0F172A',
-                }}
-              >
-                ±3 m
-              </div>
-            </div>
-            <div style={{ width: 1, height: 34, background: '#E2E8F0', display: 'flex' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: 1.2,
-                  color: '#94A3B8',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Update
-              </div>
-              <div
-                style={{
-                  fontSize: 26,
-                  fontWeight: 700,
-                  letterSpacing: -0.8,
-                  color: '#0F172A',
-                }}
-              >
-                5 dtk
-              </div>
-            </div>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div style={{ fontSize: 26, color: '#3f3f46' }}>Vehicle tracking & driver dispatch</div>
+          <svg width="176" height="176" viewBox="0 0 176 176">
+            <circle cx="88" cy="88" r="80" fill="none" stroke="#000" strokeWidth="5" />
+            <circle cx="88" cy="88" r="46" fill="none" stroke="#000" strokeWidth="5" />
+            <line x1="8" y1="88" x2="168" y2="88" stroke="#000" strokeWidth="4" />
+            <line x1="88" y1="8" x2="88" y2="168" stroke="#000" strokeWidth="4" />
+            <line x1="88" y1="88" x2="146" y2="38" stroke="#be123c" strokeWidth="9" />
+            <circle cx="146" cy="38" r="13" fill="#be123c" stroke="#000" strokeWidth="4" />
+          </svg>
         </div>
       </div>
     ),

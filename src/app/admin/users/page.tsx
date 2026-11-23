@@ -8,7 +8,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Plus, Search } from 'lucide-react';
 
 interface UserItem {
   id: string;
@@ -202,48 +201,53 @@ export default function AdminUsersPage() {
 
   const columns: Column<UserItem>[] = [
     {
-      header: 'Pengguna',
+      header: 'User',
       cell: (u) => (
-        <div className="min-w-0 max-w-[14rem]">
-          <span className="block truncate text-[0.8125rem] font-semibold text-slate-900">
-            {u.name}
-          </span>
-          <span className="block truncate text-xs text-slate-500">{u.email}</span>
+        <div>
+          <span className="font-semibold text-zinc-900">{u.name}</span>
+          <span className="text-zinc-500 block text-xs">{u.email}</span>
         </div>
       ),
     },
     {
-      header: 'Telepon',
+      header: 'Phone',
       accessorKey: 'phone',
-      cell: (u) => (
-        <span className="tabular-nums whitespace-nowrap text-xs text-slate-700">{u.phone}</span>
-      ),
+      cell: (u) => <span className="font-mono text-xs">{u.phone}</span>,
     },
     {
-      header: 'Peran',
-      cell: (u) => (
-        <span className={`pill ${u.role.code === 'ADMIN' ? 'pill-error' : 'pill-standby'}`}>
-          <span className="pill-dot" aria-hidden="true" />
-          <span>{u.role.code === 'DRIVER' ? 'Driver' : u.role.code === 'ADMIN' ? 'Admin' : 'Pemesan'}</span>
-        </span>
-      ),
+      header: 'Role',
+      cell: (u) => {
+        const color =
+          u.role.code === 'ADMIN'
+            ? 'bg-rose-50 text-rose-800 border-rose-200'
+            : u.role.code === 'DRIVER'
+            ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+            : 'bg-zinc-100 text-zinc-800 border-zinc-200';
+        return (
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${color}`}>
+            {u.role.code}
+          </span>
+        );
+      },
     },
     {
-      header: 'Status akun',
+      header: 'Status',
       cell: (u) => (
-        <span className={`pill ${u.isActive ? 'pill-active' : ''}`}>
-          <span className="pill-dot" aria-hidden="true" />
-          <span>{u.isActive ? 'Aktif' : 'Non-aktif'}</span>
-        </span>
-      ),
-    },
-    {
-      header: 'Aksi',
-      cell: (u) => (
-        <div
-          className="flex flex-wrap items-center justify-end gap-1.5"
-          onClick={(e) => e.stopPropagation()}
+        <span
+          className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${
+            u.isActive
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+              : 'bg-zinc-100 text-zinc-500 border-zinc-200'
+          }`}
         >
+          {u.isActive ? 'ACTIVE' : 'INACTIVE'}
+        </span>
+      ),
+    },
+    {
+      header: 'Actions',
+      cell: (u) => (
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => {
@@ -251,76 +255,57 @@ export default function AdminUsersPage() {
               setNewPassword('');
               setResetError(null);
             }}
-            className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
+            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
           >
-            Reset password
+            Reset Password
           </button>
 
           <button
             type="button"
             onClick={() => setTogglingUser(u)}
-            className={`cursor-pointer rounded-[var(--radius-full)] border px-2.5 py-1 text-[0.6875rem] font-semibold transition-opacity hover:opacity-80 ${
+            className={`px-2.5 py-1 text-xs font-black rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer ${
               u.isActive
-                ? 'border-[var(--status-error-border)] bg-[var(--status-error-bg)] text-[var(--status-error-fg)]'
-                : 'border-[var(--status-active-border)] bg-[var(--status-active-bg)] text-[var(--status-active-fg)]'
+                ? 'text-rose-700 bg-rose-50 hover:bg-rose-100'
+                : 'text-emerald-950 bg-emerald-200 hover:bg-emerald-300'
             }`}
           >
-            {u.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+            {u.isActive ? 'Deactivate' : 'Activate'}
           </button>
         </div>
       ),
     },
   ];
+
   return (
-    <div className="w-full min-w-0 space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">Akses &amp; identitas</span>
-          <h1 className="page-heading mt-2">Manajemen pengguna sistem</h1>
-          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-            Kelola akun karyawan, hak akses peran sistem, dan kredensial login KCIC Fleet.
-          </p>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">User Management</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">Control employee and system user accounts, roles, and credentials</p>
         </div>
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="button-primary self-start sm:self-auto"
+          className="button-primary cursor-pointer inline-flex items-center gap-1.5"
         >
-          <Plus className="size-4" strokeWidth={2.2} aria-hidden="true" />
-          <span>Tambah pengguna</span>
+          <span>+ Create User</span>
         </button>
-      </header>
+      </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
-      <div className="card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            fetchUsers(1);
-          }}
-          className="flex w-full gap-2 sm:w-80"
-        >
-          <div className="relative min-w-0 flex-1">
-            <label className="sr-only" htmlFor="user-search">
-              Cari pengguna
-            </label>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-            <input
-              id="user-search"
-              type="text"
-              placeholder="Cari nama atau email&hellip;"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <button type="submit" className="button-secondary px-3.5 py-2 text-[0.6875rem]">
-            Cari
+      {/* Search */}
+      <div className="surface p-4 flex items-center justify-between gap-3">
+        <form onSubmit={(e) => { e.preventDefault(); fetchUsers(1); }} className="w-full sm:w-80 flex gap-2">
+          <input
+            type="text"
+            placeholder="Search user name or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
+          />
+          <button type="submit" className="button-primary px-3 py-1.5 text-xs font-black">
+            Search
           </button>
         </form>
       </div>
@@ -329,7 +314,7 @@ export default function AdminUsersPage() {
         columns={columns}
         data={users}
         isLoading={isLoading}
-        emptyMessage="Tidak ada pengguna ditemukan"
+        emptyMessage="No users found"
       />
 
       <Pagination
@@ -339,63 +324,58 @@ export default function AdminUsersPage() {
         onPageChange={(p) => fetchUsers(p)}
       />
 
-      {/* Create user */}
+      {/* Create User Modal */}
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title="Buat akun pengguna baru"
-        description="Registrasi akun internal untuk pegawai pemesan, driver, atau admin."
+        title="Create System User"
         maxWidth="md"
       >
-        {createError && (
-          <ErrorBanner
-            message={createError}
-            className="mb-4"
-            onDismiss={() => setCreateError(null)}
-          />
-        )}
+        {createError && <ErrorBanner message={createError} className="mb-4" onDismiss={() => setCreateError(null)} />}
 
         <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <FormField label="Nama lengkap" required>
+          <FormField label="Full Name" required>
             <input
               type="text"
               required
-              placeholder="Contoh: Rian Anggoro"
+              placeholder="Jane Doe"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
             />
           </FormField>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Alamat email" required>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Email Address" required>
               <input
                 type="email"
                 required
-                autoComplete="off"
-                placeholder="user@kcic.co.id"
+                placeholder="user@company.com"
                 value={formEmail}
                 onChange={(e) => setFormEmail(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
 
-            <FormField label="Nomor telepon" required>
+            <FormField label="Phone Number" required>
               <input
                 type="tel"
                 required
                 placeholder="081234567890"
                 value={formPhone}
                 onChange={(e) => setFormPhone(e.target.value)}
-                className="tabular-nums"
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Peran sistem" required>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Assign Role" required>
               <select
                 required
                 value={formRoleId}
                 onChange={(e) => setFormRoleId(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
               >
                 {roles.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -405,94 +385,95 @@ export default function AdminUsersPage() {
               </select>
             </FormField>
 
-            <FormField label="Password awal" required hint="Minimal 8 karakter">
+            <FormField label="Initial Password" required hint="Min 8 characters">
               <input
                 type="password"
                 required
                 minLength={8}
-                autoComplete="new-password"
                 value={formPassword}
                 onChange={(e) => setFormPassword(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
+          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
             <button
               type="button"
               disabled={isSubmittingCreate}
               onClick={() => setIsCreateOpen(false)}
-              className="button-secondary"
+              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
             >
-              Batal
+              Cancel
             </button>
-            <button type="submit" disabled={isSubmittingCreate} className="button-primary">
-              {isSubmittingCreate && <Spinner size="xs" />}
-              <span>Buat pengguna</span>
+            <button
+              type="submit"
+              disabled={isSubmittingCreate}
+              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              {isSubmittingCreate && <Spinner size="sm" className="text-white" />}
+              Create User
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Reset password */}
+      {/* Reset Password Modal */}
       <Modal
         isOpen={Boolean(resettingUser)}
         onClose={() => setResettingUser(null)}
-        title="Reset password pengguna"
-        description={
-          resettingUser ? `${resettingUser.name} \u00b7 ${resettingUser.email}` : ''
-        }
+        title="Reset User Password"
+        description={resettingUser ? `Reset password for ${resettingUser.name}` : ''}
         maxWidth="sm"
       >
-        {resetError && (
-          <ErrorBanner message={resetError} className="mb-4" onDismiss={() => setResetError(null)} />
-        )}
+        {resetError && <ErrorBanner message={resetError} className="mb-4" onDismiss={() => setResetError(null)} />}
 
         <form onSubmit={handleResetSubmit} className="space-y-4">
-          <FormField label="Password baru" required hint="Minimal 8 karakter">
+          <FormField label="New Password" required hint="Min 8 characters">
             <input
               type="password"
               required
               minLength={8}
-              autoComplete="new-password"
-              placeholder="Minimal 8 karakter"
+              placeholder="••••••••"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
             />
           </FormField>
 
-          <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
+          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
             <button
               type="button"
               disabled={isSubmittingReset}
               onClick={() => setResettingUser(null)}
-              className="button-secondary"
+              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
             >
-              Batal
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmittingReset || newPassword.length < 8}
-              className="button-primary"
+              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
             >
-              {isSubmittingReset && <Spinner size="xs" />}
-              <span>Perbarui password</span>
+              {isSubmittingReset && <Spinner size="sm" className="text-white" />}
+              Update Password
             </button>
           </div>
         </form>
       </Modal>
 
+      {/* Toggle Active Confirm Dialog */}
       <ConfirmDialog
         isOpen={Boolean(togglingUser)}
         onClose={() => setTogglingUser(null)}
         onConfirm={handleToggleActiveConfirm}
-        title={togglingUser?.isActive ? 'Nonaktifkan pengguna' : 'Aktifkan pengguna'}
+        title={togglingUser?.isActive ? 'Deactivate User' : 'Activate User'}
         message={
           togglingUser?.isActive
-            ? `Akun ${togglingUser?.name} akan dinonaktifkan dan tidak bisa masuk ke sistem lagi. Lanjutkan?`
-            : `Akun ${togglingUser?.name} akan diaktifkan kembali. Lanjutkan?`
+            ? `Are you sure you want to deactivate ${togglingUser?.name}? They will no longer be able to log in.`
+            : `Are you sure you want to activate ${togglingUser?.name}?`
         }
-        confirmLabel={togglingUser?.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+        confirmLabel={togglingUser?.isActive ? 'Deactivate' : 'Activate'}
         isDestructive={togglingUser?.isActive}
         isLoading={isToggling}
       />

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { ArrowUpRight, Download, Share2, X } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -129,13 +129,8 @@ export function isIosDismissed(): boolean {
 }
 
 /**
- * Install prompt.
- *
- * Placement rule: it lives in a fixed, pointer-transparent lane that sits
- * *above* the mobile dock (`.install-toast` in globals.css). It is anchored to
- * the viewport edge, clears the bottom nav at every breakpoint, and its own
- * surface — not the page — receives pointer events. Nothing underneath can be
- * covered by the prompt itself.
+ * Floating Install Prompt Banner
+ * Appears on first visit, every re-login, on logout, and after "Later" cooldown.
  */
 export function InstallPrompt() {
   const { status } = useSession();
@@ -216,55 +211,66 @@ export function InstallPrompt() {
   if (!promptAvailable || isDismissed) return null;
 
   return (
-    <div className="install-toast" role="complementary" aria-label="Pasang aplikasi KCIC Fleet">
-      <div className="flex items-start gap-3 p-3.5 pb-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] text-slate-700">
-          <Download className="size-[1.125rem]" strokeWidth={1.75} aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="pill pill-active py-0 text-[0.625rem]">PWA</span>
-            <span className="text-[0.625rem] text-slate-400">Akses cepat</span>
+    <aside
+      className="install-toast fixed inset-x-4 bottom-24 z-50 mx-auto max-w-md rounded-2xl border-[2.5px] border-black bg-white p-5 shadow-[6px_6px_0px_0px_#000] sm:bottom-8 sm:right-8 sm:left-auto"
+      aria-label="Install KCIC Fleet application"
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl border-2 border-black bg-amber-300 shadow-[2px_2px_0px_0px_#000]">
+              <Icon name="download" className="size-5 text-black" />
+            </span>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="rounded border border-black bg-emerald-200 px-1.5 py-0.2 text-[9px] font-black uppercase text-black">
+                  App PWA
+                </span>
+                <span className="text-[10px] font-bold text-zinc-500">Fast Access</span>
+              </div>
+              <h2 className="mt-0.5 text-base font-black text-black">
+                Install KCIC Fleet
+              </h2>
+              <p className="mt-1 text-xs font-semibold leading-relaxed text-zinc-600">
+                Akses cepat dari layar utama HP/laptop tanpa buka browser. Offline-ready & notifikasi realtime.
+              </p>
+            </div>
           </div>
-          <h2 className="mt-1 text-[0.8125rem] font-semibold text-slate-900">Pasang KCIC Fleet</h2>
-          <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-slate-500">
-            Buka langsung dari layar utama. Siap dipakai saat koneksi terputus.
-          </p>
+          <button
+            type="button"
+            onClick={handleDismissLater}
+            className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border-1.5 border-black bg-zinc-100 hover:bg-zinc-200"
+            aria-label="Tutup saran install"
+          >
+            <Icon name="close" className="size-4" />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleDismissLater}
-          className="-mr-1 -mt-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-slate-400 transition-colors hover:bg-[var(--canvas-sunken)] hover:text-slate-700"
-          aria-label="Tutup saran install"
-        >
-          <X className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleInstallClick}
+            className="flex-1 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_0px_#000] hover:bg-emerald-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
+          >
+            <span>Install Sekarang</span>
+            <Icon name="arrowUp" className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleDismissLater}
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border-2 border-black bg-zinc-100 px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_0px_#000] hover:bg-zinc-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
+          >
+            Nanti saja
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-2 border-t border-[var(--border-subtle)] p-3">
-        <button
-          type="button"
-          onClick={handleDismissLater}
-          className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-[var(--radius-full)] px-3.5 text-xs font-medium text-slate-600 transition-colors hover:bg-[var(--canvas)]"
-        >
-          Nanti saja
-        </button>
-        <button
-          type="button"
-          onClick={handleInstallClick}
-          className="ml-auto inline-flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius-full)] bg-[var(--slate-navy)] px-4 text-xs font-semibold text-white transition-colors hover:bg-[var(--charcoal)]"
-        >
-          <span>Install</span>
-          <ArrowUpRight className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
-        </button>
-      </div>
-    </div>
+    </aside>
   );
 }
 
 /**
- * iOS Safari "Add to Home Screen" hint.
- * Intentionally inline (not fixed): it renders in the page flow, so it can
- * never float over content or controls.
+ * iOS Safari Add to Home Screen Hint
+ * Reappears after cooldown, reset on login & logout.
  */
 export function IosInstallHint() {
   const { status } = useSession();
@@ -272,36 +278,33 @@ export function IosInstallHint() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Deferred so the effect body only knows *when* to re-check eligibility;
-    // the write itself happens in a callback, not during the effect run.
-    const detect = () => {
-      const isIos =
-        typeof navigator !== 'undefined' &&
-        /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-        !('MSStream' in window);
-      setIsIosEligible(isIos && !isAppStandalone());
-      setDismissed(isIosDismissed());
-    };
-    const firstDetect = setTimeout(detect, 0);
-    return () => clearTimeout(firstDetect);
+    const isIos =
+      typeof navigator !== 'undefined' &&
+      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+      !('MSStream' in window);
+    const standalone = isAppStandalone();
+    setIsIosEligible(isIos && !standalone);
+    setDismissed(isIosDismissed());
   }, [status]);
 
   if (!isIosEligible || dismissed) return null;
 
   return (
     <aside
-      className="card flex items-start gap-3 p-3.5"
-      aria-label="Tambahkan KCIC Fleet ke layar utama"
+      className="flex items-start justify-between gap-3 rounded-2xl border-2 border-black bg-emerald-100 p-4 text-sm shadow-[3px_3px_0px_0px_#000]"
+      aria-label="Add KCIC Fleet to your home screen"
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] text-slate-600">
-        <Share2 className="size-4" strokeWidth={1.9} aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1 text-xs leading-relaxed">
-        <p className="font-semibold text-slate-900">Pasang di layar utama iPhone/iPad</p>
-        <p className="mt-0.5 text-slate-500">
-          Di Safari, ketuk <strong className="font-semibold text-slate-700">Bagikan</strong>, lalu pilih{' '}
-          <strong className="font-semibold text-slate-700">Add to Home Screen</strong>.
-        </p>
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000]">
+          <Icon name="share" className="size-5" />
+        </span>
+        <div className="leading-relaxed">
+          <p className="font-black text-black">Pasang di Layar Utama iPhone/iPad</p>
+          <p className="mt-1 text-xs font-semibold text-emerald-950">
+            Di browser Safari, ketuk tombol <strong>Share</strong> (ikon kotak tanda panah ke atas), lalu pilih{' '}
+            <strong className="underline">Add to Home Screen (Tambah ke Layar Utama)</strong>.
+          </p>
+        </div>
       </div>
       <button
         type="button"
@@ -313,10 +316,10 @@ export function IosInstallHint() {
             // ignore
           }
         }}
-        className="-mr-1 -mt-1 grid size-7 shrink-0 cursor-pointer place-items-center rounded-full text-slate-400 transition-colors hover:bg-[var(--canvas-sunken)]"
-        aria-label="Tutup tip install iOS"
+        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border-1.5 border-black bg-white hover:bg-zinc-100 shadow-[1px_1px_0px_0px_#000]"
+        aria-label="Dismiss iOS install tip"
       >
-        <X className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+        <Icon name="close" className="size-4" />
       </button>
     </aside>
   );

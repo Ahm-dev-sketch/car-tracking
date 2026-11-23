@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
@@ -12,16 +12,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Drawer } from '@/components/ui/Drawer';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
-import {
-  ChevronRight,
-  CircleAlert,
-  Download,
-  Navigation,
-  Plus,
-  Upload,
-} from 'lucide-react';
 import { saveSnapshot, getSnapshot, getOfflineQueue, processOfflineQueue } from '@/lib/offline-sync';
 
 interface Booking {
@@ -120,13 +113,13 @@ function UserBookingsContent() {
   useEffect(() => {
     if (status !== 'authenticated') return;
     async function loadLocations() {
-      const applySnapshot = () => {
+      const useSnapshot = () => {
         const cached = getSnapshot<LocationOption[]>('locations_list');
         if (cached && cached.length > 0) setLocations(cached);
       };
 
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        applySnapshot();
+        useSnapshot();
         return;
       }
 
@@ -138,10 +131,10 @@ function UserBookingsContent() {
           setLocations(list);
           saveSnapshot('locations_list', list);
         } else {
-          applySnapshot();
+          useSnapshot();
         }
       } catch {
-        applySnapshot();
+        useSnapshot();
       }
     }
     loadLocations();
@@ -358,20 +351,23 @@ function UserBookingsContent() {
 
   const columns: Column<Booking>[] = [
     {
-      header: 'Reservasi',
+      header: 'Booking #',
       accessorKey: 'bookingNumber',
       cell: (b) => (
-        <div className="min-w-0">
-          <span className="mono-plate text-[0.8125rem] font-semibold text-slate-900">
-            {b.bookingNumber}
-          </span>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <span className={`pill ${b.serviceType === 'STANDBY' ? 'pill-warning' : ''}`}>
-              <span className="pill-dot" aria-hidden="true" />
-              <span>{b.serviceType === 'STANDBY' ? 'Standby' : 'Drop off'}</span>
+        <div>
+          <span className="font-semibold text-zinc-900">{b.bookingNumber}</span>
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            <span
+              className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
+                b.serviceType === 'STANDBY'
+                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-rose-100 text-rose-900 border-rose-300'
+              }`}
+            >
+              {b.serviceType === 'STANDBY' ? 'Standby' : 'Drop Off'}
             </span>
             {b.operationalLocation && (
-              <span className="text-[0.625rem] font-medium uppercase tracking-[0.06em] text-slate-400">
+              <span className="text-[10px] text-zinc-500 font-medium">
                 {b.operationalLocation.code}
               </span>
             )}
@@ -380,32 +376,25 @@ function UserBookingsContent() {
       ),
     },
     {
-      header: 'Rute',
+      header: 'Route',
       cell: (b) => (
-        <div className="min-w-0 max-w-[14rem]">
-          <div className="truncate text-[0.8125rem] font-medium text-slate-800">
-            {b.pickupLocation}
-          </div>
-          <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-slate-500">
-            <span aria-hidden="true" className="text-slate-300">
-              &rarr;
-            </span>
-            <span className="truncate">{b.destination}</span>
-          </div>
+        <div className="max-w-[220px]">
+          <div className="font-medium text-zinc-800 truncate">{b.pickupLocation}</div>
+          <div className="text-xs text-zinc-500 truncate">→ {b.destination}</div>
         </div>
       ),
     },
     {
-      header: 'Berangkat',
+      header: 'Departure',
       cell: (b) => (
-        <div className="whitespace-nowrap text-xs">
-          <div className="tabular-nums font-medium text-slate-800">
+        <div className="text-xs">
+          <div>
             {new Date(b.departureAt).toLocaleDateString([], {
               month: 'short',
               day: 'numeric',
             })}
           </div>
-          <div className="tabular-nums text-slate-500">
+          <div className="text-zinc-500">
             {new Date(b.departureAt).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
@@ -415,19 +404,15 @@ function UserBookingsContent() {
       ),
     },
     {
-      header: 'Armada',
+      header: 'Vehicle',
       cell: (b) =>
         b.vehicle ? (
-          <div className="min-w-0">
-            <div className="mono-plate text-[0.6875rem] font-semibold text-slate-900">
-              {b.vehicle.plateNumber}
-            </div>
-            <div className="max-w-[9rem] truncate text-[0.6875rem] text-slate-500">
-              {b.vehicle.brand}
-            </div>
+          <div>
+            <div className="font-mono text-xs font-semibold">{b.vehicle.plateNumber}</div>
+            <div className="text-[11px] text-zinc-500">{b.vehicle.brand}</div>
           </div>
         ) : (
-          <span className="text-xs text-slate-400">Belum ditugaskan</span>
+          <span className="text-xs text-zinc-400 italic">Unassigned</span>
         ),
     },
     {
@@ -435,23 +420,22 @@ function UserBookingsContent() {
       cell: (b) => (
         <div className="space-y-1">
           {b.status === 'OFFLINE_PENDING' ? (
-            <span className="pill pill-warning">
-              <span className="pill-dot" aria-hidden="true" />
-              <span>Menunggu sinkron</span>
+            <span className="inline-flex max-w-full items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] bg-amber-300 text-black">
+              MENUNGGU SYNC (OFFLINE)
             </span>
           ) : (
             <StatusBadge status={b.status} />
           )}
           {b.etaSeconds !== undefined && b.etaSeconds !== null && (
-            <div className="tabular-nums text-[0.6875rem] font-medium text-[var(--status-standby-fg)]">
-              ETA {formatEta(b.etaSeconds, b.etaEstimated)}
+            <div className="text-[10px] font-mono text-indigo-700">
+              ETA: {formatEta(b.etaSeconds, b.etaEstimated)}
             </div>
           )}
         </div>
       ),
     },
     {
-      header: 'Aksi',
+      header: 'Actions',
       cell: (b) => {
         const canCancel = [
           'PENDING',
@@ -465,52 +449,42 @@ function UserBookingsContent() {
           ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(b.status);
 
         return (
-          <div
-            className="flex flex-wrap items-center justify-end gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
             {canTrack && b.vehicle && (
               <Link
                 href={`/user/tracking?vehicleId=${b.vehicle.id}`}
-                className="inline-flex items-center gap-1 rounded-[var(--radius-full)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] px-2.5 py-1 text-[0.6875rem] font-semibold text-[var(--status-active-fg)] transition-opacity hover:opacity-80"
+                className="px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100"
               >
-                <span className="live-ping relative flex size-1.5" aria-hidden="true">
-                  <span className="absolute inset-0 rounded-full bg-current" />
-                  <span className="relative size-1.5 rounded-full bg-current" />
-                </span>
-                Lacak
+                Track
               </Link>
             )}
             {b.status === 'PENDING_COMPLETION' && (
               <button
                 type="button"
                 onClick={() => setUploadBooking(b)}
-                className={`inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-full)] px-2.5 py-1 text-[0.6875rem] font-semibold text-white transition-opacity hover:opacity-90 ${
+                className={`px-2.5 py-1 text-xs font-black rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer ${
                   b.rejectedReason
-                    ? 'bg-[var(--kcic-red)]'
-                    : 'bg-[var(--slate-navy)]'
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                    : 'bg-[#be123c] hover:bg-[#9f1239] text-white'
                 }`}
               >
-                <Upload className="size-3" strokeWidth={2.4} aria-hidden="true" />
-                <span>
-                  {b.rejectedReason ? 'Revisi nota' : b.notaDinasUrl ? 'Ganti nota' : 'Unggah nota'}
-                </span>
+                {b.rejectedReason ? 'Revisi Nota' : b.notaDinasUrl ? 'Ganti Nota' : 'Upload Nota'}
               </button>
             )}
             <button
               type="button"
               onClick={() => setSelectedBooking(b)}
-              className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
+              className="px-2 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
             >
-              Rincian
+              Details
             </button>
             {canCancel && (
               <button
                 type="button"
                 onClick={() => setCancellingBooking(b)}
-                className="cursor-pointer rounded-[var(--radius-full)] px-2 py-1 text-[0.6875rem] font-medium text-[var(--status-error-fg)] transition-colors hover:bg-[var(--status-error-bg)]"
+                className="px-2 py-1 text-xs font-medium text-rose-700 border border-rose-200 rounded hover:bg-rose-50 cursor-pointer"
               >
-                Batalkan
+                Cancel
               </button>
             )}
           </div>
@@ -518,41 +492,38 @@ function UserBookingsContent() {
       },
     },
   ];
+
   return (
-    <div className="w-full min-w-0 space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">Riwayat &amp; status</span>
-          <h1 className="page-heading mt-2">Pemesanan saya</h1>
-          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-            Pantau reservasi kendaraan dinas dan status penugasan pengemudi.
-          </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-zinc-200">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-900">My Bookings</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">Track your trip reservations and assignments</p>
         </div>
         <button
           type="button"
           onClick={() => setIsCreateOpen(true)}
-          className="button-primary self-start sm:self-auto"
+          className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5"
         >
-          <Plus className="size-4" strokeWidth={2.2} aria-hidden="true" />
-          <span>Pengajuan baru</span>
+          <span>+ New Reservation</span>
         </button>
-      </header>
+      </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
-      <div className="card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* Filters */}
+      <div className="bg-white p-3 rounded-lg border border-zinc-200 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <label htmlFor="booking-hub" className="metric-label shrink-0">
-              Hub
-            </label>
+          {/* Location filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Location:</span>
             <select
-              id="booking-hub"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="w-auto min-w-0 max-w-[12rem] rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
             >
-              <option value="">Semua lokasi</option>
+              <option value="">All Locations</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -561,41 +532,41 @@ function UserBookingsContent() {
             </select>
           </div>
 
-          <div className="flex min-w-0 items-center gap-1.5">
-            <label htmlFor="booking-status" className="metric-label shrink-0">
-              Status
-            </label>
+          {/* Status filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-zinc-500">Status:</span>
             <select
-              id="booking-status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-auto min-w-0 max-w-[12rem] rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
+              className="px-2.5 py-1 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
             >
-              <option value="">Semua status</option>
-              <option value="SEARCHING_DRIVER">Mencari driver</option>
-              <option value="DRIVER_NOTIFIED">Driver dihubungi</option>
-              <option value="DRIVER_ASSIGNED">Driver ditugaskan</option>
-              <option value="DRIVER_EN_ROUTE">Menuju penjemputan</option>
-              <option value="ARRIVED">Driver tiba</option>
-              <option value="IN_PROGRESS">Sedang berjalan</option>
-              <option value="PENDING_COMPLETION">Menunggu approval nota</option>
-              <option value="COMPLETED">Selesai</option>
-              <option value="NO_DRIVER_AVAILABLE">Driver tidak tersedia</option>
-              <option value="ADMIN_INTERVENTION">Eskalasi admin</option>
-              <option value="CANCELLED">Dibatalkan</option>
+              <option value="">All Statuses</option>
+              <option value="SEARCHING_DRIVER">Searching Driver</option>
+              <option value="DRIVER_NOTIFIED">Driver Notified</option>
+              <option value="DRIVER_ASSIGNED">Driver Assigned</option>
+              <option value="DRIVER_EN_ROUTE">Driver En Route</option>
+              <option value="ARRIVED">Arrived</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="PENDING_COMPLETION">Menunggu Approval Nota</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
+              <option value="ADMIN_INTERVENTION">Admin Intervention</option>
+              <option value="CANCELLED">Cancelled</option>
             </select>
           </div>
         </div>
       </div>
 
+      {/* Table */}
       <DataTable
         columns={columns}
         data={bookings}
         isLoading={isLoading}
         onRowClick={(b) => setSelectedBooking(b)}
-        emptyMessage="Belum ada reservasi pada filter ini"
+        emptyMessage="No reservations found"
       />
 
+      {/* Pagination */}
       <Pagination
         page={page}
         totalPages={totalPages}
@@ -603,15 +574,14 @@ function UserBookingsContent() {
         onPageChange={(p) => fetchBookings(p)}
       />
 
-      {/* Detail drawer */}
+      {/* Booking Details Drawer */}
       <Drawer
         isOpen={Boolean(selectedBooking)}
         onClose={() => setSelectedBooking(null)}
-        width="lg"
-        title={selectedBooking ? `Reservasi ${selectedBooking.bookingNumber}` : 'Reservasi'}
+        title={selectedBooking ? `Reservation #${selectedBooking.bookingNumber}` : 'Booking'}
         description={
           selectedBooking
-            ? `Diajukan ${new Date(selectedBooking.createdAt).toLocaleDateString([], {
+            ? `Created ${new Date(selectedBooking.createdAt).toLocaleDateString([], {
                 month: 'short',
                 day: 'numeric',
                 year: 'numeric',
@@ -620,41 +590,41 @@ function UserBookingsContent() {
         }
         footer={
           selectedBooking && (
-            <div className="flex w-full flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                {['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(
-                  selectedBooking.status
-                ) &&
-                  selectedBooking.vehicle && (
-                    <Link
-                      href={`/user/tracking?vehicleId=${selectedBooking.vehicle.id}`}
-                      className="button-primary"
-                    >
-                      <Navigation className="size-4" strokeWidth={2} aria-hidden="true" />
-                      <span>Lacak kendaraan</span>
-                    </Link>
-                  )}
-                {selectedBooking.status === 'PENDING_COMPLETION' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const b = selectedBooking;
-                      setUploadBooking(b);
-                    }}
-                    className="button-primary"
+            <div className="flex items-center justify-between w-full">
+              {['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(
+                selectedBooking.status
+              ) &&
+                selectedBooking.vehicle && (
+                  <Link
+                    href={`/user/tracking?vehicleId=${selectedBooking.vehicle.id}`}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold"
                   >
-                    <Upload className="size-4" strokeWidth={2.2} aria-hidden="true" />
-                    <span>
-                      {selectedBooking.rejectedReason
-                        ? 'Revisi nota dinas'
-                        : selectedBooking.notaDinasUrl
-                          ? 'Ganti nota dinas'
-                          : 'Unggah nota dinas'}
-                    </span>
-                  </button>
+                    Track Vehicle Live
+                  </Link>
                 )}
-              </div>
-
+              {selectedBooking.status === 'PENDING_COMPLETION' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const b = selectedBooking;
+                    setUploadBooking(b);
+                  }}
+                  className={`px-3.5 py-2 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 ${
+                    selectedBooking.rejectedReason
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-[#be123c] hover:bg-[#9f1239]'
+                  }`}
+                >
+                  <Icon name="download" className="size-3.5 rotate-180" />
+                  <span>
+                    {selectedBooking.rejectedReason
+                      ? 'Revisi Dokumen Nota Dinas'
+                      : selectedBooking.notaDinasUrl
+                      ? 'Ganti Nota Dinas'
+                      : 'Upload Nota Dinas'}
+                  </span>
+                </button>
+              )}
               {[
                 'PENDING',
                 'SEARCHING_DRIVER',
@@ -668,9 +638,9 @@ function UserBookingsContent() {
                     setSelectedBooking(null);
                     setCancellingBooking(b);
                   }}
-                  className="button-ghost text-[var(--status-error-fg)]"
+                  className="px-3.5 py-2 text-rose-700 border border-rose-200 rounded hover:bg-rose-50 text-xs font-medium cursor-pointer"
                 >
-                  Batalkan reservasi
+                  Cancel Reservation
                 </button>
               )}
             </div>
@@ -678,267 +648,245 @@ function UserBookingsContent() {
         }
       >
         {selectedBooking && (
-          <div className="space-y-3">
+          <div className="space-y-4 text-sm">
+            {/* Dispatch progress visual */}
             <DispatchProgress
               status={selectedBooking.status}
               etaSeconds={selectedBooking.etaSeconds}
               etaEstimated={selectedBooking.etaEstimated}
             />
 
-            <section className="card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="eyebrow">Rute perjalanan</span>
+            {/* Service Type & Operational Hub */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Jenis Layanan</span>
                 <span
-                  className={`pill ${selectedBooking.serviceType === 'STANDBY' ? 'pill-warning' : ''}`}
-                >
-                  <span className="pill-dot" aria-hidden="true" />
-                  <span>
-                    {selectedBooking.serviceType === 'STANDBY'
-                      ? 'Standby operasional'
-                      : 'Drop off sekali jalan'}
-                  </span>
-                </span>
-              </div>
-
-              <div className="route-stepper mt-3.5">
-                <div className="route-point" data-kind="pickup">
-                  <span className="route-label">Penjemputan</span>
-                  <p className="route-value">{selectedBooking.pickupLocation}</p>
-                </div>
-                <div className="route-point" data-kind="destination">
-                  <span className="route-label">Tujuan</span>
-                  <p className="route-value">{selectedBooking.destination}</p>
-                </div>
-              </div>
-
-              <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-[var(--border-subtle)] pt-3.5 text-xs">
-                <div>
-                  <dt className="metric-label">Berangkat</dt>
-                  <dd className="tabular-nums mt-0.5 font-medium text-slate-800">
-                    {new Date(selectedBooking.departureAt).toLocaleString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="metric-label">Kembali</dt>
-                  <dd className="tabular-nums mt-0.5 font-medium text-slate-800">
-                    {new Date(selectedBooking.expectedReturnAt).toLocaleString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="metric-label">Penumpang</dt>
-                  <dd className="tabular-nums mt-0.5 font-medium text-slate-800">
-                    {selectedBooking.passengerCount} orang
-                  </dd>
-                </div>
-                <div className="min-w-0">
-                  <dt className="metric-label">Keperluan</dt>
-                  <dd className="mt-0.5 font-medium text-slate-800 wrap-anywhere">
-                    {selectedBooking.purpose}
-                  </dd>
-                </div>
-                {selectedBooking.operationalLocation && (
-                  <div className="col-span-2">
-                    <dt className="metric-label">Hub operasional</dt>
-                    <dd className="mt-1">
-                      <LocationBadge
-                        type="home"
-                        name={selectedBooking.operationalLocation.name}
-                        code={selectedBooking.operationalLocation.code}
-                      />
-                    </dd>
-                  </div>
-                )}
-              </dl>
-
-              {selectedBooking.notes && (
-                <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-xs leading-relaxed text-slate-600 wrap-anywhere">
-                  <span className="font-medium text-slate-800">Catatan </span>
-                  {selectedBooking.notes}
-                </p>
-              )}
-            </section>
-
-            {(selectedBooking.vehicle || selectedBooking.driver) && (
-              <section className="card grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                <div className="min-w-0">
-                  <span className="metric-label">Armada</span>
-                  {selectedBooking.vehicle ? (
-                    <>
-                      <div className="mt-1 flex items-center gap-2">
-                        <p className="mono-plate text-sm font-semibold text-slate-900">
-                          {selectedBooking.vehicle.plateNumber}
-                        </p>
-                        <StatusBadge status={selectedBooking.vehicle.status} />
-                      </div>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
-                        {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                        {selectedBooking.vehicle.homeLocation && (
-                          <LocationBadge
-                            type="home"
-                            name={selectedBooking.vehicle.homeLocation.name}
-                            code={selectedBooking.vehicle.homeLocation.code}
-                          />
-                        )}
-                        {(selectedBooking.vehicle.currentLocation ||
-                          selectedBooking.vehicle.currentOperationalLocation) && (
-                          <LocationBadge
-                            type="current"
-                            name={
-                              (
-                                selectedBooking.vehicle.currentLocation ||
-                                selectedBooking.vehicle.currentOperationalLocation
-                              )?.name
-                            }
-                            code={
-                              (
-                                selectedBooking.vehicle.currentLocation ||
-                                selectedBooking.vehicle.currentOperationalLocation
-                              )?.code
-                            }
-                          />
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-400">Belum ada armada</p>
-                  )}
-                </div>
-
-                <div className="min-w-0 sm:border-l sm:border-[var(--border-subtle)] sm:pl-3">
-                  <span className="metric-label">Driver</span>
-                  {selectedBooking.driver ? (
-                    <>
-                      <p className="mt-1 truncate text-sm font-semibold text-slate-900">
-                        {selectedBooking.driver.user.name}
-                      </p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-[var(--status-active-fg)]">
-                        <span className="pill-dot" aria-hidden="true" />
-                        <span>Kontak terproteksi in-app</span>
-                      </p>
-                      <Link
-                        href={`/user/tracking?vehicleId=${selectedBooking.vehicle?.id || ''}`}
-                        className="mt-1.5 inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-[var(--kcic-red)] hover:underline"
-                      >
-                        Buka tracking &amp; chat
-                        <ChevronRight className="size-3" strokeWidth={2.4} aria-hidden="true" />
-                      </Link>
-                    </>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-400">Belum ada driver</p>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* Nota dinas */}
-            <section className="card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="eyebrow">Dokumen nota dinas</span>
-                <span
-                  className={`pill ${
-                    selectedBooking.rejectedReason
-                      ? 'pill-error'
-                      : selectedBooking.notaDinasUrl
-                        ? 'pill-active'
-                        : 'pill-warning'
+                  className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[11px] font-black border ${
+                    selectedBooking.serviceType === 'STANDBY'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-rose-100 text-rose-900 border-rose-300'
                   }`}
                 >
-                  <span className="pill-dot" aria-hidden="true" />
-                  <span>
-                    {selectedBooking.rejectedReason
-                      ? 'Ditolak \u00b7 perlu revisi'
-                      : selectedBooking.notaDinasUrl
-                        ? 'Terlampir'
-                        : 'Belum dilampirkan'}
+                  {selectedBooking.serviceType === 'STANDBY'
+                    ? 'Standby (Operasional Seharian)'
+                    : 'Drop Off (Sekali Jalan)'}
+                </span>
+              </div>
+              {selectedBooking.operationalLocation && (
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">Hub Operasional</span>
+                  <span className="font-bold text-zinc-800">
+                    {selectedBooking.operationalLocation.name} ({selectedBooking.operationalLocation.code})
                   </span>
+                </div>
+              )}
+            </div>
+
+            {/* Nota Dinas Section */}
+            <div className="p-3 bg-amber-50/70 border-2 border-black rounded-xl space-y-2 shadow-[2px_2px_0px_0px_#000]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                  <Icon name="check" className="size-4 text-emerald-600" />
+                  <span>Dokumen Nota Dinas</span>
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    selectedBooking.rejectedReason
+                      ? 'bg-rose-100 text-rose-800 border-rose-300'
+                      : selectedBooking.notaDinasUrl
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}
+                >
+                  {selectedBooking.rejectedReason
+                    ? 'Ditolak (Perlu Revisi)'
+                    : selectedBooking.notaDinasUrl
+                    ? 'Terlampir'
+                    : 'Belum Dilampirkan'}
                 </span>
               </div>
 
               {selectedBooking.rejectedReason && (
-                <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-3 py-2.5 text-xs">
-                  <p className="flex items-center gap-1.5 font-semibold text-[var(--status-error-fg)]">
-                    <CircleAlert className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
-                    <span>Nota dinas ditolak admin</span>
+                <div className="p-2.5 bg-rose-50 border-2 border-rose-300 rounded-lg text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                    <Icon name="close" className="size-3.5 text-rose-600" />
+                    <span>Nota Dinas Ditolak Admin</span>
+                  </div>
+                  <p className="text-[11px] text-rose-700">
+                    <span className="font-semibold">Alasan:</span> {selectedBooking.rejectedReason}
                   </p>
-                  <p className="mt-1 leading-relaxed text-[var(--status-error-fg)]/85 wrap-anywhere">
-                    {selectedBooking.rejectedReason}
-                  </p>
-                  <p className="mt-1 text-[0.6875rem] text-slate-500">
-                    Silakan unggah dokumen perbaikan melalui tombol revisi.
+                  <p className="text-[10px] text-zinc-600">
+                    Silakan unggah dokumen perbaikan melalui tombol Unggah Revisi di bawah.
                   </p>
                 </div>
               )}
 
               {selectedBooking.notaDinasUrl ? (
-                <div className="mt-3 space-y-2">
-                  <p className="truncate text-xs text-slate-500">
-                    <span className="font-medium text-slate-800">
-                      {selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}
-                    </span>
+                <div className="space-y-1.5 pt-1 text-xs">
+                  <p className="text-[11px] text-zinc-600 truncate">
+                    File: <span className="font-semibold text-zinc-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
                   </p>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
                     <a
                       href={selectedBooking.notaDinasUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="button-secondary"
+                      className="px-3 py-1 bg-white hover:bg-zinc-100 text-zinc-800 rounded text-xs font-bold border border-black shadow-[1.5px_1.5px_0px_0px_#000] inline-flex items-center gap-1"
                     >
-                      <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
-                      <span>Lihat dokumen</span>
+                      <Icon name="download" className="size-3.5" />
+                      <span>Lihat / Unduh Dokumen</span>
                     </a>
                     {selectedBooking.status === 'PENDING_COMPLETION' && (
                       <button
                         type="button"
                         onClick={() => setUploadBooking(selectedBooking)}
-                        className="button-ghost text-[var(--kcic-red)]"
+                        className="px-2.5 py-1 text-xs font-bold text-[#be123c] hover:underline cursor-pointer"
                       >
-                        {selectedBooking.rejectedReason ? 'Unggah revisi' : 'Unggah ulang'}
+                        {selectedBooking.rejectedReason ? 'Unggah Dokumen Revisi' : 'Unggah Ulang'}
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="mt-2 space-y-2.5">
-                  <p className="text-xs leading-relaxed text-slate-500">
+                <div className="text-xs space-y-2 pt-1">
+                  <p className="text-[11px] text-zinc-600">
                     {selectedBooking.status === 'PENDING_COMPLETION'
-                      ? 'Trip telah selesai. Silakan unggah nota dinas untuk diverifikasi oleh admin KCIC.'
+                      ? 'Trip telah selesai. Silakan unggah Nota Dinas untuk diverifikasi oleh admin KCIC.'
                       : 'Belum ada nota dinas yang dilampirkan pada pesanan ini.'}
                   </p>
                   {selectedBooking.status === 'PENDING_COMPLETION' && (
                     <button
                       type="button"
                       onClick={() => setUploadBooking(selectedBooking)}
-                      className="button-primary"
+                      className="px-3 py-1.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded text-xs font-bold border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
                     >
-                      <Upload className="size-4" strokeWidth={2.2} aria-hidden="true" />
-                      <span>Unggah nota dinas</span>
+                      <Icon name="download" className="size-3.5 rotate-180" />
+                      <span>Unggah Nota Dinas Sekarang</span>
                     </button>
                   )}
                 </div>
               )}
-            </section>
+            </div>
+
+            {/* Route details */}
+            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Pickup</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.pickupLocation}</span>
+              </div>
+              <div className="pt-2 border-t border-zinc-200">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Destination</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.destination}</span>
+              </div>
+            </div>
+
+            {/* Trip Schedule & Purpose */}
+            <div className="grid grid-cols-2 gap-3 text-xs pb-3 border-b border-zinc-100">
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Departure</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.departureAt).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Expected Return</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Passengers</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.passengerCount} Persons</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Purpose</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.purpose}</span>
+              </div>
+            </div>
+
+            {/* Vehicle info */}
+            {selectedBooking.vehicle && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1.5">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Asset</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-mono font-bold text-zinc-900">
+                      {selectedBooking.vehicle.plateNumber}
+                    </span>
+                    <span className="text-zinc-600 ml-2">
+                      {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
+                    </span>
+                  </div>
+                  <StatusBadge status={selectedBooking.vehicle.status} />
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {selectedBooking.vehicle.homeLocation && (
+                    <LocationBadge
+                      type="home"
+                      name={selectedBooking.vehicle.homeLocation.name}
+                      code={selectedBooking.vehicle.homeLocation.code}
+                    />
+                  )}
+                  {(selectedBooking.vehicle.currentLocation ||
+                    selectedBooking.vehicle.currentOperationalLocation) && (
+                    <LocationBadge
+                      type="current"
+                      name={
+                        (
+                          selectedBooking.vehicle.currentLocation ||
+                          selectedBooking.vehicle.currentOperationalLocation
+                        )?.name
+                      }
+                      code={
+                        (
+                          selectedBooking.vehicle.currentLocation ||
+                          selectedBooking.vehicle.currentOperationalLocation
+                        )?.code
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Driver info */}
+            {selectedBooking.driver && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Driver</span>
+                <div className="font-semibold text-zinc-900">
+                  {selectedBooking.driver.user.name}
+                </div>
+                <div className="text-[11px] text-zinc-600 flex items-center gap-2 pt-0.5">
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-800">
+                    <span className="size-1.5 rounded-full bg-emerald-500 inline-block" />
+                    Kontak Terproteksi In-App
+                  </span>
+                  <Link
+                    href={`/user/tracking?vehicleId=${selectedBooking.vehicle?.id || ''}`}
+                    className="text-[#be123c] hover:underline font-bold"
+                  >
+                    Buka Tracking & Chat
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            {selectedBooking.notes && (
+              <div className="text-xs text-zinc-600 pt-2 border-t border-zinc-100">
+                <span className="font-semibold text-zinc-700 block">Notes:</span>
+                <p className="mt-0.5">{selectedBooking.notes}</p>
+              </div>
+            )}
           </div>
         )}
       </Drawer>
 
-      {/* Cancel */}
+      {/* Cancel Confirmation Modal */}
       <Modal
         isOpen={Boolean(cancellingBooking)}
         onClose={() => setCancellingBooking(null)}
-        title="Batalkan reservasi"
-        description={`Reservasi ${cancellingBooking?.bookingNumber}`}
+        title="Cancel Reservation"
         maxWidth="sm"
         footer={
           <>
@@ -946,45 +894,42 @@ function UserBookingsContent() {
               type="button"
               onClick={() => setCancellingBooking(null)}
               disabled={isCancelling}
-              className="button-secondary"
+              className="min-h-[44px] px-4 py-2 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 disabled:opacity-50 cursor-pointer"
             >
-              Simpan reservasi
+              Keep Booking
             </button>
             <button
               type="button"
               onClick={handleCancelConfirm}
               disabled={isCancelling}
-              className="button-danger"
+              className="min-h-[44px] px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white rounded text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              {isCancelling && <Spinner size="xs" />}
-              <span>Batalkan reservasi</span>
+              {isCancelling && <Spinner size="sm" className="text-white" />}
+              Cancel Reservation
             </button>
           </>
         }
       >
         <div className="space-y-3">
-          <p className="text-xs leading-relaxed text-slate-600">
-            Reservasi ini akan dibatalkan dan driver tidak akan ditugaskan.
+          <p className="text-xs text-zinc-600">
+            Are you sure you want to cancel booking #{cancellingBooking?.bookingNumber}?
           </p>
           <div>
-            <label
-              htmlFor="cancel-reason"
-              className="mb-1.5 block text-xs font-medium text-slate-700"
-            >
-              Alasan pembatalan <span className="text-slate-400">(opsional)</span>
+            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 block mb-1">
+              Reason for cancellation (optional)
             </label>
             <input
-              id="cancel-reason"
               type="text"
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Contoh: Jadwal berubah, perjalanan ditunda"
+              placeholder="e.g. Schedule changed, trip postponed"
+              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
             />
           </div>
         </div>
       </Modal>
 
-      {/* Upload nota dinas */}
+      {/* Upload Nota Dinas Modal */}
       {uploadBooking && (
         <Modal
           isOpen={Boolean(uploadBooking)}
@@ -994,41 +939,35 @@ function UserBookingsContent() {
             setUploadFile(null);
             setUploadError(null);
           }}
-          title="Lampirkan nota dinas"
-          description={`Reservasi ${uploadBooking.bookingNumber} \u00b7 ${uploadBooking.pickupLocation} \u2192 ${uploadBooking.destination}`}
+          title="Lampirkan Dokumen Nota Dinas"
+          description={`Booking #${uploadBooking.bookingNumber} (${uploadBooking.pickupLocation} → ${uploadBooking.destination})`}
           maxWidth="md"
         >
           <div className="space-y-4">
-            {uploadError && (
-              <ErrorBanner message={uploadError} onDismiss={() => setUploadError(null)} />
-            )}
+            {uploadError && <ErrorBanner message={uploadError} onDismiss={() => setUploadError(null)} />}
 
             {uploadBooking.rejectedReason ? (
-              <div className="rounded-[var(--radius-md)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-3 py-2.5 text-xs">
-                <p className="flex items-center gap-1.5 font-semibold text-[var(--status-error-fg)]">
-                  <CircleAlert className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
-                  <span>Catatan penolakan sebelumnya</span>
-                </p>
-                <p className="mt-1 leading-relaxed text-[var(--status-error-fg)]/85 wrap-anywhere">
-                  {uploadBooking.rejectedReason}
-                </p>
-                <p className="mt-1 text-[0.6875rem] text-slate-500">
-                  Pastikan dokumen revisi sudah jelas dan sesuai catatan admin.
+              <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-lg text-xs space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                  <Icon name="close" className="size-3.5 text-rose-600" />
+                  <span>Catatan Penolakan Nota Dinas Sebelumnya:</span>
+                </div>
+                <p className="text-[11px] text-rose-950 font-medium">"{uploadBooking.rejectedReason}"</p>
+                <p className="text-[10px] text-zinc-600 italic">
+                  Pastikan dokumen/foto revisi yang Anda unggah sudah jelas dan sesuai dengan catatan admin.
                 </p>
               </div>
             ) : (
-              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2.5 text-xs leading-relaxed text-slate-600">
-                Perjalanan telah selesai. Sesuai ketentuan operasional KCIC, lampirkan nota dinas
-                (PDF, JPG, PNG, atau WebP, maks. 10 MB) untuk diverifikasi admin.
+              <div className="p-3 bg-amber-50 border-2 border-black rounded-lg text-xs font-medium text-amber-950">
+                Perjalanan telah selesai. Sesuai ketentuan operasional KCIC, silakan lampirkan Nota Dinas (format PDF, JPG, PNG, atau WebP, maks. 10MB) untuk diverifikasi oleh admin.
               </div>
             )}
 
             <div>
-              <label htmlFor="nota-file" className="mb-1.5 block text-xs font-medium text-slate-700">
-                File dokumen atau foto nota dinas
+              <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                Pilih File Dokumen / Foto Nota Dinas
               </label>
               <input
-                id="nota-file"
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
                 onChange={(e) => {
@@ -1036,28 +975,23 @@ function UserBookingsContent() {
                   setUploadFile(f);
                   setUploadError(null);
                 }}
-                className="w-full rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--canvas)] p-2.5 text-xs file:mr-3 file:cursor-pointer file:rounded-[var(--radius-full)] file:border-0 file:bg-[var(--slate-navy)] file:px-3.5 file:py-1.5 file:text-[0.6875rem] file:font-semibold file:text-white"
+                className="w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-black file:text-xs file:font-black file:bg-zinc-100 hover:file:bg-zinc-200 file:cursor-pointer border-2 border-dashed border-zinc-300 p-2 rounded-lg"
               />
             </div>
 
             {uploadFile && (
-              <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2.5 text-xs">
-                <div className="min-w-0">
-                  <span className="block truncate font-medium text-slate-900">
-                    {uploadFile.name}
-                  </span>
-                  <span className="tabular-nums text-[0.6875rem] text-slate-400">
-                    {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
-                  </span>
+              <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs flex items-center justify-between">
+                <div className="truncate max-w-[280px]">
+                  <span className="font-bold text-zinc-900 block truncate">{uploadFile.name}</span>
+                  <span className="text-[11px] text-zinc-500">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
-                <span className="pill pill-active shrink-0">
-                  <span className="pill-dot" aria-hidden="true" />
-                  <span>Siap diunggah</span>
+                <span className="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                  Siap Diunggah
                 </span>
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
               <button
                 type="button"
                 onClick={() => {
@@ -1066,7 +1000,7 @@ function UserBookingsContent() {
                   setUploadError(null);
                 }}
                 disabled={isUploading}
-                className="button-secondary"
+                className="px-3.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-700 hover:bg-zinc-100 cursor-pointer"
               >
                 Batal
               </button>
@@ -1074,20 +1008,17 @@ function UserBookingsContent() {
                 type="button"
                 onClick={handleUploadNotaDinas}
                 disabled={!uploadFile || isUploading}
-                className="button-primary"
+                className="px-4 py-1.5 text-xs font-black rounded-lg border-2 border-black bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000] hover:bg-[#9f1239] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
               >
-                {isUploading ? (
-                  <Spinner size="xs" />
-                ) : (
-                  <Upload className="size-4" strokeWidth={2.2} aria-hidden="true" />
-                )}
-                <span>{isUploading ? 'Mengunggah\u2026' : 'Unggah nota dinas'}</span>
+                {isUploading ? <Spinner size="sm" /> : <Icon name="download" className="size-3.5 rotate-180" />}
+                <span>{isUploading ? 'Mengunggah...' : 'Unggah Nota Dinas'}</span>
               </button>
             </div>
           </div>
         </Modal>
       )}
 
+      {/* Reworked Booking Modal */}
       <BookingModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
@@ -1104,9 +1035,9 @@ export default function UserBookingsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col items-center justify-center gap-2 py-24 text-xs text-slate-500">
-          <Spinner size="md" className="text-[var(--kcic-red)]" />
-          <p>Memuat reservasi&hellip;</p>
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          <Spinner size="lg" className="mb-2" />
+          <p>Loading bookings...</p>
         </div>
       }
     >

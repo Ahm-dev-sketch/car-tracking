@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { ArrowRight, CalendarDays, Car, ChevronRight, Clock, MapPin, Route, X } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { InterventionQueue } from '@/components/admin/InterventionQueue';
 import { LocationCapacityChart, LocationStatItem } from '@/components/admin/LocationCapacityChart';
+import { Icon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 
 interface AdminStats {
@@ -67,6 +67,7 @@ export default function AdminOverviewPage() {
       if (statsRes.ok) {
         const json = await statsRes.json();
         if (json.data) {
+          // Only update stats if we got real data (not a DB-busy fallback without data)
           setStats(json.data);
         }
       }
@@ -78,7 +79,7 @@ export default function AdminOverviewPage() {
         }
       }
     } catch {
-      // ignore
+      // ignore network errors silently without wiping out existing state
     } finally {
       if (isInitial) setIsLoading(false);
     }
@@ -100,6 +101,7 @@ export default function AdminOverviewPage() {
 
   const selectedLoc = stats?.byLocation.find((l) => l.locationId === selectedLocationId);
 
+  // Filtered active trips
   const filteredTrips = activeTripsList.filter((t) => {
     if (!selectedLocationId) return true;
     return (
@@ -109,6 +111,7 @@ export default function AdminOverviewPage() {
     );
   });
 
+  // Calculate dynamic top metrics (either scoped to selected hub or across all network)
   const availableCount = selectedLoc
     ? selectedLoc.availableVehicles ?? Math.max(0, selectedLoc.vehicles - (selectedLoc.inUseVehicles ?? 0))
     : stats?.vehicles.available;
@@ -116,6 +119,10 @@ export default function AdminOverviewPage() {
   const activeTripsCount = selectedLoc
     ? selectedLoc.bookings
     : stats?.bookings.active;
+
+  const onlineDriversCount = selectedLoc
+    ? selectedLoc.drivers
+    : stats?.drivers.online;
 
   const maxCapacityCount = selectedLoc
     ? selectedLoc.maxCapacity ?? selectedLoc.vehicles
@@ -125,138 +132,101 @@ export default function AdminOverviewPage() {
     ? selectedLoc.inUseVehicles ?? 0
     : stats?.vehicles.inUse;
 
-  const metrics = [
-    {
-      label: selectedLoc ? 'Kapasitas hub' : 'Total armada',
-      value: maxCapacityCount,
-      caption: selectedLoc
-        ? `Maksimal order simultan di ${selectedLoc.name}`
-        : 'Aset kendaraan terdaftar',
-      icon: Car,
-    },
-    {
-      label: selectedLoc ? `Siap pakai` : 'Armada siap pakai',
-      value: availableCount,
-      caption: selectedLoc ? `Siap terima booking di ${selectedLoc.name}` : 'Standby di seluruh hub',
-      icon: Car,
-    },
-    {
-      label: selectedLoc ? 'Sedang digunakan' : 'Sedang bertugas',
-      value: inUseCount,
-      caption: selectedLoc ? `Melayani trip di ${selectedLoc.name}` : 'Unit dalam perjalanan aktif',
-      icon: Route,
-    },
-    {
-      label: selectedLoc ? 'Order aktif' : 'Perjalanan aktif',
-      value: activeTripsCount,
-      caption: selectedLoc ? `Order aktif di ${selectedLoc.name}` : 'Order berjalan di seluruh hub',
-      icon: Route,
-    },
-  ];
-
-  const statusGrid = [
-    { label: 'Total armada', value: stats?.vehicles.total, caption: 'Unit terdaftar' },
-    { label: 'Dipesan', value: stats?.vehicles.reserved, caption: 'Terjadwal' },
-    { label: 'Sedang digunakan', value: stats?.vehicles.inUse, caption: 'Sedang di jalan' },
-    { label: 'Maintenance', value: stats?.vehicles.maintenance, caption: 'Bengkel servis' },
-    { label: 'Tidak aktif', value: stats?.vehicles.inactive, caption: 'Non-aktif' },
-    { label: 'Driver bertugas', value: stats?.drivers.busy, caption: 'On-trip' },
-    { label: 'Driver standby', value: stats?.drivers.offline, caption: 'Siap dinas' },
-    { label: 'Mencari driver', value: stats?.bookings.searching, caption: 'Auto-dispatch' },
-    { label: 'Belum ditugaskan', value: stats?.bookings.unassigned, caption: 'Menunggu slot' },
-    {
-      label: 'Perlu intervensi',
-      value: stats?.bookings.adminIntervention,
-      caption: 'Timeout dispatch',
-      attention: true,
-    },
-  ];
-
   return (
-    <div className="w-full min-w-0 space-y-6">
+    <div className="min-w-0 space-y-6 text-zinc-900 sm:space-y-8">
       <GreetingClock userName={session?.user?.name} roleLabel="Operations Admin" />
 
-      {/* Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">
-            <span className="size-1.5 rounded-full bg-[var(--kcic-red)]" aria-hidden="true" />
-            KCIC Operations Control
-          </span>
-          <h1 className="page-heading mt-2">Ringkasan Operasional Armada</h1>
-          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-            Kesiapan aset kendaraan, penugasan pengemudi, dan pemantauan perjalanan aktif di seluruh
-            stasiun KCIC.
+      <header className="page-intro">
+        <div>
+          <p className="eyebrow">KCIC Fleet / Operations overview</p>
+          <h1 className="page-heading mt-2">Fleet at a glance</h1>
+          <p className="mt-2 max-w-lg text-sm leading-relaxed text-zinc-500">
+            A clear view of your vehicles, people, and journeys. Ready for the decisions ahead.
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={`/admin/fleet${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`}
-            className="button-primary"
-          >
-            <MapPin className="size-4" strokeWidth={1.9} aria-hidden="true" />
-            <span>Peta armada live</span>
+        <div className="flex flex-col gap-2 min-[380px]:flex-row sm:flex-wrap sm:justify-end">
+          <Link href={`/admin/fleet${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`} className="button-primary">
+            <Icon name="pin" />Live fleet map
           </Link>
-          <Link
-            href={`/admin/bookings${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`}
-            className="button-secondary"
-          >
-            <CalendarDays className="size-4" strokeWidth={1.9} aria-hidden="true" />
-            <span>Kelola booking</span>
+          <Link href={`/admin/bookings${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`} className="button-secondary">
+            <Icon name="calendar" />Manage bookings
           </Link>
         </div>
       </header>
 
-      {/* Active hub filter */}
+      {/* Filter location status indicator */}
       {selectedLoc && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--kcic-red)]/25 bg-[var(--kcic-red-soft)] px-4 py-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-sm)] bg-[var(--kcic-red)] text-white">
-              <MapPin className="size-3.5" strokeWidth={2} aria-hidden="true" />
+        <div className="flex items-center justify-between rounded-xl border-2 border-black bg-rose-50 px-4 py-3 shadow-[2px_2px_0px_0px_#000]">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-md border border-black bg-[#be123c] text-white">
+              <Icon name="pin" className="h-3.5 w-3.5" />
             </span>
-            <span className="min-w-0 text-xs text-slate-600">
-              Menampilkan filter operasional stasiun:{' '}
-              <strong className="font-semibold text-[var(--kcic-red)]">
-                {selectedLoc.name} ({selectedLoc.code})
-              </strong>
+            <span className="text-xs font-bold text-zinc-800">
+              Menampilkan data terfilter untuk Hub: <strong className="font-black text-[#be123c]">{selectedLoc.name} ({selectedLoc.code})</strong>
             </span>
           </div>
           <button
             type="button"
             onClick={() => setSelectedLocationId('')}
-            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border)] bg-white px-3 py-1.5 text-[0.6875rem] font-semibold text-slate-700 transition-colors hover:border-[var(--border-strong)]"
+            className="rounded-md border border-black bg-white px-2.5 py-1 text-xs font-black text-zinc-900 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100 cursor-pointer"
           >
-            <X className="size-3" strokeWidth={2.4} aria-hidden="true" />
-            Reset filter
+            Tampilkan Semua Hub
           </button>
         </div>
       )}
 
-      {/* Metrics */}
-      <section aria-label="Metrik ringkasan" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {metrics.map((metric) => (
-          <div key={metric.label} className="card flex flex-col justify-between p-4">
-            <div className="flex items-start justify-between gap-2">
-              <span className="metric-label leading-snug">{metric.label}</span>
-              <span className="icon-tile size-8 shrink-0">
-                <metric.icon className="size-[0.9375rem]" strokeWidth={1.85} aria-hidden="true" />
+      {/* Top Key Metrics */}
+      <section aria-label="Fleet overview metrics" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
+        {[
+          {
+            label: selectedLoc ? `Kapasitas Maks Hub` : 'Total Armada',
+            value: maxCapacityCount,
+            caption: selectedLoc ? `Maksimal order simultan di ${selectedLoc.name}` : 'Aset kendaraan terdaftar',
+            icon: 'car' as const,
+            bgIcon: 'bg-rose-200',
+            valColor: 'text-zinc-950',
+          },
+          {
+            label: selectedLoc ? `Armada Available (${selectedLoc.code})` : 'Available fleet',
+            value: availableCount,
+            caption: selectedLoc ? `Siap terima booking di ${selectedLoc.name}` : 'Ready for dispatch seluruh hub',
+            icon: 'car' as const,
+            bgIcon: 'bg-emerald-300',
+            valColor: 'text-emerald-700',
+          },
+          {
+            label: selectedLoc ? `Sedang Digunakan (${selectedLoc.code})` : 'In use fleet',
+            value: inUseCount,
+            caption: selectedLoc ? `Sedang melayani trip di ${selectedLoc.name}` : 'Unit dalam perjalanan aktif',
+            icon: 'route' as const,
+            bgIcon: 'bg-amber-300',
+            valColor: 'text-amber-800',
+          },
+          {
+            label: selectedLoc ? `Trips / Booking (${selectedLoc.code})` : 'Active trips',
+            value: activeTripsCount,
+            caption: selectedLoc ? `Order aktif di ${selectedLoc.name}` : 'Assigned / en route seluruh hub',
+            icon: 'route' as const,
+            bgIcon: 'bg-sky-200',
+            valColor: 'text-zinc-950',
+          },
+        ].map((metric) => (
+          <div key={metric.label} className="surface flex flex-col justify-between p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xs font-black uppercase tracking-wider text-zinc-600">{metric.label}</h2>
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-black ${metric.bgIcon} text-zinc-950 shadow-[2px_2px_0px_0px_#000]`}>
+                <Icon name={metric.icon} />
               </span>
             </div>
-            <div className="mt-3 flex h-8 items-center">
-              {isLoading ? (
-                <Spinner size="sm" className="text-[var(--kcic-red)]" />
-              ) : (
-                <span className="metric-value">{metric.value ?? '—'}</span>
-              )}
+            <div className={`metric-value mt-4 text-4xl font-black ${metric.valColor}`}>
+              {isLoading ? <Spinner size="md" /> : (metric.value ?? '—')}
             </div>
-            <p className="mt-1.5 line-clamp-2 text-[0.6875rem] leading-relaxed text-slate-400">
-              {metric.caption}
-            </p>
+            <p className="mt-2 text-xs font-semibold text-zinc-600">{metric.caption}</p>
           </div>
         ))}
       </section>
 
+      {/* NEW INTERACTIVE CAPACITY & LOAD CHART */}
       <LocationCapacityChart
         locations={stats?.byLocation || []}
         selectedLocationId={selectedLocationId}
@@ -265,116 +235,87 @@ export default function AdminOverviewPage() {
 
       <InterventionQueue onAssigned={loadStats} />
 
-      {/* Status distribution */}
-      <section className="card overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3.5 sm:px-5">
-          <div className="min-w-0">
-            <span className="eyebrow">Distribusi status</span>
-            <h2 className="section-title mt-1">Status armada &amp; dispatch</h2>
+      <section aria-labelledby="fleet-health-heading" className="surface px-5 py-6 sm:px-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow">The operational picture</p>
+            <h2 id="fleet-health-heading" className="section-title mt-2">Fleet health & dispatch</h2>
           </div>
-          <p className="flex items-center gap-1.5 text-[0.6875rem] font-medium text-slate-400">
-            <Clock className="size-3.5" strokeWidth={1.9} aria-hidden="true" />
-            <span>Diperbarui tiap 20 detik</span>
-          </p>
+          <p className="flex items-center gap-2 text-xs font-semibold text-zinc-600"><Icon name="clock" className="h-4 w-4" />Refreshes every 20 seconds</p>
         </div>
-
-        <div className="grid grid-cols-2 gap-px bg-[var(--border-subtle)] sm:grid-cols-3 xl:grid-cols-5">
-          {statusGrid.map((m) => (
-            <div key={m.label} className="bg-white px-4 py-3.5">
-              <span
-                className={`block text-[0.6875rem] font-semibold leading-snug ${
-                  m.attention ? 'text-[var(--status-warning-fg)]' : 'text-slate-500'
-                }`}
-              >
-                {m.label}
-              </span>
-              <span
-                className={`mt-1.5 block text-xl font-bold leading-none tabular-nums tracking-tight ${
-                  m.attention ? 'text-[var(--status-warning-fg)]' : 'text-slate-900'
-                }`}
-              >
-                {isLoading ? <Spinner size="xs" /> : (m.value ?? '—')}
-              </span>
-              <span className="mt-1 block text-[0.625rem] text-slate-400">{m.caption}</span>
+        <dl className="mt-5 grid grid-cols-2 gap-x-5 sm:grid-cols-3 xl:grid-cols-5 xl:gap-x-8">
+          {[
+            { label: 'Total fleet', value: stats?.vehicles.total, caption: 'Registered assets', attention: false },
+            { label: 'Reserved', value: stats?.vehicles.reserved, caption: 'Assigned to a booking', attention: false },
+            { label: 'In use', value: stats?.vehicles.inUse, caption: 'On an active trip', attention: false },
+            { label: 'Maintenance', value: stats?.vehicles.maintenance, caption: 'Service workshop', attention: false },
+            { label: 'Inactive', value: stats?.vehicles.inactive, caption: 'Decommissioned', attention: false },
+            { label: 'Busy drivers', value: stats?.drivers.busy, caption: 'On a trip', attention: false },
+            { label: 'Offline drivers', value: stats?.drivers.offline, caption: 'On standby', attention: false },
+            { label: 'Searching for a driver', value: stats?.bookings.searching, caption: 'Auto-dispatch', attention: false },
+            { label: 'Unassigned bookings', value: stats?.bookings.unassigned, caption: 'No driver available', attention: false },
+            { label: 'Intervention', value: stats?.bookings.adminIntervention, caption: 'Needs assignment', attention: true },
+          ].map((metric) => (
+            <div key={metric.label} className="min-w-0 border-t-2 border-black/10 py-4">
+              <dt className={`min-h-10 text-xs font-bold leading-relaxed ${metric.attention ? 'text-amber-800' : 'text-zinc-600'}`}>{metric.label}</dt>
+              <dd className={`mt-1 text-2xl font-black tracking-tight tabular-nums ${metric.attention ? 'text-amber-800' : 'text-zinc-950'}`}>
+                {isLoading ? <Spinner size="sm" /> : (metric.value ?? '—')}
+              </dd>
+              <dd className={`mt-1 text-xs font-medium ${metric.attention ? 'text-amber-800' : 'text-zinc-500'}`}>{metric.caption}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       </section>
 
-      {/* Live trips */}
-      <section className="card overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3.5 sm:px-5">
-          <div className="min-w-0">
-            <span className="eyebrow">Sedang di jalan</span>
-            <h2 className="section-title mt-1">
-              Perjalanan berlangsung{' '}
-              <span className="font-normal text-slate-400 tabular-nums">({filteredTrips.length})</span>
+      <section aria-labelledby="active-trips-heading" className="surface px-5 py-6 sm:px-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="eyebrow">On the road</p>
+            <h2 id="active-trips-heading" className="section-title mt-2">
+              Active trips{' '}
+              <span className="ml-2 rounded-md border-2 border-black bg-zinc-100 px-2 py-0.5 text-xs font-black text-zinc-900 shadow-[1px_1px_0px_0px_#000]">
+                {filteredTrips.length} shown
+              </span>
             </h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">
+              {selectedLoc
+                ? `Perjalanan aktif di hub ${selectedLoc.name} (${selectedLoc.code}).`
+                : 'Vehicles currently underway on live routes across all hubs.'}
+            </p>
           </div>
-          <Link
-            href={`/admin/fleet${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`}
-            className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-[var(--kcic-red)] hover:underline"
-          >
-            <span>Buka peta live</span>
-            <ChevronRight className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+          <Link href={`/admin/fleet${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`} className="button-secondary">
+            Live tracking map<Icon name="arrow" className="h-4 w-4" />
           </Link>
         </div>
 
         {filteredTrips.length === 0 ? (
-          <div className="flex flex-col items-center px-6 py-10 text-center">
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
             {isLoading ? (
-              <div role="status" className="flex items-center gap-2 text-xs text-slate-500">
-                <Spinner size="sm" className="text-[var(--kcic-red)]" />
-                <span>Memuat perjalanan aktif…</span>
-              </div>
+              <div role="status" className="flex items-center gap-3 text-sm font-bold text-zinc-600"><Spinner size="md" />Loading active trips...</div>
             ) : (
               <>
-                <span className="mb-3 grid size-10 place-items-center rounded-full border border-[var(--border)] bg-[var(--canvas)] text-slate-400">
-                  <Route className="size-4" strokeWidth={1.8} aria-hidden="true" />
-                </span>
-                <p className="text-xs font-semibold text-slate-900">Tidak ada perjalanan aktif</p>
-                <p className="mt-1 max-w-xs text-[0.6875rem] leading-relaxed text-slate-500">
-                  {selectedLoc
-                    ? `Belum ada perjalanan aktif di ${selectedLoc.name}.`
-                    : 'Belum ada perjalanan aktif saat ini.'}
+                <span className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-rose-200 text-zinc-950 shadow-[2px_2px_0px_0px_#000]"><Icon name="route" /></span>
+                <p className="text-base font-black text-zinc-900">
+                  {selectedLoc ? `No trips underway at ${selectedLoc.name} right now.` : 'No trips underway right now.'}
                 </p>
+                <p className="max-w-sm text-xs font-medium leading-relaxed text-zinc-600">Active journeys will appear here as drivers start their trips.</p>
               </>
             )}
           </div>
         ) : (
-          <ul>
+          <ul className="mt-5 divide-y-2 divide-black/10">
             {filteredTrips.map((t) => (
-              <li key={t.id} className="list-row items-start sm:items-center">
-                <span className="icon-tile">
-                  <Car className="size-4" strokeWidth={1.85} aria-hidden="true" />
-                </span>
-
-                <div className="min-w-0 flex-1">
-                  <span className="mono-plate inline-block rounded-[var(--radius-xs)] bg-[var(--canvas)] px-1.5 py-0.5 text-[0.6875rem] font-semibold text-slate-700">
-                    {t.vehicle?.plateNumber || '—'}
-                  </span>
-                  <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-medium text-slate-700">
-                    <span className="truncate">
-                      {t.booking ? t.booking.pickupLocation : 'Perjalanan ad-hoc'}
-                    </span>
-                    {t.booking && (
-                      <ChevronRight
-                        className="size-3 shrink-0 text-slate-300"
-                        strokeWidth={2.6}
-                        aria-hidden="true"
-                      />
-                    )}
-                    {t.booking && <span className="truncate">{t.booking.destination}</span>}
-                  </p>
+              <li key={t.id} className="flex min-w-0 flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-amber-200 text-zinc-950 shadow-[2px_2px_0px_0px_#000]"><Icon name="car" /></span>
+                  <div className="min-w-0">
+                    <p className="wrap-anywhere font-mono text-sm font-black text-zinc-950">{t.vehicle?.plateNumber}</p>
+                    <p className="mt-1 wrap-anywhere text-sm font-medium leading-relaxed text-zinc-700">{t.booking ? `${t.booking.pickupLocation} → ${t.booking.destination}` : 'Ad-hoc trip'}</p>
+                  </div>
                 </div>
-
-                <div className="shrink-0 pl-11 text-left sm:pl-0 sm:text-right">
-                  <p className="text-[0.6875rem] font-semibold text-slate-900">
-                    {t.driver?.user?.name || 'Pengemudi ditugaskan'}
-                  </p>
-                  <p className="mt-0.5 text-[0.625rem] text-slate-400">
-                    Mulai <RelativeTime date={t.startedAt} />
-                  </p>
+                <div className="min-w-0 pl-14 sm:max-w-[45%] sm:pl-0 sm:text-right">
+                  <p className="wrap-anywhere text-sm font-bold text-zinc-800">Driver: {t.driver?.user?.name || 'Assigned driver'}</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-500">Started <RelativeTime date={t.startedAt} /></p>
                 </div>
               </li>
             ))}
@@ -382,87 +323,67 @@ export default function AdminOverviewPage() {
         )}
       </section>
 
-      {/* Hubs */}
-      <section className="card overflow-hidden">
-        <div className="border-b border-[var(--border-subtle)] px-4 py-3.5 sm:px-5">
-          <span className="eyebrow">Jaringan stasiun</span>
-          <h2 className="section-title mt-1">
-            Stasiun &amp; hub operasional{' '}
-            <span className="font-normal text-slate-400 tabular-nums">
-              ({stats?.byLocation.length || 0})
-            </span>
-          </h2>
+      <section aria-labelledby="locations-heading" className="surface min-w-0 space-y-6 p-5 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="eyebrow">Across your network</p>
+            <h2 id="locations-heading" className="section-title mt-2">Operational locations</h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">Fleet distribution and active workload at each base.</p>
+          </div>
+          <span className="rounded-md border-2 border-black bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-900 shadow-[1px_1px_0px_0px_#000]">{stats?.byLocation.length || 0} operational hubs</span>
         </div>
 
-        {stats && stats.byLocation.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4">
+        {isLoading ? (
+          <div role="status" className="flex items-center justify-center gap-3 py-12 text-sm font-bold text-zinc-600"><Spinner size="md" />Loading operational locations...</div>
+        ) : !stats || stats.byLocation.length === 0 ? (
+          <div className="rounded-2xl border-2 border-black bg-zinc-50 px-5 py-10 text-center shadow-[3px_3px_0px_0px_#000]">
+            <Icon name="pin" className="mx-auto mb-4 h-6 w-6 text-rose-800" />
+            <p className="text-base font-black text-zinc-900">No operational locations configured.</p>
+            <p className="mt-2 text-xs font-medium leading-relaxed text-zinc-600">Your base-by-base fleet overview will appear here when locations are available.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {stats.byLocation.map((loc) => {
               const isSelected = selectedLocationId === loc.locationId;
               const avail = loc.availableVehicles ?? Math.max(0, loc.vehicles - (loc.inUseVehicles ?? 0));
               const inUse = loc.inUseVehicles ?? 0;
               return (
-                <div
+                <article
                   key={loc.locationId}
-                  className={`rounded-[var(--radius-lg)] border p-3.5 transition-colors ${
-                    isSelected
-                      ? 'border-[var(--kcic-red)]/40 bg-[var(--kcic-red-soft)]'
-                      : 'border-[var(--border)] bg-white hover:border-[var(--border-strong)]'
+                  className={`min-w-0 rounded-2xl border-2 border-black p-5 shadow-[4px_4px_0px_0px_#000] transition-all ${
+                    isSelected ? 'bg-rose-50 ring-2 ring-[#be123c]' : 'bg-white'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="truncate text-[0.8125rem] font-semibold text-slate-900">{loc.name}</h3>
-                    <span className="mono-plate shrink-0 rounded-[var(--radius-xs)] bg-[var(--canvas)] px-1.5 py-0.5 text-[0.625rem] font-semibold text-slate-500">
-                      {loc.code}
-                    </span>
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="wrap-anywhere text-base font-black tracking-tight text-zinc-950">{loc.name}</h3>
+                    <span className="shrink-0 rounded-md border-2 border-black bg-rose-200 px-2.5 py-1 font-mono text-xs font-black text-zinc-950 shadow-[1px_1px_0px_0px_#000]">{loc.code}</span>
                   </div>
-
-                  <div className="mt-3.5 grid grid-cols-3 gap-1.5 text-center">
-                    <div className="rounded-[var(--radius-sm)] bg-[var(--canvas)] py-1.5">
-                      <span className="metric-label block">Total</span>
-                      <span className="mt-0.5 block text-sm font-bold tabular-nums text-slate-900">
-                        {loc.vehicles}
-                      </span>
+                  <dl className="my-5 grid grid-cols-3 gap-2">
+                    <div className="rounded-lg border border-black bg-zinc-50 p-2 text-center">
+                      <dt className="text-[10px] font-black uppercase text-zinc-500">Maks Armada</dt>
+                      <dd className="mt-1 text-2xl font-black tabular-nums text-zinc-900">{loc.vehicles}</dd>
                     </div>
-                    <div className="rounded-[var(--radius-sm)] bg-[var(--status-active-bg)] py-1.5">
-                      <span className="metric-label block text-[var(--status-active-fg)]">Ready</span>
-                      <span className="mt-0.5 block text-sm font-bold tabular-nums text-[var(--status-active-fg)]">
-                        {avail}
-                      </span>
+                    <div className="rounded-lg border border-black bg-emerald-50 p-2 text-center">
+                      <dt className="text-[10px] font-black uppercase text-emerald-800">Available</dt>
+                      <dd className="mt-1 text-2xl font-black tabular-nums text-emerald-800">{avail}</dd>
                     </div>
-                    <div className="rounded-[var(--radius-sm)] bg-[var(--status-warning-bg)] py-1.5">
-                      <span className="metric-label block text-[var(--status-warning-fg)]">In use</span>
-                      <span className="mt-0.5 block text-sm font-bold tabular-nums text-[var(--status-warning-fg)]">
-                        {inUse}
-                      </span>
+                    <div className="rounded-lg border border-black bg-amber-50 p-2 text-center">
+                      <dt className="text-[10px] font-black uppercase text-amber-800">In Use</dt>
+                      <dd className="mt-1 text-2xl font-black tabular-nums text-amber-800">{inUse}</dd>
                     </div>
+                  </dl>
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t-2 border-black/10 pt-3">
+                    <Link href={`/admin/vehicles?locationId=${loc.locationId}`} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-black bg-zinc-100 px-2.5 text-xs font-bold text-zinc-900 hover:bg-zinc-200 shadow-[1px_1px_0px_0px_#000]">Vehicles<Icon name="arrow" className="h-3.5 w-3.5" /></Link>
+                    <Link href={`/admin/bookings?locationId=${loc.locationId}`} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-black bg-zinc-100 px-2.5 text-xs font-bold text-zinc-900 hover:bg-zinc-200 shadow-[1px_1px_0px_0px_#000]">Bookings<Icon name="arrow" className="h-3.5 w-3.5" /></Link>
+                    <Link href={`/admin/fleet?locationId=${loc.locationId}`} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-black bg-zinc-100 px-2.5 text-xs font-bold text-zinc-900 hover:bg-zinc-200 shadow-[1px_1px_0px_0px_#000]">Map<Icon name="arrow" className="h-3.5 w-3.5" /></Link>
                   </div>
-
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2.5">
-                    {[
-                      { href: `/admin/vehicles?locationId=${loc.locationId}`, label: 'Armada' },
-                      { href: `/admin/bookings?locationId=${loc.locationId}`, label: 'Booking' },
-                      { href: `/admin/fleet?locationId=${loc.locationId}`, label: 'Peta' },
-                    ].map((link) => (
-                      <Link
-                        key={link.label}
-                        href={link.href}
-                        className="inline-flex items-center gap-0.5 text-[0.6875rem] font-semibold text-slate-600 transition-colors hover:text-[var(--kcic-red)]"
-                      >
-                        {link.label}
-                        <ArrowRight className="size-2.5" strokeWidth={2.4} aria-hidden="true" />
-                      </Link>
-                    ))}
-                  </div>
-                </div>
+                </article>
               );
             })}
-          </div>
-        ) : (
-          <div className="px-6 py-10 text-center text-xs text-slate-400">
-            {isLoading ? 'Memuat jaringan stasiun…' : 'Belum ada data hub operasional.'}
           </div>
         )}
       </section>
     </div>
   );
 }
+

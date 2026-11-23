@@ -9,7 +9,6 @@ type StatusType =
   | 'DRIVER_EN_ROUTE'
   | 'ARRIVED'
   | 'IN_PROGRESS'
-  | 'PENDING_COMPLETION'
   | 'COMPLETED'
   | 'NO_DRIVER_AVAILABLE'
   | 'ADMIN_INTERVENTION'
@@ -33,93 +32,54 @@ type StatusType =
   | 'ABORTED'
   | string;
 
-/**
- * Tone mapping only — the actual colours come from the four fixed status
- * token sets in globals.css (.pill-active / -standby / -warning / -error).
- */
-type Tone = 'active' | 'standby' | 'warning' | 'error' | 'neutral';
-
-const statusTones: Record<string, Tone> = {
+const statusStyles: Record<string, string> = {
   // Booking
-  PENDING: 'standby',
-  SEARCHING_DRIVER: 'standby',
-  DRIVER_NOTIFIED: 'standby',
-  DRIVER_ASSIGNED: 'standby',
-  DRIVER_EN_ROUTE: 'active',
-  ARRIVED: 'active',
-  IN_PROGRESS: 'active',
-  PENDING_COMPLETION: 'warning',
-  COMPLETED: 'active',
-  NO_DRIVER_AVAILABLE: 'error',
-  ADMIN_INTERVENTION: 'warning',
-  APPROVED: 'active',
-  REJECTED: 'error',
-  CANCELLED: 'error',
+  PENDING: 'bg-amber-300 text-black',
+  SEARCHING_DRIVER: 'bg-amber-400 text-black animate-pulse',
+  DRIVER_NOTIFIED: 'bg-sky-300 text-black',
+  DRIVER_ASSIGNED: 'bg-violet-300 text-black',
+  DRIVER_EN_ROUTE: 'bg-indigo-300 text-black',
+  ARRIVED: 'bg-teal-300 text-black',
+  IN_PROGRESS: 'bg-emerald-300 text-black',
+  PENDING_COMPLETION: 'bg-amber-300 text-black animate-pulse',
+  COMPLETED: 'bg-emerald-400 text-black',
+  NO_DRIVER_AVAILABLE: 'bg-zinc-200 text-black',
+  ADMIN_INTERVENTION: 'bg-orange-300 text-black',
+  APPROVED: 'bg-sky-300 text-black',
+  REJECTED: 'bg-rose-300 text-black',
+  CANCELLED: 'bg-rose-300 text-black',
 
   // Vehicle
-  AVAILABLE: 'active',
-  RESERVED: 'standby',
-  IN_USE: 'active',
-  MAINTENANCE: 'warning',
-  INACTIVE: 'error',
+  AVAILABLE: 'bg-emerald-300 text-black',
+  RESERVED: 'bg-amber-300 text-black',
+  IN_USE: 'bg-sky-300 text-black',
+  MAINTENANCE: 'bg-zinc-200 text-black',
+  INACTIVE: 'bg-rose-300 text-black',
 
   // Driver / Trip
-  OFFLINE: 'error',
-  ONLINE: 'active',
-  BUSY: 'warning',
-  ON_TRIP: 'active',
-  ACTIVE: 'active',
-  ABORTED: 'error',
+  OFFLINE: 'bg-zinc-200 text-black',
+  ONLINE: 'bg-emerald-300 text-black',
+  BUSY: 'bg-sky-300 text-black',
+  ON_TRIP: 'bg-sky-300 text-black',
+  ACTIVE: 'bg-emerald-300 text-black',
+  ABORTED: 'bg-rose-300 text-black',
 };
-
-const pulseStates = new Set(['SEARCHING_DRIVER', 'PENDING_COMPLETION']);
-
-const humanize = (value: string) =>
-  value
-    .toLowerCase()
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
 
 export function StatusBadge({ status, className = '' }: { status: StatusType; className?: string }) {
   const normalized = status ? status.toUpperCase() : 'UNKNOWN';
-  const tone = statusTones[normalized] ?? 'neutral';
-
+  const style = statusStyles[normalized] || 'bg-zinc-200 text-black';
   const label =
     normalized === 'PENDING_COMPLETION'
       ? 'Menunggu Approval Nota'
       : normalized === 'PENDING'
-        ? 'Menunggu Admin'
-        : normalized === 'NO_DRIVER_AVAILABLE'
-          ? 'Tanpa Driver'
-          : normalized === 'ADMIN_INTERVENTION'
-            ? 'Perlu Intervensi'
-            : normalized === 'DRIVER_EN_ROUTE'
-              ? 'Menuju Jemput'
-              : normalized === 'DRIVER_ASSIGNED'
-                ? 'Driver Ditugaskan'
-                : normalized === 'DRIVER_NOTIFIED'
-                  ? 'Driver Dihubungi'
-                  : normalized === 'IN_PROGRESS'
-                    ? 'Berjalan'
-                    : normalized === 'IN_USE'
-                      ? 'Sedang Dipakai'
-                      : normalized === 'ON_TRIP'
-                        ? 'On Trip'
-                        : normalized === 'INACTIVE'
-                          ? 'Non-aktif'
-                          : humanize(normalized);
+      ? 'Menunggu Admin'
+      : normalized.replace(/_/g, ' ');
 
   return (
     <span
-      className={`pill ${tone === 'neutral' ? '' : `pill-${tone}`} ${className}`}
-      data-status={normalized}
+      className={`inline-flex max-w-full items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] ${style} ${className}`}
     >
-      <span
-        className={`pill-dot ${pulseStates.has(normalized) ? 'animate-pulse' : ''}`}
-        aria-hidden="true"
-      />
-      <span title={label}>{label}</span>
+      {label}
     </span>
   );
 }

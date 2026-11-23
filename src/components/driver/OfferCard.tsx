@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Clock, Timer, Users } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { formatEta } from '@/components/booking/DispatchProgress';
 
@@ -72,9 +71,6 @@ export function OfferCard({ offer, onAccept, onReject, onExpire }: OfferCardProp
   const maxSec = 60;
   const pct = Math.min(100, Math.max(0, (secondsRemaining / maxSec) * 100));
 
-  const urgent = secondsRemaining <= 10;
-  const soon = secondsRemaining <= 20;
-
   const handleAccept = async () => {
     setIsAccepting(true);
     try {
@@ -94,104 +90,98 @@ export function OfferCard({ offer, onAccept, onReject, onExpire }: OfferCardProp
   };
 
   return (
-    <article className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
-      {/* Countdown bar */}
-      <div
-        className="h-1 w-full overflow-hidden bg-[var(--border-subtle)]"
-        role="progressbar"
-        aria-label="Sisa waktu merespons tawaran"
-        aria-valuemin={0}
-        aria-valuemax={maxSec}
-        aria-valuenow={Math.min(secondsRemaining, maxSec)}
-      >
+    <div className="rounded-xl border-[3px] border-black bg-white overflow-hidden shadow-[6px_6px_0px_0px_#000]">
+      {/* 60s Countdown Bar */}
+      <div className="w-full bg-zinc-200 border-b-2 border-black h-3 overflow-hidden" role="progressbar" aria-label="Time remaining to respond" aria-valuemin={0} aria-valuemax={maxSec} aria-valuenow={Math.min(secondsRemaining, maxSec)}>
         <div
-          className={`h-full origin-left transition-transform duration-500 ease-out ${
-            urgent
-              ? 'bg-[var(--status-error-fg)]'
-              : soon
-                ? 'bg-[var(--status-warning-fg)]'
-                : 'bg-[var(--status-active-fg)]'
+          className={`h-full origin-left transition-transform duration-500 ease-out border-r-2 border-black ${
+            secondsRemaining <= 10
+              ? 'bg-rose-500'
+              : secondsRemaining <= 20
+              ? 'bg-amber-400'
+              : 'bg-emerald-500'
           }`}
           style={{ transform: `scaleX(${pct / 100})` }}
         />
       </div>
 
-      <div className="space-y-3.5 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="relative flex size-2 shrink-0">
-              <span className="live-ping absolute inset-0 rounded-full bg-[var(--status-active-fg)]" aria-hidden="true" />
-              <span className="relative size-2 rounded-full bg-[var(--status-active-fg)]" aria-hidden="true" />
+      <div className="p-4 sm:p-5 space-y-4">
+        {/* Header with Countdown Badge */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 border border-black bg-emerald-500" />
             </span>
-            <span className="truncate text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
-              Tawaran perjalanan baru
+            <span className="text-sm font-black uppercase tracking-wider text-black">
+              Tawaran Perjalanan Baru
             </span>
           </div>
 
-          <span
-            className={`mono-plate shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tabular-nums ${
-              urgent
-                ? 'animate-pulse bg-[var(--status-error-bg)] text-[var(--status-error-fg)]'
-                : soon
-                  ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-fg)]'
-                  : 'bg-[var(--canvas)] text-slate-600'
+          <div
+            className={`font-mono font-black text-xs px-2.5 py-1 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] ${
+              secondsRemaining <= 5
+                ? 'bg-rose-300 text-black animate-pulse'
+                : secondsRemaining <= 10
+                ? 'bg-amber-300 text-black'
+                : 'bg-emerald-300 text-black'
             }`}
           >
-            {secondsRemaining}s
-          </span>
-        </div>
-
-        <div className="route-stepper">
-          <div className="route-point" data-kind="pickup">
-            <p className="route-label">Titik jemput</p>
-            <p className="route-value truncate">{pickup}</p>
-          </div>
-          <div className="route-point" data-kind="destination">
-            <p className="route-label">Tujuan</p>
-            <p className="route-value truncate">{dest}</p>
+            {secondsRemaining}s remaining
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[0.6875rem] font-medium text-slate-600">
-              <Users className="size-3" strokeWidth={2} aria-hidden="true" />
-              <strong className="font-semibold tabular-nums text-slate-900">{passengers}</strong>
-              penumpang
+        {/* Route Details */}
+        <div className="bg-amber-50/60 rounded-xl border-2 border-black p-4 space-y-3 text-sm shadow-[2px_2px_0px_0px_#000]">
+          <div>
+            <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500 block">Titik Jemput</span>
+            <span className="font-extrabold text-black text-base">{pickup}</span>
+          </div>
+          <div className="pt-2 border-t-2 border-dashed border-black/20">
+            <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500 block">Tujuan</span>
+            <span className="font-extrabold text-black text-base">{dest}</span>
+          </div>
+        </div>
+
+        {/* Meta / Metrics */}
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-1">
+          <div className="flex items-center gap-3">
+            <span className="text-zinc-700 font-bold">
+              <strong className="text-black font-black text-sm">{passengers}</strong> penumpang
             </span>
             {etaText && (
-              <span className="pill pill-warning">
-                <Timer className="size-2.5" strokeWidth={2.4} aria-hidden="true" />
-                <span>ETA {etaText}</span>
+              <span className="text-black font-mono font-black bg-amber-300 px-2.5 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
+                ETA: {etaText}
               </span>
             )}
           </div>
           {offer.booking?.bookingNumber && (
-            <span className="mono-plate inline-flex items-center gap-1 text-[0.625rem] text-slate-400">
-              <Clock className="size-2.5" strokeWidth={2.2} aria-hidden="true" />#{offer.booking.bookingNumber}
+            <span className="text-zinc-600 font-mono font-black text-[11px]">
+              #{offer.booking.bookingNumber}
             </span>
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-3 pt-2 border-t-2 border-black/15">
           <button
             type="button"
             disabled={isAccepting || isRejecting}
             onClick={handleReject}
-            className="button-secondary py-2.5"
+            className="w-full inline-flex items-center justify-center rounded-xl border-2 border-black bg-rose-200 hover:bg-rose-300 text-black font-extrabold py-3 text-sm shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all disabled:opacity-50 cursor-pointer"
           >
-            {isRejecting ? <Spinner size="sm" /> : 'Tolak'}
+            {isRejecting ? <Spinner size="sm" className="text-black" /> : 'Tolak Tawaran'}
           </button>
           <button
             type="button"
             disabled={isAccepting || isRejecting}
             onClick={handleAccept}
-            className="button-primary py-2.5"
+            className="w-full inline-flex items-center justify-center rounded-xl border-2 border-black bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold py-3 text-sm shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all disabled:opacity-50 cursor-pointer"
           >
-            {isAccepting ? <Spinner size="sm" className="text-white" /> : 'Terima'}
+            {isAccepting ? <Spinner size="sm" className="text-black" /> : 'Terima Tawaran'}
           </button>
         </div>
       </div>
-    </article>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -13,16 +13,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
+import { Icon } from '@/components/ui/Icon';
 import { ExportReportModal } from '@/components/admin/ExportReportModal';
-import {
-  Check,
-  CheckCircle2,
-  Download,
-  MapPin,
-  Signal,
-  TriangleAlert,
-  X,
-} from 'lucide-react';
 import {
   saveSnapshot,
   getSnapshot,
@@ -579,19 +571,20 @@ function AdminBookingsContent() {
 
   const columns: Column<AdminBooking>[] = [
     {
-      header: 'Booking',
+      header: 'Booking #',
       accessorKey: 'bookingNumber',
       cell: (b) => (
-        <div className="min-w-0">
-          <span className="mono-plate text-[0.8125rem] font-semibold text-slate-900">
-            {b.bookingNumber}
-          </span>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
+        <div>
+          <span className="font-semibold text-zinc-900">{b.bookingNumber}</span>
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
             <span
-              className={`pill ${b.serviceType === 'STANDBY' ? 'pill-warning' : 'pill-error'}`}
+              className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
+                b.serviceType === 'STANDBY'
+                  ? 'bg-amber-100 text-amber-900 border-amber-300'
+                  : 'bg-rose-100 text-rose-900 border-rose-300'
+              }`}
             >
-              <span className="pill-dot" aria-hidden="true" />
-              <span>{b.serviceType === 'STANDBY' ? 'Standby' : 'Drop off'}</span>
+              {b.serviceType === 'STANDBY' ? 'Standby' : 'Drop Off'}
             </span>
             {b.operationalLocation && (
               <LocationBadge
@@ -605,32 +598,25 @@ function AdminBookingsContent() {
       ),
     },
     {
-      header: 'Rute',
+      header: 'Route',
       cell: (b) => (
-        <div className="max-w-[15rem] min-w-0">
-          <div className="truncate text-[0.8125rem] font-medium text-slate-800">
-            {b.pickupLocation}
-          </div>
-          <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-slate-500">
-            <span aria-hidden="true" className="text-slate-300">
-              &rarr;
-            </span>
-            <span className="truncate">{b.destination}</span>
-          </div>
+        <div className="max-w-[200px]">
+          <div className="font-medium text-zinc-800 truncate">{b.pickupLocation}</div>
+          <div className="text-xs text-zinc-500 truncate">→ {b.destination}</div>
         </div>
       ),
     },
     {
-      header: 'Berangkat',
+      header: 'Departure',
       cell: (b) => (
-        <div className="whitespace-nowrap text-xs">
-          <div className="tabular-nums font-medium text-slate-800">
+        <div className="text-xs">
+          <div>
             {new Date(b.departureAt).toLocaleDateString([], {
               month: 'short',
               day: 'numeric',
             })}
           </div>
-          <div className="tabular-nums text-slate-500">
+          <div className="text-zinc-500">
             {new Date(b.departureAt).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
@@ -640,24 +626,24 @@ function AdminBookingsContent() {
       ),
     },
     {
-      header: 'Pemesan',
+      header: 'Employee',
       cell: (b) => (
-        <div className="min-w-0 max-w-[11rem] text-xs">
-          <div className="truncate font-medium text-slate-800">{b.user?.name}</div>
-          <div className="tabular-nums truncate text-slate-500">{b.user?.phone}</div>
+        <div className="text-xs">
+          <div className="font-medium text-zinc-800">{b.user?.name}</div>
+          <div className="text-zinc-500 text-[11px]">{b.user?.phone}</div>
         </div>
       ),
     },
     {
-      header: 'Armada & driver',
+      header: 'Vehicle & Driver',
       cell: (b) => (
-        <div className="min-w-0 space-y-1 text-xs">
+        <div className="text-xs space-y-0.5">
           {b.vehicle ? (
-            <div className="space-y-1">
-              <span className="mono-plate inline-flex rounded-[var(--radius-xs)] border border-[var(--border)] bg-white px-1.5 py-0.5 text-[0.6875rem] font-semibold text-slate-800">
-                {b.vehicle.plateNumber}
-              </span>
-              <div className="flex flex-wrap items-center gap-1">
+            <div>
+              <div className="flex items-center gap-1 font-mono font-semibold text-zinc-800">
+                <span>{b.vehicle.plateNumber}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1 mt-0.5">
                 {b.vehicle.homeLocation && (
                   <LocationBadge
                     type="home"
@@ -675,14 +661,14 @@ function AdminBookingsContent() {
               </div>
             </div>
           ) : (
-            <span className="text-slate-400">Tanpa armada</span>
+            <span className="text-zinc-400 italic">No Vehicle</span>
           )}
           {b.driver ? (
-            <div className="max-w-[9.5rem] truncate text-[0.6875rem] text-slate-500">
-              {b.driver.user.name}
+            <div className="text-[11px] text-zinc-600 truncate max-w-[120px]">
+              Driver: {b.driver.user.name}
             </div>
           ) : (
-            <div className="text-[0.6875rem] text-slate-400">Tanpa driver</div>
+            <div className="text-[11px] text-zinc-400 italic">No Driver</div>
           )}
         </div>
       ),
@@ -693,21 +679,20 @@ function AdminBookingsContent() {
         <div className="space-y-1">
           <StatusBadge status={b.status} />
           {b.status === 'PENDING_COMPLETION' && b.rejectedReason && (
-            <span className="pill pill-error">
-              <span className="pill-dot" aria-hidden="true" />
-              <span>Nota ditolak</span>
-            </span>
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded border border-rose-300 bg-rose-100 text-rose-800 text-[9px] font-black uppercase">
+              Nota Ditolak
+            </div>
           )}
           {b.etaSeconds !== undefined && b.etaSeconds !== null && (
-            <div className="tabular-nums text-[0.6875rem] font-medium text-[var(--status-standby-fg)]">
-              ETA {formatEta(b.etaSeconds, b.etaEstimated)}
+            <div className="text-[10px] font-mono text-indigo-700">
+              ETA: {formatEta(b.etaSeconds, b.etaEstimated)}
             </div>
           )}
         </div>
       ),
     },
     {
-      header: 'Aksi',
+      header: 'Actions',
       cell: (b) => {
         const isIntervention = b.status === 'ADMIN_INTERVENTION' || b.status === 'PENDING';
         const canCancel = [
@@ -721,17 +706,14 @@ function AdminBookingsContent() {
         ].includes(b.status);
 
         return (
-          <div
-            className="flex flex-wrap items-center justify-end gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
             {isIntervention && (
               <button
                 type="button"
                 onClick={() => handleOpenIntervention(b)}
-                className="pill pill-warning cursor-pointer transition-opacity hover:opacity-80"
+                className="px-2.5 py-1 text-xs font-black bg-amber-400 hover:bg-amber-500 text-zinc-950 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
               >
-                <span>Tugaskan</span>
+                Tugaskan Driver
               </button>
             )}
             {b.status === 'PENDING' && (
@@ -742,16 +724,16 @@ function AdminBookingsContent() {
                   setRejectPendingReason('');
                   setRejectPendingError(null);
                 }}
-                className="pill pill-error cursor-pointer transition-opacity hover:opacity-80"
+                className="px-2.5 py-1 text-xs font-black bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
               >
-                <span>Tolak</span>
+                Tolak
               </button>
             )}
-            {b.status === 'PENDING_COMPLETION' &&
-              (b.rejectedReason ? (
+            {b.status === 'PENDING_COMPLETION' && (
+              b.rejectedReason ? (
                 <div className="flex items-center gap-1.5">
-                  <span className="pill pill-error">
-                    <span>Menunggu revisi</span>
+                  <span className="px-2 py-1 text-[11px] font-black text-rose-800 bg-rose-100 border border-rose-300 rounded-lg">
+                    Menunggu Revisi Pemesan
                   </span>
                   <button
                     type="button"
@@ -760,9 +742,9 @@ function AdminBookingsContent() {
                       setRejectReason(b.rejectedReason || '');
                       setRejectError(null);
                     }}
-                    className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
+                    className="px-2 py-1 text-xs font-bold text-zinc-700 hover:text-black border border-zinc-300 bg-white rounded-lg hover:bg-zinc-50 cursor-pointer"
                   >
-                    Ubah alasan
+                    Edit Alasan
                   </button>
                 </div>
               ) : b.notaDinasUrl ? (
@@ -771,14 +753,10 @@ function AdminBookingsContent() {
                     type="button"
                     onClick={() => handleApproveCompletion(b.id)}
                     disabled={approvingBookingId === b.id}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-full)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] px-2.5 py-1 text-[0.6875rem] font-semibold text-[var(--status-active-fg)] transition-opacity hover:opacity-80 disabled:opacity-50"
+                    className="px-2.5 py-1 text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
                   >
-                    {approvingBookingId === b.id ? (
-                      <Spinner size="xs" />
-                    ) : (
-                      <Check className="size-3" strokeWidth={2.6} aria-hidden="true" />
-                    )}
-                    <span>Setujui</span>
+                    {approvingBookingId === b.id && <Spinner size="sm" className="text-white" />}
+                    <span>Approve Selesai</span>
                   </button>
                   <button
                     type="button"
@@ -787,31 +765,32 @@ function AdminBookingsContent() {
                       setRejectReason('');
                       setRejectError(null);
                     }}
-                    className="inline-flex cursor-pointer items-center gap-1 rounded-[var(--radius-full)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-2.5 py-1 text-[0.6875rem] font-semibold text-[var(--status-error-fg)] transition-opacity hover:opacity-80"
+                    className="px-2.5 py-1 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
                   >
-                    <X className="size-3" strokeWidth={2.6} aria-hidden="true" />
-                    <span>Tolak</span>
+                    <Icon name="close" className="size-3.5" />
+                    <span>Tolak Nota Dinas</span>
                   </button>
                 </>
               ) : (
-                <span className="pill pill-warning">
-                  <span>Menunggu nota</span>
+                <span className="px-2.5 py-1 text-[11px] font-bold bg-amber-100 text-amber-900 rounded-lg border border-amber-300" title="Dokumen Nota Dinas belum diunggah oleh pemesan atau pengemudi">
+                  Menunggu Nota Dinas
                 </span>
-              ))}
+              )
+            )}
             <button
               type="button"
               onClick={() => setSelectedBooking(b)}
-              className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-3 py-1 text-[0.6875rem] font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
+              className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
             >
-              Detail
+              Details
             </button>
             {canCancel && (
               <button
                 type="button"
                 onClick={() => setCancellingBooking(b)}
-                className="button-ghost min-h-0 cursor-pointer px-2 py-1 text-[0.6875rem] text-[var(--status-error-fg)]"
+                className="px-2.5 py-1 text-xs font-black text-rose-700 bg-rose-50 border-2 border-black rounded-lg hover:bg-rose-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
               >
-                Batalkan
+                Cancel
               </button>
             )}
           </div>
@@ -821,89 +800,116 @@ function AdminBookingsContent() {
   ];
 
   return (
-    <div className="w-full min-w-0 space-y-5">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="eyebrow eyebrow-accent">Manajemen dispatch</span>
-          <h1 className="page-heading mt-2">Reservasi &amp; penugasan armada</h1>
-          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
-            Pantau status auto-dispatch, verifikasi dokumen nota dinas, dan penugasan manual driver.
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Reservations & Dispatch</h1>
+          <p className="text-xs font-medium text-zinc-600 mt-0.5">
+            Monitor auto-dispatch states, operational locations, and admin intervention escalations
           </p>
         </div>
         <button
           type="button"
           onClick={() => setIsExportModalOpen(true)}
-          className="button-secondary self-start sm:self-auto"
+          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border-2 border-black text-xs font-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 self-start sm:self-auto transition-transform active:translate-y-0.5"
         >
-          <Download className="size-4" strokeWidth={2} aria-hidden="true" />
-          <span>Unduh laporan</span>
+          <Icon name="download" className="size-4" />
+          <span>Download Laporan Excel</span>
         </button>
-      </header>
+      </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
       {successMessage && (
-        <div
-          role="status"
-          className="flex items-start justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] px-3.5 py-2.5 text-xs text-[var(--status-active-fg)]"
-        >
-          <div className="flex min-w-0 items-start gap-2">
-            <CheckCircle2 className="mt-px size-4 shrink-0" strokeWidth={2} aria-hidden="true" />
-            <span className="leading-relaxed">{successMessage}</span>
+        <div className="flex items-center justify-between p-3.5 bg-emerald-100 text-black border-[2.5px] border-black rounded-xl text-xs font-black shadow-[4px_4px_0px_0px_#000] animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-black border border-black text-[10px]">
+              ✓
+            </span>
+            <span>{successMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setSuccessMessage(null)}
-            aria-label="Tutup pesan"
-            className="shrink-0 cursor-pointer rounded-full p-0.5 opacity-60 transition-opacity hover:opacity-100"
+            className="p-1 text-zinc-600 hover:text-black cursor-pointer"
           >
-            <X className="size-3.5" strokeWidth={2.4} aria-hidden="true" />
+            <Icon name="close" className="size-4" />
           </button>
         </div>
       )}
 
-      {/* Status tabs + hub filter */}
-      <div className="card flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="no-scrollbar -mx-0.5 flex min-w-0 items-center gap-1.5 overflow-x-auto px-0.5 pb-0.5 lg:flex-wrap lg:overflow-visible lg:pb-0">
-          {(
-            [
-              { value: '', label: 'Semua' },
-              { value: 'ADMIN_INTERVENTION', label: 'Perlu intervensi', warn: true },
-              { value: 'SEARCHING_DRIVER', label: 'Mencari driver' },
-              { value: 'IN_PROGRESS', label: 'Berjalan' },
-              { value: 'PENDING_COMPLETION', label: 'Menunggu nota' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.value || 'all'}
-              type="button"
-              onClick={() => setStatusFilter(tab.value)}
-              aria-pressed={statusFilter === tab.value}
-              className={`chip shrink-0 ${'warn' in tab && tab.warn ? 'border-[var(--status-warning-border)]' : ''}`}
-            >
-              {'warn' in tab && tab.warn && statusFilter !== tab.value && (
-                <TriangleAlert
-                  className="size-3 text-[var(--status-warning-fg)]"
-                  strokeWidth={2.4}
-                  aria-hidden="true"
-                />
-              )}
-              <span>{tab.label}</span>
-            </button>
-          ))}
+      {/* Filter and quick selection bar */}
+      <div className="surface p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick filter pills */}
+          <button
+            type="button"
+            onClick={() => setStatusFilter('')}
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
+              statusFilter === ''
+                ? 'bg-zinc-950 text-white shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-900 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('ADMIN_INTERVENTION')}
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition inline-flex items-center gap-1.5 ${
+              statusFilter === 'ADMIN_INTERVENTION'
+                ? 'bg-amber-400 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-amber-100 text-zinc-950 shadow-[1px_1px_0px_0px_#000] hover:bg-amber-200'
+            }`}
+          >
+            <Icon name="alert" className="size-3.5 shrink-0 text-amber-950" />
+            <span>Intervention Required</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('SEARCHING_DRIVER')}
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
+              statusFilter === 'SEARCHING_DRIVER'
+                ? 'bg-amber-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+            }`}
+          >
+            Searching
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('IN_PROGRESS')}
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
+              statusFilter === 'IN_PROGRESS'
+                ? 'bg-emerald-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+            }`}
+          >
+            In Progress
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('PENDING_COMPLETION')}
+            className={`px-3 py-1 text-xs rounded-lg font-black border-2 border-black cursor-pointer transition ${
+              statusFilter === 'PENDING_COMPLETION'
+                ? 'bg-amber-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
+                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+            }`}
+          >
+            Menunggu Approval Nota
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <label htmlFor="booking-hub-filter" className="metric-label shrink-0">
-              Hub
-            </label>
+          {/* Operational Hub filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
             <select
-              id="booking-hub-filter"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="w-auto min-w-0 rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
+              className="px-2.5 py-1 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
-              <option value="">Semua hub</option>
+              <option value="">All Hubs</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -912,42 +918,42 @@ function AdminBookingsContent() {
             </select>
           </div>
 
-          <div className="flex min-w-0 items-center gap-1.5">
-            <label htmlFor="booking-status-filter" className="metric-label shrink-0">
-              Status
-            </label>
+          {/* Status dropdown */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
             <select
-              id="booking-status-filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-auto min-w-0 max-w-[11rem] rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
+              className="px-2.5 py-1 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
             >
-              <option value="">Semua status</option>
-              <option value="SEARCHING_DRIVER">Mencari driver</option>
-              <option value="DRIVER_NOTIFIED">Driver dihubungi</option>
-              <option value="DRIVER_ASSIGNED">Driver ditugaskan</option>
-              <option value="DRIVER_EN_ROUTE">Menuju titik jemput</option>
-              <option value="ARRIVED">Tiba di titik jemput</option>
-              <option value="IN_PROGRESS">Dalam perjalanan</option>
-              <option value="PENDING_COMPLETION">Menunggu approval nota</option>
-              <option value="COMPLETED">Selesai</option>
-              <option value="NO_DRIVER_AVAILABLE">Tidak ada driver</option>
-              <option value="ADMIN_INTERVENTION">Intervensi dispatch</option>
-              <option value="CANCELLED">Dibatalkan</option>
-              <option value="PENDING">Menunggu admin</option>
+              <option value="">All Statuses</option>
+              <option value="SEARCHING_DRIVER">Searching Driver</option>
+              <option value="DRIVER_NOTIFIED">Driver Notified</option>
+              <option value="DRIVER_ASSIGNED">Driver Assigned</option>
+              <option value="DRIVER_EN_ROUTE">Driver En Route</option>
+              <option value="ARRIVED">Arrived</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="PENDING_COMPLETION">Menunggu Approval Nota</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
+              <option value="ADMIN_INTERVENTION">Admin Intervention</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="PENDING">Legacy Pending</option>
             </select>
           </div>
         </div>
       </div>
 
+      {/* Table */}
       <DataTable
         columns={columns}
         data={bookings}
         isLoading={isLoading}
         onRowClick={(b) => setSelectedBooking(b)}
-        emptyMessage="Belum ada reservasi pada filter ini"
+        emptyMessage="No reservations found"
       />
 
+      {/* Pagination */}
       <Pagination
         page={page}
         totalPages={totalPages}
@@ -955,27 +961,25 @@ function AdminBookingsContent() {
         onPageChange={(p) => fetchBookings(p)}
       />
 
-      {/* Detail drawer */}
+      {/* Booking Details Drawer */}
       <Drawer
         isOpen={Boolean(selectedBooking)}
         onClose={() => setSelectedBooking(null)}
-        width="lg"
-        title={selectedBooking ? `Reservasi ${selectedBooking.bookingNumber}` : 'Reservasi'}
+        title={selectedBooking ? `Reservation #${selectedBooking.bookingNumber}` : 'Booking'}
         description={
           selectedBooking
-            ? `${selectedBooking.user?.name} \u00b7 ${selectedBooking.user?.email}`
+            ? `Requested by ${selectedBooking.user?.name} (${selectedBooking.user?.email})`
             : ''
         }
         footer={
           selectedBooking && (
-            <div className="flex w-full flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                {selectedBooking.status === 'PENDING_COMPLETION' &&
-                  (selectedBooking.rejectedReason ? (
-                    <>
-                      <span className="pill pill-error">
-                        <span className="pill-dot" aria-hidden="true" />
-                        <span>Nota ditolak &mdash; menunggu revisi</span>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                {selectedBooking.status === 'PENDING_COMPLETION' && (
+                  selectedBooking.rejectedReason ? (
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1.5 text-xs font-black bg-rose-100 text-rose-900 border-2 border-rose-400 rounded-lg shadow-[2px_2px_0px_0px_#000]">
+                        Nota Ditolak (Menunggu Dokumen Revisi)
                       </span>
                       <button
                         type="button"
@@ -984,25 +988,25 @@ function AdminBookingsContent() {
                           setRejectReason(selectedBooking.rejectedReason || '');
                           setRejectError(null);
                         }}
-                        className="button-secondary"
+                        className="px-2.5 py-1.5 text-xs font-black bg-white text-zinc-900 border-2 border-black rounded-lg shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 cursor-pointer"
                       >
-                        Ubah alasan
+                        Ubah Alasan
                       </button>
-                    </>
+                    </div>
                   ) : selectedBooking.notaDinasUrl ? (
                     <>
                       <button
                         type="button"
                         disabled={approvingBookingId === selectedBooking.id}
                         onClick={() => handleApproveCompletion(selectedBooking.id)}
-                        className="button-primary"
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
                       >
                         {approvingBookingId === selectedBooking.id ? (
-                          <Spinner size="xs" />
+                          <Spinner size="sm" className="text-white" />
                         ) : (
-                          <Check className="size-4" strokeWidth={2.6} aria-hidden="true" />
+                          <Icon name="check" className="size-3.5" />
                         )}
-                        <span>Selesaikan</span>
+                        <span>Approve & Selesaikan</span>
                       </button>
                       <button
                         type="button"
@@ -1011,19 +1015,20 @@ function AdminBookingsContent() {
                           setRejectReason('');
                           setRejectError(null);
                         }}
-                        className="button-danger"
+                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
                       >
-                        <X className="size-4" strokeWidth={2.6} aria-hidden="true" />
-                        <span>Tolak nota</span>
+                        <Icon name="close" className="size-3.5" />
+                        <span>Tolak Nota Dinas</span>
                       </button>
                     </>
                   ) : (
-                    <span className="pill pill-warning">
-                      <span className="pill-dot" aria-hidden="true" />
-                      <span>Nota dinas belum diunggah</span>
-                    </span>
-                  ))}
-
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1.5 bg-amber-100 text-amber-900 text-xs font-bold rounded-lg border border-amber-300">
+                        Nota Dinas Belum Diunggah
+                      </span>
+                    </div>
+                  )
+                )}
                 {(selectedBooking.status === 'ADMIN_INTERVENTION' ||
                   selectedBooking.status === 'PENDING') && (
                   <>
@@ -1034,9 +1039,9 @@ function AdminBookingsContent() {
                         setSelectedBooking(null);
                         handleOpenIntervention(b);
                       }}
-                      className="button-primary"
+                      className="px-3.5 py-2 bg-amber-400 hover:bg-amber-500 text-zinc-950 rounded text-xs font-black border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
                     >
-                      Tugaskan driver
+                      Tugaskan Driver
                     </button>
                     {selectedBooking.status === 'PENDING' && (
                       <button
@@ -1048,15 +1053,14 @@ function AdminBookingsContent() {
                           setRejectPendingReason('');
                           setRejectPendingError(null);
                         }}
-                        className="button-secondary text-[var(--status-error-fg)]"
+                        className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-xs font-black border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer"
                       >
-                        Tolak pesanan
+                        Tolak Pesanan
                       </button>
                     )}
                   </>
                 )}
               </div>
-
               {[
                 'PENDING',
                 'APPROVED',
@@ -1073,9 +1077,9 @@ function AdminBookingsContent() {
                     setSelectedBooking(null);
                     setCancellingBooking(b);
                   }}
-                  className="button-ghost text-[var(--status-error-fg)]"
+                  className="px-3.5 py-2 text-rose-700 border border-rose-200 rounded hover:bg-rose-50 text-xs font-medium cursor-pointer"
                 >
-                  Batalkan
+                  Cancel Booking
                 </button>
               )}
             </div>
@@ -1083,302 +1087,308 @@ function AdminBookingsContent() {
         }
       >
         {selectedBooking && (
-          <div className="space-y-3">
+          <div className="space-y-4 text-sm">
             <DispatchProgress
               status={selectedBooking.status}
               etaSeconds={selectedBooking.etaSeconds}
               etaEstimated={selectedBooking.etaEstimated}
             />
 
-            {/* Route + schedule */}
-            <section className="card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="eyebrow">Rute perjalanan</span>
+            {/* Service Type & Operational Hub */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Jenis Layanan</span>
                 <span
-                  className={`pill ${selectedBooking.serviceType === 'STANDBY' ? 'pill-warning' : 'pill-error'}`}
-                >
-                  <span className="pill-dot" aria-hidden="true" />
-                  <span>
-                    {selectedBooking.serviceType === 'STANDBY'
-                      ? 'Standby operasional'
-                      : 'Drop off sekali jalan'}
-                  </span>
-                </span>
-              </div>
-
-              <div className="route-stepper mt-3.5">
-                <div className="route-point" data-kind="pickup">
-                  <span className="route-label">Penjemputan</span>
-                  <p className="route-value">{selectedBooking.pickupLocation}</p>
-                </div>
-                <div className="route-point" data-kind="destination">
-                  <span className="route-label">Tujuan</span>
-                  <p className="route-value">{selectedBooking.destination}</p>
-                </div>
-              </div>
-
-              <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-[var(--border-subtle)] pt-3.5 text-xs">
-                <div>
-                  <dt className="metric-label">Berangkat</dt>
-                  <dd className="tabular-nums mt-0.5 font-medium text-slate-800">
-                    {new Date(selectedBooking.departureAt).toLocaleString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="metric-label">Kembali</dt>
-                  <dd className="tabular-nums mt-0.5 font-medium text-slate-800">
-                    {new Date(selectedBooking.expectedReturnAt).toLocaleString('id-ID', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="metric-label">Penumpang</dt>
-                  <dd className="tabular-nums mt-0.5 font-medium text-slate-800">
-                    {selectedBooking.passengerCount} orang
-                  </dd>
-                </div>
-                <div className="min-w-0">
-                  <dt className="metric-label">Keperluan</dt>
-                  <dd className="mt-0.5 font-medium text-slate-800 wrap-anywhere">
-                    {selectedBooking.purpose}
-                  </dd>
-                </div>
-                {selectedBooking.operationalLocation && (
-                  <div className="col-span-2">
-                    <dt className="metric-label">Hub operasional</dt>
-                    <dd className="mt-1">
-                      <LocationBadge
-                        type="home"
-                        name={selectedBooking.operationalLocation.name}
-                        code={selectedBooking.operationalLocation.code}
-                      />
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </section>
-
-            {/* Asset + driver */}
-            {(selectedBooking.vehicle || selectedBooking.driver) && (
-              <section className="card grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                <div className="min-w-0">
-                  <span className="metric-label">Armada</span>
-                  {selectedBooking.vehicle ? (
-                    <>
-                      <p className="mono-plate mt-1 text-sm font-semibold text-slate-900">
-                        {selectedBooking.vehicle.plateNumber}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
-                        {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-400">Belum ada armada</p>
-                  )}
-                </div>
-                <div className="min-w-0 sm:border-l sm:border-[var(--border-subtle)] sm:pl-3">
-                  <span className="metric-label">Driver</span>
-                  {selectedBooking.driver ? (
-                    <>
-                      <p className="mt-1 truncate text-sm font-semibold text-slate-900">
-                        {selectedBooking.driver.user.name}
-                      </p>
-                      <p className="tabular-nums mt-0.5 text-xs text-slate-500">
-                        {selectedBooking.driver.user.phone}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="mt-1 text-xs text-slate-400">Belum ada driver</p>
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* Nota dinas */}
-            <section className="card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="eyebrow">Verifikasi nota dinas</span>
-                <span
-                  className={`pill ${
-                    selectedBooking.rejectedReason
-                      ? 'pill-error'
-                      : selectedBooking.notaDinasUrl
-                        ? 'pill-active'
-                        : 'pill-warning'
+                  className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[11px] font-black border ${
+                    selectedBooking.serviceType === 'STANDBY'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-rose-100 text-rose-900 border-rose-300'
                   }`}
                 >
-                  <span className="pill-dot" aria-hidden="true" />
-                  <span>
-                    {selectedBooking.rejectedReason
-                      ? 'Ditolak'
+                  {selectedBooking.serviceType === 'STANDBY'
+                    ? 'Standby (Operasional Seharian)'
+                    : 'Drop Off (Sekali Jalan)'}
+                </span>
+              </div>
+              {selectedBooking.operationalLocation && (
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block">Hub Operasional</span>
+                  <LocationBadge
+                    type="home"
+                    name={selectedBooking.operationalLocation.name}
+                    code={selectedBooking.operationalLocation.code}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Nota Dinas Verification Section */}
+            <div className="p-3 bg-amber-50/70 border-2 border-black rounded-xl space-y-2 shadow-[2px_2px_0px_0px_#000]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                  <Icon name="check" className="size-4 text-emerald-600" />
+                  <span>Verifikasi Dokumen Nota Dinas</span>
+                </span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    selectedBooking.rejectedReason
+                      ? 'bg-rose-100 text-rose-800 border-rose-300'
                       : selectedBooking.notaDinasUrl
-                        ? 'Terlampir'
-                        : 'Belum dilampirkan'}
-                  </span>
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}
+                >
+                  {selectedBooking.rejectedReason
+                    ? 'Ditolak (Perlu Revisi)'
+                    : selectedBooking.notaDinasUrl
+                    ? 'Terlampir'
+                    : 'Belum Dilampirkan'}
                 </span>
               </div>
 
               {selectedBooking.rejectedReason && (
-                <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-3 py-2.5 text-xs">
-                  <p className="font-semibold text-[var(--status-error-fg)]">
-                    Nota dinas ditolak
+                <div className="p-2.5 bg-rose-50 border-2 border-rose-300 rounded-lg text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                    <Icon name="close" className="size-3.5 text-rose-600" />
+                    <span>Nota Dinas Ditolak Admin</span>
+                  </div>
+                  <p className="text-[11px] text-rose-700">
+                    <span className="font-semibold">Alasan:</span> {selectedBooking.rejectedReason}
                   </p>
-                  <p className="mt-0.5 leading-relaxed text-[var(--status-error-fg)]/85">
-                    {selectedBooking.rejectedReason}
+                  <p className="text-[10px] text-zinc-500 italic">
+                    Menunggu pemesan atau driver mengunggah ulang dokumen revisi.
                   </p>
                 </div>
               )}
 
               {selectedBooking.notaDinasUrl ? (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="min-w-0 truncate text-xs text-slate-500">
-                    <span className="font-medium text-slate-800">
-                      {selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}
-                    </span>
+                <div className="space-y-1.5 pt-1 text-xs">
+                  <p className="text-[11px] text-zinc-600 truncate">
+                    File: <span className="font-semibold text-zinc-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
                   </p>
-                  <a
-                    href={selectedBooking.notaDinasUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="button-secondary"
-                  >
-                    <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
-                    <span>Lihat dokumen</span>
-                  </a>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <a
+                      href={selectedBooking.notaDinasUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 bg-white hover:bg-zinc-100 text-zinc-800 rounded text-xs font-bold border border-black shadow-[1.5px_1.5px_0px_0px_#000] inline-flex items-center gap-1"
+                    >
+                      <Icon name="download" className="size-3.5" />
+                      <span>Lihat / Unduh Dokumen</span>
+                    </a>
+                    {selectedBooking.status === 'PENDING_COMPLETION' && (
+                      selectedBooking.rejectedReason ? (
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-black rounded border border-rose-300">
+                            Status: Nota Ditolak
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectingBooking(selectedBooking);
+                              setRejectReason(selectedBooking.rejectedReason || '');
+                              setRejectError(null);
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-zinc-100 text-zinc-800 rounded text-xs font-bold border border-zinc-300 cursor-pointer"
+                          >
+                            Ubah Alasan
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            disabled={approvingBookingId === selectedBooking.id}
+                            onClick={() => handleApproveCompletion(selectedBooking.id)}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {approvingBookingId === selectedBooking.id ? (
+                              <Spinner size="sm" className="text-white" />
+                            ) : (
+                              <Icon name="check" className="size-3.5" />
+                            )}
+                            <span>Approve Selesai</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectingBooking(selectedBooking);
+                              setRejectReason('');
+                              setRejectError(null);
+                            }}
+                            className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-black border border-black shadow-[1.5px_1.5px_0px_0px_#000] cursor-pointer inline-flex items-center gap-1"
+                          >
+                            <Icon name="close" className="size-3.5" />
+                            <span>Tolak Nota</span>
+                          </button>
+                        </>
+                      )
+                    )}
+                  </div>
                 </div>
               ) : (
-                <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                  {selectedBooking.status === 'PENDING_COMPLETION'
-                    ? 'Trip telah selesai. Menunggu dokumen nota dinas diunggah oleh pemesan atau driver.'
-                    : 'Belum ada nota dinas yang dilampirkan pada pesanan ini.'}
-                </p>
+                <div className="text-xs space-y-2 pt-1">
+                  <p className="text-[11px] text-zinc-600">
+                    {selectedBooking.status === 'PENDING_COMPLETION'
+                      ? 'Trip telah selesai. Menunggu dokumen Nota Dinas diunggah oleh pemesan atau driver untuk diverifikasi.'
+                      : 'Belum ada nota dinas yang dilampirkan pada pesanan ini.'}
+                  </p>
+                </div>
               )}
-            </section>
+            </div>
+
+            {/* Route */}
+            <div className="p-3 bg-zinc-50 border border-zinc-200 rounded-lg space-y-2 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Pickup</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.pickupLocation}</span>
+              </div>
+              <div className="pt-2 border-t border-zinc-200">
+                <span className="text-[10px] uppercase font-bold text-zinc-400 block">Destination</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.destination}</span>
+              </div>
+            </div>
+
+            {/* Schedule */}
+            <div className="grid grid-cols-2 gap-3 text-xs pb-3 border-b border-zinc-100">
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Departure</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.departureAt).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Return</span>
+                <span className="font-medium text-zinc-800">
+                  {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Passengers</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.passengerCount} Persons</span>
+              </div>
+              <div>
+                <span className="text-zinc-500 uppercase font-semibold text-[10px] block">Purpose</span>
+                <span className="font-medium text-zinc-800">{selectedBooking.purpose}</span>
+              </div>
+            </div>
+
+            {/* Vehicle & Driver */}
+            {selectedBooking.vehicle && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Asset</span>
+                <div className="font-mono font-bold text-zinc-900">{selectedBooking.vehicle.plateNumber}</div>
+                <div className="text-zinc-600">
+                  {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
+                </div>
+              </div>
+            )}
+
+            {selectedBooking.driver && (
+              <div className="p-3 bg-white border border-zinc-200 rounded-lg text-xs space-y-1">
+                <span className="text-[10px] font-bold uppercase text-zinc-400 block">Assigned Driver</span>
+                <div className="font-semibold text-zinc-900">{selectedBooking.driver.user.name}</div>
+                <div className="text-zinc-500">Phone: {selectedBooking.driver.user.phone}</div>
+              </div>
+            )}
           </div>
         )}
       </Drawer>
 
-      {/* Manual assign / intervention */}
+      {/* Intervention / Candidates Manual Assign Modal */}
       {interventionBooking && (
         <Modal
           isOpen={Boolean(interventionBooking)}
           onClose={() => setInterventionBooking(null)}
-          title="Penugasan driver &amp; armada"
-          description={`Reservasi ${interventionBooking.bookingNumber} \u00b7 ${interventionBooking.pickupLocation} \u2192 ${interventionBooking.destination}`}
+          title="Penugasan Driver & Armada Kendaraan"
+          description={`Penugasan untuk booking #${interventionBooking.bookingNumber} (${interventionBooking.pickupLocation} → ${interventionBooking.destination})`}
           maxWidth="2xl"
         >
           <div className="space-y-4">
             {interventionError && (
-              <ErrorBanner
-                message={interventionError}
-                onDismiss={() => setInterventionError(null)}
-              />
+              <ErrorBanner message={interventionError} onDismiss={() => setInterventionError(null)} />
             )}
 
             {loadingCandidates ? (
-              <div className="flex flex-col items-center gap-2 py-12 text-xs text-slate-500">
-                <Spinner size="md" className="text-[var(--kcic-red)]" />
-                <p>Memuat driver armada dan status GPS&hellip;</p>
+              <div className="py-12 text-center text-zinc-500 text-xs">
+                <Spinner size="md" className="mb-2" />
+                <p>Memuat driver armada dan status GPS...</p>
               </div>
             ) : (
               <div className="space-y-4">
+                {/* 1. Candidate drivers ranked by GPS proximity (if online) */}
                 {candidates.length > 0 && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex size-2 shrink-0">
-                        <span
-                          className="live-ping absolute inset-0 rounded-full bg-[var(--status-active-fg)]"
-                          aria-hidden="true"
-                        />
-                        <span
-                          className="relative size-2 rounded-full bg-[var(--status-active-fg)]"
-                          aria-hidden="true"
-                        />
-                      </span>
-                      <span className="eyebrow">Driver online terdekat</span>
-                      <span className="tabular-nums text-[0.6875rem] font-medium text-slate-400">
-                        {candidates.length}
-                      </span>
-                    </div>
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Driver Online (Sinyal GPS Aktif Terdekat - {candidates.length})</span>
+                    </span>
 
-                    <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {candidates.map((c) => {
                         const driverName = c.driverName || c.name || 'Driver';
-                        const plate = c.plateNumber || c.vehiclePlateNumber || '\u2014';
+                        const plate = c.plateNumber || c.vehiclePlateNumber || '—';
                         const cleanPhone = c.phone ? c.phone.replace(/\D/g, '') : '';
                         const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
                         const isAssigning = assigningCandidateId === c.driverId;
                         const etaText = formatEta(c.etaSeconds, c.etaEstimated);
 
                         return (
-                          <li
+                          <div
                             key={c.driverId}
-                            className="flex flex-col gap-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+                            className="p-3 bg-white border-2 border-black rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs shadow-[2px_2px_0px_0px_#000]"
                           >
-                            <div className="min-w-0 space-y-1">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="font-semibold text-slate-900">{driverName}</span>
-                                {c.phone && (
-                                  <span className="tabular-nums text-slate-500">{c.phone}</span>
-                                )}
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-zinc-900">{driverName}</span>
+                                {c.phone && <span className="text-zinc-500">({c.phone})</span>}
                                 {etaText && (
-                                  <span className="pill pill-standby">
-                                    <span className="tabular-nums">ETA {etaText}</span>
+                                  <span className="font-mono text-[10px] font-semibold text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                    ETA: {etaText}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex flex-wrap items-center gap-1.5 text-slate-500">
-                                <span className="mono-plate rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--canvas)] px-1.5 py-0.5 text-[0.6875rem] font-semibold text-slate-800">
-                                  {plate}
-                                </span>
+
+                              <div className="text-zinc-600 flex items-center gap-2">
+                                <span className="font-mono font-semibold text-zinc-800">{plate}</span>
                                 {(c.vehicleBrand || c.vehicleModel) && (
-                                  <span className="truncate">
-                                    {c.vehicleBrand} {c.vehicleModel}
+                                  <span>
+                                    • {c.vehicleBrand} {c.vehicleModel}
                                   </span>
                                 )}
-                                {c.seatingCapacity && (
-                                  <span className="tabular-nums">{c.seatingCapacity} kursi</span>
-                                )}
+                                {c.seatingCapacity && <span>• {c.seatingCapacity} seats</span>}
                               </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-1.5">
+                            <div className="flex items-center gap-2 shrink-0">
                               {waUrl && (
                                 <a
                                   href={waUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex cursor-pointer items-center rounded-[var(--radius-full)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] px-3 py-1.5 text-[0.6875rem] font-semibold text-[var(--status-active-fg)] transition-opacity hover:opacity-80"
+                                  className="px-2.5 py-1.5 border-2 border-emerald-600 text-emerald-800 hover:bg-emerald-50 rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
                                 >
-                                  WhatsApp
+                                  <span>WhatsApp</span>
                                 </a>
                               )}
+
                               <button
                                 type="button"
                                 disabled={Boolean(assigningCandidateId)}
                                 onClick={() => handleManualAssign(c.driverId)}
-                                className="button-primary px-3.5 py-1.5 text-[0.6875rem]"
+                                className="px-3.5 py-1.5 bg-[#be123c] hover:bg-[#9f1239] disabled:opacity-50 text-white rounded-lg border-2 border-black text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000]"
                               >
-                                {isAssigning ? <Spinner size="xs" /> : null}
-                                <span>Tugaskan</span>
+                                {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Tugaskan Driver'}
                               </button>
                             </div>
-                          </li>
+                          </div>
                         );
                       })}
-                    </ul>
+                    </div>
                   </div>
                 )}
 
+                {/* 2. Other Online Standby Fleet Drivers */}
                 {(() => {
                   const onlineStandbyDrivers = fleetDrivers.filter(
                     (d) =>
@@ -1389,58 +1399,46 @@ function AdminBookingsContent() {
 
                   if (candidates.length === 0 && onlineStandbyDrivers.length === 0) {
                     return (
-                      <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border-strong)] bg-[var(--canvas)] px-6 py-10 text-center">
-                        <span className="icon-tile mx-auto">
-                          <Signal className="size-5" strokeWidth={1.8} aria-hidden="true" />
-                        </span>
-                        <p className="mt-3 text-sm font-semibold text-slate-900">
-                          Tidak ada driver yang sedang online
-                        </p>
-                        <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-slate-500">
-                          Sistem hanya menampilkan driver dengan status online (standby). Driver
-                          perlu membuka dashboard aplikasi dan mengaktifkan status online agar siap
-                          ditugaskan.
+                      <div className="p-8 bg-zinc-50 border-2 border-dashed border-zinc-300 rounded-lg text-center text-xs space-y-2">
+                        <div className="flex justify-center mb-1">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-black bg-zinc-200 text-zinc-700">
+                            <Icon name="signal" className="size-5" />
+                          </span>
+                        </div>
+                        <p className="font-extrabold text-sm text-zinc-900">Tidak Ada Driver yang Sedang Online</p>
+                        <p className="max-w-md mx-auto text-zinc-600">
+                          Sistem hanya menampilkan driver yang sedang <strong>ONLINE (Standby)</strong>. Driver harus membuka dashboard aplikasi driver dan mengaktifkan status online (<strong>&apos;Go online&apos;</strong>) agar siap ditugaskan.
                         </p>
                       </div>
                     );
                   }
 
-                  if (onlineStandbyDrivers.length === 0) return null;
+                  if (onlineStandbyDrivers.length === 0) {
+                    return null;
+                  }
 
                   return (
                     <div className="space-y-2">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="pill-dot text-[var(--status-active-fg)]" aria-hidden="true" />
-                          <span className="eyebrow">Driver online standby</span>
-                          <span className="tabular-nums text-[0.6875rem] font-medium text-slate-400">
-                            {onlineStandbyDrivers.length}
-                          </span>
-                        </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+                          <span className="size-2 rounded-full bg-emerald-500" />
+                          <span>Driver Online Standby ({onlineStandbyDrivers.length})</span>
+                        </span>
 
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <MapPin
-                            className="size-3 shrink-0 text-slate-400"
-                            strokeWidth={2}
-                            aria-hidden="true"
-                          />
-                          <label
-                            htmlFor="pool-filter"
-                            className="metric-label shrink-0"
-                          >
-                            Pool
-                          </label>
+                        {/* Location filter for pool vehicles */}
+                        <div className="flex items-center gap-1.5 bg-zinc-100 px-2 py-1 rounded-lg border border-zinc-200">
+                          <Icon name="pin" className="size-3 text-zinc-600" />
+                          <span className="text-[11px] font-bold text-zinc-700">Pool Kendaraan:</span>
                           <select
-                            id="pool-filter"
                             value={vehicleLocationFilter}
                             onChange={(e) => {
                               const newLoc = e.target.value;
                               setVehicleLocationFilter(newLoc);
                               fetchAvailableVehicles(newLoc);
                             }}
-                            className="w-auto min-w-0 max-w-[11rem] rounded-full py-1 pl-3 pr-8 text-[0.6875rem] font-semibold"
+                            className="text-[11px] font-bold border border-zinc-300 rounded bg-white px-1.5 py-0.5 focus:outline-none"
                           >
-                            <option value="">Semua lokasi ({availableVehicles.length})</option>
+                            <option value="">Semua Lokasi ({availableVehicles.length})</option>
                             {Array.from(
                               new Map(locations.map((loc) => [loc.code || loc.name, loc])).values()
                             ).map((loc) => (
@@ -1452,144 +1450,96 @@ function AdminBookingsContent() {
                         </div>
                       </div>
 
-                      <ul className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                      <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                         {onlineStandbyDrivers.map((d) => {
                           const isAssigning = assigningCandidateId === d.id;
                           const hasVehicle = Boolean(d.currentVehicle);
-                          const chosenVehicle =
-                            selectedVehicleMap[d.id] || (d.currentVehicle?.id ?? '');
-                          const chosenVehicleObj = availableVehicles.find(
-                            (v) => v.id === chosenVehicle
-                          );
+                          const chosenVehicle = selectedVehicleMap[d.id] || (d.currentVehicle?.id ?? '');
+                          const chosenVehicleObj = availableVehicles.find((v) => v.id === chosenVehicle);
 
                           const isSameLocation = (
-                            locA?: {
-                              id?: string | null;
-                              code?: string | null;
-                              name?: string | null;
-                            } | null,
-                            locB?: {
-                              id?: string | null;
-                              code?: string | null;
-                              name?: string | null;
-                            } | null
+                            locA?: { id?: string | null; code?: string | null; name?: string | null } | null,
+                            locB?: { id?: string | null; code?: string | null; name?: string | null } | null
                           ) => {
                             if (!locA || !locB) return false;
                             if (locA.id && locB.id && locA.id === locB.id) return true;
-                            if (
-                              locA.code &&
-                              locB.code &&
-                              locA.code.trim().toLowerCase() === locB.code.trim().toLowerCase()
-                            )
-                              return true;
-                            if (
-                              locA.name &&
-                              locB.name &&
-                              locA.name.trim().toLowerCase() === locB.name.trim().toLowerCase()
-                            )
-                              return true;
+                            if (locA.code && locB.code && locA.code.trim().toLowerCase() === locB.code.trim().toLowerCase()) return true;
+                            if (locA.name && locB.name && locA.name.trim().toLowerCase() === locB.name.trim().toLowerCase()) return true;
                             return false;
                           };
 
                           const isDriverLocationMismatch = Boolean(
                             interventionBooking?.operationalLocation &&
-                              hasVehicle &&
-                              d.currentVehicle &&
-                              !isSameLocation(
-                                d.currentVehicle.currentOperationalLocation,
-                                interventionBooking.operationalLocation
-                              ) &&
-                              !isSameLocation(
-                                d.currentVehicle.homeLocation,
-                                interventionBooking.operationalLocation
-                              )
+                            hasVehicle &&
+                            d.currentVehicle &&
+                            !isSameLocation(d.currentVehicle.currentOperationalLocation, interventionBooking.operationalLocation) &&
+                            !isSameLocation(d.currentVehicle.homeLocation, interventionBooking.operationalLocation)
                           );
 
                           const isChosenVehicleMismatch = Boolean(
                             interventionBooking?.operationalLocation &&
-                              !hasVehicle &&
-                              chosenVehicleObj &&
-                              !isSameLocation(
-                                chosenVehicleObj.currentOperationalLocation,
-                                interventionBooking.operationalLocation
-                              ) &&
-                              !isSameLocation(
-                                chosenVehicleObj.homeLocation,
-                                interventionBooking.operationalLocation
-                              )
+                            !hasVehicle &&
+                            chosenVehicleObj &&
+                            !isSameLocation(chosenVehicleObj.currentOperationalLocation, interventionBooking.operationalLocation) &&
+                            !isSameLocation(chosenVehicleObj.homeLocation, interventionBooking.operationalLocation)
                           );
 
-                          const isBlocked =
-                            isDriverLocationMismatch ||
-                            isChosenVehicleMismatch ||
-                            (!hasVehicle && !chosenVehicle);
+                          const isBlocked = isDriverLocationMismatch || isChosenVehicleMismatch || (!hasVehicle && !chosenVehicle);
 
-                          const driverHubName =
-                            d.currentVehicle?.currentOperationalLocation?.name ||
-                            d.currentVehicle?.homeLocation?.name;
-                          const chosenHubName =
-                            chosenVehicleObj?.currentOperationalLocation?.name ||
-                            chosenVehicleObj?.homeLocation?.name;
+                          const driverHubName = d.currentVehicle?.currentOperationalLocation?.name || d.currentVehicle?.homeLocation?.name;
+                          const chosenHubName = chosenVehicleObj?.currentOperationalLocation?.name || chosenVehicleObj?.homeLocation?.name;
 
                           return (
-                            <li
+                            <div
                               key={d.id}
-                              className={`flex flex-col gap-2.5 rounded-[var(--radius-lg)] border p-3 text-xs sm:flex-row sm:items-center sm:justify-between ${
-                                isDriverLocationMismatch || isChosenVehicleMismatch
-                                  ? 'border-[var(--status-error-border)] bg-[var(--status-error-bg)]'
-                                  : 'border-[var(--border)] bg-white'
+                              className={`p-3 border-2 border-black rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs ${
+                                isDriverLocationMismatch ? 'bg-rose-50/50 opacity-80' : 'bg-zinc-50'
                               }`}
                             >
-                              <div className="min-w-0 space-y-1">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="font-semibold text-slate-900">
-                                    {d.user?.name || 'Driver'}
-                                  </span>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-zinc-950">{d.user?.name || 'Driver'}</span>
                                   {d.licenseNumber && (
-                                    <span className="mono-plate text-[0.6875rem] text-slate-500">
-                                      SIM {d.licenseNumber}
-                                    </span>
+                                    <span className="text-[10px] font-mono text-zinc-500">SIM: {d.licenseNumber}</span>
                                   )}
-                                  <span className="pill pill-active">
-                                    <span className="pill-dot" aria-hidden="true" />
-                                    <span>Online</span>
+                                  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                    ONLINE
                                   </span>
                                   {isDriverLocationMismatch && (
-                                    <span className="pill pill-error">
-                                      <span>Beda lokasi &middot; {driverHubName}</span>
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-100 text-rose-800 border border-rose-300">
+                                      Beda Lokasi: {driverHubName}
                                     </span>
                                   )}
                                   {isChosenVehicleMismatch && (
-                                    <span className="pill pill-error">
-                                      <span>Mobil di {chosenHubName}</span>
+                                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-rose-100 text-rose-800 border border-rose-300">
+                                      Mobil di {chosenHubName}
                                     </span>
                                   )}
                                 </div>
-                                <div className="tabular-nums truncate text-slate-500">
-                                  {d.user?.phone || 'Tanpa nomor'}
+                                <div className="text-zinc-600 font-mono text-[11px]">
+                                  {d.user?.phone || 'No phone'}
                                 </div>
 
                                 {hasVehicle ? (
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="mono-plate rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--canvas)] px-1.5 py-0.5 font-semibold text-slate-800">
+                                  <div className="flex items-center gap-1.5 pt-0.5">
+                                    <span className="font-mono font-bold text-zinc-900 bg-white px-2 py-0.5 rounded border border-black text-[11px]">
                                       {d.currentVehicle.plateNumber}
                                     </span>
-                                    <span className="truncate text-slate-500">
+                                    <span className="text-[11px] text-zinc-600">
                                       {d.currentVehicle.brand} {d.currentVehicle.model}
                                       {driverHubName ? ` (${driverHubName})` : ''}
                                     </span>
                                   </div>
                                 ) : (
                                   <div className="flex flex-col gap-1 pt-0.5">
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="text-slate-500">Pilih kendaraan</span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[11px] text-zinc-500 font-bold">Pilih Kendaraan:</span>
                                       {isLoadingVehicles ? (
-                                        <span className="flex items-center gap-1 text-slate-500">
-                                          <Spinner size="xs" /> Memuat armada&hellip;
+                                        <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                          <Spinner size="sm" className="text-zinc-600" /> Memuat armada...
                                         </span>
                                       ) : (
                                         <select
-                                          aria-label={`Pilih kendaraan untuk ${d.user?.name || 'driver'}`}
                                           value={chosenVehicle}
                                           onChange={(e) =>
                                             setSelectedVehicleMap((prev) => ({
@@ -1597,19 +1547,14 @@ function AdminBookingsContent() {
                                               [d.id]: e.target.value,
                                             }))
                                           }
-                                          className="w-auto max-w-full rounded-full py-1 pl-3 pr-8 text-[0.6875rem] font-medium"
+                                          className="px-2 py-1 text-xs border border-black rounded bg-white font-medium"
                                         >
-                                          <option value="">
-                                            Pilih armada ({availableVehicles.length} tersedia)
-                                          </option>
+                                          <option value="">-- Pilih Armada ({availableVehicles.length} tersedia) --</option>
                                           {availableVehicles.map((v) => {
-                                            const hub =
-                                              v.currentOperationalLocation?.name ||
-                                              v.homeLocation?.name;
+                                            const hub = v.currentOperationalLocation?.name || v.homeLocation?.name;
                                             return (
                                               <option key={v.id} value={v.id}>
-                                                {v.plateNumber} ({v.brand} {v.model})
-                                                {hub ? ` \u2014 ${hub}` : ''}
+                                                {v.plateNumber} ({v.brand} {v.model}){hub ? ` — ${hub}` : ''}
                                               </option>
                                             );
                                           })}
@@ -1617,56 +1562,52 @@ function AdminBookingsContent() {
                                       )}
                                     </div>
                                     {availableVehicles.length === 0 && !isLoadingVehicles && (
-                                      <span className="text-[0.6875rem] font-medium text-[var(--status-warning-fg)]">
-                                        Tidak ada kendaraan tersedia
-                                        {vehicleLocationFilter ? ' di lokasi ini' : ''}. Ubah filter
-                                        pool di atas.
+                                      <span className="text-[10px] text-amber-700 font-medium">
+                                        Tidak ada kendaraan AVAILABLE {vehicleLocationFilter ? 'di lokasi ini' : ''}. Ubah filter pool di atas.
                                       </span>
                                     )}
                                   </div>
                                 )}
 
                                 {isDriverLocationMismatch && (
-                                  <p className="text-[0.6875rem] font-medium leading-relaxed text-[var(--status-error-fg)]">
-                                    Driver berada di {driverHubName}, berbeda dengan hub pesanan{' '}
-                                    {interventionBooking?.operationalLocation?.name}.
+                                  <p className="text-[10px] text-rose-600 font-bold pt-0.5">
+                                    Driver berada di {driverHubName}. Tidak dapat ditugaskan ke order {interventionBooking?.operationalLocation?.name}.
                                   </p>
                                 )}
                               </div>
 
-                              <div className="flex shrink-0 items-center gap-1.5">
+                              <div className="flex items-center gap-2 shrink-0">
                                 <button
                                   type="button"
                                   disabled={Boolean(assigningCandidateId) || isBlocked}
                                   onClick={() => handleManualAssign(d.id, chosenVehicle || undefined)}
                                   title={
                                     isDriverLocationMismatch || isChosenVehicleMismatch
-                                      ? `Driver atau armada berada di lokasi berbeda dengan pesanan (${interventionBooking?.operationalLocation?.name || 'lokasi order'})`
+                                      ? `Driver/armada berada di lokasi berbeda dengan pesanan (${interventionBooking?.operationalLocation?.name || 'lokasi order'})`
                                       : !hasVehicle && !chosenVehicle
-                                        ? 'Pilih kendaraan terlebih dahulu'
-                                        : undefined
+                                      ? 'Pilih kendaraan terlebih dahulu'
+                                      : undefined
                                   }
-                                  className="button-primary px-3.5 py-1.5 text-[0.6875rem]"
+                                  className="px-3.5 py-1.5 bg-[#be123c] hover:bg-[#9f1239] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg border-2 border-black text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000]"
                                 >
-                                  {isAssigning ? <Spinner size="xs" /> : null}
-                                  <span>Tugaskan</span>
+                                  {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Tugaskan Driver'}
                                 </button>
                               </div>
-                            </li>
+                            </div>
                           );
                         })}
-                      </ul>
+                      </div>
                     </div>
                   );
                 })()}
               </div>
             )}
 
-            <div className="flex items-center justify-end border-t border-[var(--border-subtle)] pt-3">
+            <div className="flex items-center justify-end pt-2 border-t border-zinc-200">
               <button
                 type="button"
                 onClick={() => setInterventionBooking(null)}
-                className="button-secondary"
+                className="px-4 py-1.5 border-2 border-black hover:bg-zinc-100 text-zinc-800 rounded-lg text-xs font-bold cursor-pointer"
               >
                 Tutup
               </button>
@@ -1675,7 +1616,7 @@ function AdminBookingsContent() {
         </Modal>
       )}
 
-      {/* Reject pending booking */}
+      {/* Reject Pending Booking Modal */}
       {rejectingPendingBooking && (
         <Modal
           isOpen={Boolean(rejectingPendingBooking)}
@@ -1686,31 +1627,22 @@ function AdminBookingsContent() {
               setRejectPendingError(null);
             }
           }}
-          title="Tolak pesanan perjalanan"
-          description={`Reservasi ${rejectingPendingBooking.bookingNumber} oleh ${
-            rejectingPendingBooking.user?.name || 'Pemesan'
-          }`}
+          title="Tolak Pesanan Perjalanan"
+          description={`Pemesanan #${rejectingPendingBooking.bookingNumber} oleh ${rejectingPendingBooking.user?.name || 'User'}`}
           maxWidth="md"
         >
           <div className="space-y-4">
             {rejectPendingError && (
-              <ErrorBanner
-                message={rejectPendingError}
-                onDismiss={() => setRejectPendingError(null)}
-              />
+              <ErrorBanner message={rejectPendingError} onDismiss={() => setRejectPendingError(null)} />
             )}
 
-            <div className="rounded-[var(--radius-md)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] px-3 py-2.5 text-xs leading-relaxed text-[var(--status-warning-fg)]">
-              Berikan alasan penolakan, misalnya armada penuh, di luar jam dinas, atau keperluan
-              tidak sesuai.
+            <div className="p-3 bg-amber-50 border-2 border-black rounded-lg text-xs font-medium text-amber-950">
+              Berikan alasan penolakan pemesanan perjalanan (misal: armada penuh, di luar jam dinas, atau keperluan tidak sesuai).
             </div>
 
             <div>
-              <label
-                htmlFor="rejectPendingReason"
-                className="mb-1.5 block text-xs font-medium text-slate-700"
-              >
-                Alasan penolakan <span className="text-[var(--kcic-red)]">*</span>
+              <label htmlFor="rejectPendingReason" className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                Alasan Penolakan <span className="text-[#be123c]">*</span>
               </label>
               <textarea
                 id="rejectPendingReason"
@@ -1718,10 +1650,11 @@ function AdminBookingsContent() {
                 value={rejectPendingReason}
                 onChange={(e) => setRejectPendingReason(e.target.value)}
                 placeholder="Contoh: Seluruh armada Innova sedang digunakan dinas direksi pada jam tersebut."
+                className="w-full p-2.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
               <button
                 type="button"
                 onClick={() => {
@@ -1730,7 +1663,7 @@ function AdminBookingsContent() {
                   setRejectPendingError(null);
                 }}
                 disabled={isRejectingPending}
-                className="button-secondary"
+                className="px-3.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-700 hover:bg-zinc-100 cursor-pointer disabled:opacity-50"
               >
                 Batal
               </button>
@@ -1738,21 +1671,17 @@ function AdminBookingsContent() {
                 type="button"
                 onClick={handleRejectPendingBooking}
                 disabled={!rejectPendingReason.trim() || isRejectingPending}
-                className="button-danger"
+                className="px-4 py-1.5 text-xs font-black rounded-lg border-2 border-black bg-rose-600 text-white shadow-[2px_2px_0px_0px_#000] hover:bg-rose-700 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
               >
-                {isRejectingPending ? (
-                  <Spinner size="xs" />
-                ) : (
-                  <X className="size-3.5" strokeWidth={2.6} aria-hidden="true" />
-                )}
-                <span>{isRejectingPending ? 'Memproses\u2026' : 'Tolak pesanan'}</span>
+                {isRejectingPending ? <Spinner size="sm" /> : <Icon name="close" className="size-3.5" />}
+                <span>{isRejectingPending ? 'Memproses...' : 'Tolak Pesanan'}</span>
               </button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Reject nota dinas */}
+      {/* Reject Nota Dinas Modal */}
       {rejectingBooking && (
         <Modal
           isOpen={Boolean(rejectingBooking)}
@@ -1763,26 +1692,20 @@ function AdminBookingsContent() {
               setRejectError(null);
             }
           }}
-          title="Tolak dokumen nota dinas"
-          description={`Reservasi ${rejectingBooking.bookingNumber} \u00b7 ${rejectingBooking.pickupLocation} \u2192 ${rejectingBooking.destination}`}
+          title="Tolak Dokumen Nota Dinas"
+          description={`Booking #${rejectingBooking.bookingNumber} (${rejectingBooking.pickupLocation} → ${rejectingBooking.destination})`}
           maxWidth="md"
         >
           <div className="space-y-4">
-            {rejectError && (
-              <ErrorBanner message={rejectError} onDismiss={() => setRejectError(null)} />
-            )}
+            {rejectError && <ErrorBanner message={rejectError} onDismiss={() => setRejectError(null)} />}
 
-            <div className="rounded-[var(--radius-md)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-3 py-2.5 text-xs leading-relaxed text-[var(--status-error-fg)]">
-              Berikan alasan penolakan agar pemesan atau driver mengetahui revisi yang diperlukan,
-              misalnya foto blur, dokumen salah, atau tidak terbaca.
+            <div className="p-3 bg-rose-50 border-2 border-black rounded-lg text-xs font-medium text-rose-950">
+              Berikan alasan penolakan dokumen Nota Dinas agar pemesan/driver mengetahui revisi yang diperlukan (misal: foto blur, salah dokumen, tidak terbaca, dll).
             </div>
 
             <div>
-              <label
-                htmlFor="rejectReason"
-                className="mb-1.5 block text-xs font-medium text-slate-700"
-              >
-                Alasan penolakan <span className="text-[var(--kcic-red)]">*</span>
+              <label htmlFor="rejectReason" className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                Alasan Penolakan <span className="text-[#be123c]">*</span>
               </label>
               <textarea
                 id="rejectReason"
@@ -1790,10 +1713,11 @@ function AdminBookingsContent() {
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Contoh: Foto nota dinas blur, nomor surat tidak terbaca. Harap foto ulang dengan jelas."
+                className="w-full p-2.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
               <button
                 type="button"
                 onClick={() => {
@@ -1802,7 +1726,7 @@ function AdminBookingsContent() {
                   setRejectError(null);
                 }}
                 disabled={isRejecting}
-                className="button-secondary"
+                className="px-3.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-700 hover:bg-zinc-100 cursor-pointer disabled:opacity-50"
               >
                 Batal
               </button>
@@ -1810,31 +1734,29 @@ function AdminBookingsContent() {
                 type="button"
                 onClick={handleRejectCompletion}
                 disabled={!rejectReason.trim() || isRejecting}
-                className="button-danger"
+                className="px-4 py-1.5 text-xs font-black rounded-lg border-2 border-black bg-rose-600 text-white shadow-[2px_2px_0px_0px_#000] hover:bg-rose-700 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
               >
-                {isRejecting ? (
-                  <Spinner size="xs" />
-                ) : (
-                  <X className="size-3.5" strokeWidth={2.6} aria-hidden="true" />
-                )}
-                <span>{isRejecting ? 'Memproses\u2026' : 'Tolak nota dinas'}</span>
+                {isRejecting ? <Spinner size="sm" /> : <Icon name="close" className="size-3.5" />}
+                <span>{isRejecting ? 'Memproses...' : 'Tolak Nota Dinas'}</span>
               </button>
             </div>
           </div>
         </Modal>
       )}
 
+      {/* Cancel Confirmation Dialog */}
       <ConfirmDialog
         isOpen={Boolean(cancellingBooking)}
         onClose={() => setCancellingBooking(null)}
         onConfirm={handleCancelConfirm}
-        title="Batalkan reservasi"
-        message={`Reservasi ${cancellingBooking?.bookingNumber} akan dibatalkan dan driver tidak akan ditugaskan. Lanjutkan?`}
-        confirmLabel="Batalkan reservasi"
+        title="Cancel Booking"
+        message={`Are you sure you want to cancel booking #${cancellingBooking?.bookingNumber}?`}
+        confirmLabel="Cancel Booking"
         isDestructive={true}
         isLoading={isCancelling}
       />
 
+      {/* Export Report Excel Modal */}
       <ExportReportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
@@ -1848,9 +1770,9 @@ export default function AdminBookingsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex flex-col items-center justify-center gap-2 py-24 text-xs text-slate-500">
-          <Spinner size="md" className="text-[var(--kcic-red)]" />
-          <p>Memuat manajemen reservasi&hellip;</p>
+        <div className="py-20 text-center text-zinc-500 text-sm">
+          <Spinner size="lg" className="mb-2" />
+          <p>Loading bookings management...</p>
         </div>
       }
     >

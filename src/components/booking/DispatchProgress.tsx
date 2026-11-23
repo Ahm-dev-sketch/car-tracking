@@ -73,7 +73,7 @@ export function DispatchProgress({
           </div>
           <StatusBadge status="ADMIN_INTERVENTION" />
         </div>
-        <p className="mt-2 leading-relaxed text-warning-700/90">
+        <p className="mt-2 leading-relaxed text-warning-700">
           Auto-dispatch retries exhausted. A fleet manager will assign a driver manually.
         </p>
       </div>

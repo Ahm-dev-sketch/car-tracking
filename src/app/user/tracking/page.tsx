@@ -551,7 +551,7 @@ function UserTrackingContent() {
                   </div>
                 </div>
               ) : (
-                <p className="text-xs italic text-slate-400">Pilih kendaraan untuk melihat detail posisi</p>
+                <p className="text-xs italic text-slate-600">Pilih kendaraan untuk melihat detail posisi</p>
               )}
             </div>
           </div>

@@ -249,7 +249,7 @@ function DriverVehicleContent() {
                 </div>
               </div>
             ) : (
-              <div className="px-5 py-12 text-center text-xs font-medium text-slate-400">
+              <div className="px-5 py-12 text-center text-xs font-medium text-slate-600">
                 No permanent vehicle assignment. Search below to inspect available vehicles.
               </div>
             )}

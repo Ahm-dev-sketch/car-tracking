@@ -1187,11 +1187,11 @@ export default function DriverDashboardPage() {
               Aktifkan Lokasi Sekarang
             </button>
           </div>
-          <p className="text-xs font-medium text-warning-700/90">
+          <p className="text-xs font-medium text-warning-700">
             Browser Anda menolak atau belum memberikan akses GPS. Pengemudi wajib menyalakan lokasi agar
             dapat menerima penawaran trip dan menyiarkan armada.
           </p>
-          <ul className="list-inside list-disc space-y-1 text-xs font-medium text-warning-700/90">
+          <ul className="list-inside list-disc space-y-1 text-xs font-medium text-warning-700">
             <li>Klik ikon gembok / izin situs di address bar browser.</li>
             <li>Ubah opsi Lokasi (Location) menjadi &quot;Izinkan&quot; (Allow).</li>
             <li>Klik tombol &quot;Aktifkan Lokasi Sekarang&quot; di atas atau muat ulang halaman.</li>
@@ -1402,7 +1402,7 @@ export default function DriverDashboardPage() {
               <Icon name="signal" className="mt-0.5 size-4 shrink-0" />
               <div>
                 <span className="block font-semibold">GPS signal paused</span>
-                <p className="mt-0.5 text-xs font-medium leading-relaxed text-warning-700/90">
+                <p className="mt-0.5 text-xs font-medium leading-relaxed text-warning-700">
                   Location updates pause when this tab is backgrounded or screen locks — reopen to resume.
                 </p>
               </div>
@@ -1904,7 +1904,7 @@ export default function DriverDashboardPage() {
             {completedTripSummary.pendingSync && (
               <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-700">
                 <span className="mb-0.5 block font-semibold">Trip selesai (Menunggu Sinkronisasi)</span>
-                <p className="text-[11px] font-medium leading-relaxed text-warning-700/90">
+                <p className="text-[11px] font-medium leading-relaxed text-warning-700">
                   Perjalanan selesai offline. Data akan dikirim otomatis saat koneksi kembali.
                 </p>
               </div>
@@ -1944,7 +1944,7 @@ export default function DriverDashboardPage() {
             {!completedTripSummary.aborted && (
               <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-700">
                 <span className="mb-0.5 block font-semibold">Status: Menunggu Approval Nota Dinas</span>
-                <p className="text-[11px] font-medium leading-relaxed text-warning-700/90">
+                <p className="text-[11px] font-medium leading-relaxed text-warning-700">
                   Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum diselesaikan
                   resmi oleh admin KCIC.
                 </p>

@@ -456,7 +456,7 @@ function UserBookingsContent() {
             {canTrack && b.vehicle && (
               <Link
                 href={`/user/tracking?vehicleId=${b.vehicle.id}`}
-                className="rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
+                className="inline-flex min-h-11 items-center rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
               >
                 Track
               </Link>
@@ -465,7 +465,7 @@ function UserBookingsContent() {
               <button
                 type="button"
                 onClick={() => setUploadBooking(b)}
-                className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-11 cursor-pointer items-center rounded-lg px-3.5 text-xs font-semibold transition-colors ${
                   b.rejectedReason
                     ? 'bg-danger-600 text-white hover:bg-danger-700'
                     : 'bg-brand-600 text-white hover:bg-brand-700'

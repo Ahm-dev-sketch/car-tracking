@@ -400,7 +400,7 @@ function AdminFleetMapContent() {
             {mergedVehicles.length === 0 ? (
               <div className="py-12 text-center text-xs text-slate-500">
                 <p className="text-sm font-semibold text-slate-700">Tidak ada armada aktif di wilayah ini</p>
-                <p className="mt-1 text-slate-400">Peta wilayah {selectedLocation?.name || 'operasional'} tetap aktif di atas.</p>
+                <p className="mt-1 text-slate-600">Peta wilayah {selectedLocation?.name || 'operasional'} tetap aktif di atas.</p>
               </div>
             ) : (
               <div>
@@ -566,7 +566,7 @@ function AdminFleetMapContent() {
                   )}
                 </div>
               ) : (
-                <div className="py-6 text-center text-xs font-medium text-slate-400">
+                <div className="py-6 text-center text-xs font-medium text-slate-600">
                   Select a marker on the map to inspect unit details.
                 </div>
               )}

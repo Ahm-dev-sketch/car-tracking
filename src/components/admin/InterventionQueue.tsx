@@ -183,7 +183,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
         <div className="flex items-center gap-2.5">
           <span className="relative inline-flex size-2 shrink-0 rounded-full bg-success-600" aria-hidden="true" />
           <span className="font-semibold text-success-700">Intervention Queue Clear</span>
-          <span className="font-medium text-success-700/80">
+          <span className="font-medium text-success-700">
             — All auto-dispatch requests have been fulfilled or assigned.
           </span>
         </div>

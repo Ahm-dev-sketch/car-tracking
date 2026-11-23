@@ -298,7 +298,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      <footer className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-400">
+      <footer className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-600">
         <span>KCIC Fleet &middot; Operational Mobility.</span>
         <span className="hidden sm:block">For your team. For the road ahead.</span>
       </footer>

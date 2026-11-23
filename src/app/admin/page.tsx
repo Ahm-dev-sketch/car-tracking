@@ -222,7 +222,7 @@ export default function AdminOverviewPage() {
               </div>
               <div className="mt-4 flex items-baseline gap-2">
                 {metric.live && <span className="relative inline-flex size-1.5 shrink-0 rounded-full bg-success-600 status-ping" aria-hidden="true" />}
-                <div className="metric-value text-3xl font-semibold text-slate-900">
+                <div className="metric-value text-3xl font-semibold tabular-nums text-slate-900">
                   {isLoading ? <Spinner size="md" /> : (metric.value ?? '—')}
                 </div>
               </div>
@@ -250,7 +250,7 @@ export default function AdminOverviewPage() {
               <p className="eyebrow">The operational picture</p>
               <h2 id="fleet-health-heading" className="section-title mt-2">Fleet health & dispatch</h2>
             </div>
-            <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400"><Icon name="clock" className="size-3.5" />Refreshes every 20 seconds</p>
+            <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Icon name="clock" className="size-3.5" />Refreshes every 20 seconds</p>
           </div>
           <dl className="mt-5 grid grid-cols-2 gap-x-5 sm:grid-cols-3 xl:grid-cols-5 xl:gap-x-8">
             {[
@@ -324,7 +324,7 @@ export default function AdminOverviewPage() {
                   </div>
                   <div className="min-w-0 pl-12 sm:max-w-[45%] sm:pl-0 sm:text-right">
                     <p className="wrap-anywhere text-sm font-medium text-slate-700">Driver: {t.driver?.user?.name || 'Assigned driver'}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-400">Started <RelativeTime date={t.startedAt} /></p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">Started <RelativeTime date={t.startedAt} /></p>
                   </div>
                 </li>
               ))}

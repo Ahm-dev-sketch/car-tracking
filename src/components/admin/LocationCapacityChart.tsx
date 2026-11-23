@@ -147,7 +147,7 @@ export function LocationCapacityChart({
                 <span>{loc.name}</span>
                 <span
                   className={`rounded font-mono text-[10px] tabular-nums ${
-                    isSelected ? 'text-brand-600/80' : 'text-slate-400'
+                    isSelected ? 'text-brand-600' : 'text-slate-500'
                   }`}
                 >
                   {loc.code}

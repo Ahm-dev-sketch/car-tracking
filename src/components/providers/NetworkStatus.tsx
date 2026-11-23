@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Icon } from '@/components/ui/Icon';
 import { getOfflineQueueCount, processOfflineQueue } from '@/lib/offline-sync';
 
 export function NetworkStatus() {
@@ -75,50 +76,51 @@ export function NetworkStatus() {
     ? (pending ? `Mode Offline • ${pendingCount} data menunggu dikirim` : 'Connection lost — updates paused')
     : (pending ? `Menyinkronkan ${pendingCount} data tertunda ke server...` : 'Back online');
 
+  const tone = !isOnline
+    ? 'border-warning-200 bg-warning-50 text-warning-700'
+    : 'border-success-200 bg-success-50 text-success-700';
+
+  const dotTone = !isOnline ? 'bg-warning-600' : 'bg-success-600';
+
   return (
     <div
       role="status"
       aria-live="polite"
-      className="fixed top-[max(0.5rem,env(safe-area-inset-top))] inset-x-0 z-[var(--layer-toast)] flex justify-center px-4 pointer-events-none"
+      className="pointer-events-none fixed inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-[var(--layer-toast)] flex justify-center px-3"
     >
       <div
-        className={`pointer-events-auto flex items-center gap-2.5 pl-4 pr-1.5 py-1.5 rounded-full shadow-[0_8px_32px_-12px_rgba(25,76,60,0.15)] border text-xs font-medium ${
-          !isOnline
-            ? 'bg-rose-600/95 text-white border-rose-700 shadow-rose-950/20'
-            : 'bg-emerald-600/95 text-white border-emerald-700 shadow-emerald-950/20'
-        }`}
+        className={`pointer-events-auto flex max-w-full items-center gap-2.5 rounded-full border py-1.5 pl-3 pr-1.5 text-xs font-medium ${tone}`}
       >
-        <span className="relative flex h-2 w-2 shrink-0">
-          {!isOnline ? (
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-          ) : (
-            <>
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-            </>
-          )}
+        <span className="relative inline-flex size-2 shrink-0 rounded-full" aria-hidden="true">
+          <span className={`absolute inset-0 rounded-full ${dotTone}`} />
+          {isOnline && <span className={`absolute inset-0 rounded-full ${dotTone} status-ping`} />}
         </span>
-        <span>
-          {message}
-        </span>
+
+        <Icon name={!isOnline ? 'wifi' : 'check'} className="size-3.5 shrink-0" />
+
+        <span className="min-w-0 truncate tabular-nums">{message}</span>
+
         {isOnline && pending && (
           <button
             type="button"
             onClick={() => void processOfflineQueue().catch(() => {})}
-            className="ml-1 min-h-11 px-3 flex items-center justify-center hover:bg-white/20 rounded-full text-white/90 hover:text-white cursor-pointer font-semibold"
+            className="flex min-h-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-success-600 px-3 font-semibold text-white transition-colors hover:bg-success-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
             Sync Sekarang
           </button>
         )}
+
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          className="ml-1 min-h-11 min-w-11 flex items-center justify-center hover:bg-white/20 rounded-full text-white/80 hover:text-white cursor-pointer"
+          className={`flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+            !isOnline
+              ? 'text-warning-700/60 hover:bg-warning-100 hover:text-warning-700'
+              : 'text-success-700/60 hover:bg-success-100 hover:text-success-700'
+          }`}
           aria-label="Dismiss network notice"
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Icon name="close" className="size-3.5" />
         </button>
       </div>
     </div>

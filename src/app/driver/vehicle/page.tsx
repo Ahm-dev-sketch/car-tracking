@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { LocationBadge } from '@/components/ui/LocationBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
 import { fetchJson } from '@/lib/fetch-json';
 
 interface VehicleLocation {
@@ -152,55 +153,60 @@ function DriverVehicleContent() {
     currentVehicle?.currentLocation || currentVehicle?.currentOperationalLocation;
 
   return (
-    <div className="space-y-6">
-      <div className="pb-4 border-b border-zinc-200">
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900">My Assigned Vehicle</h1>
-        <p className="text-xs text-zinc-500 mt-0.5">Fleet asset currently linked to your driver profile</p>
+    <div className="space-y-5">
+      <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow">KCIC Fleet / Driver asset</p>
+          <h1 className="page-heading mt-2">My assigned vehicle.</h1>
+          <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
+            Fleet asset currently linked to your driver profile
+          </p>
+        </div>
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {isLoading ? (
-        <div className="py-20 text-center text-zinc-500 text-sm">
+        <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
           <p>Loading vehicle information...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3 lg:gap-4">
           {/* Main Vehicle Profile */}
-          <div className="md:col-span-2 bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                Vehicle Assignment
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white md:col-span-2">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Vehicle assignment
               </span>
               {currentVehicle ? (
                 <StatusBadge status={currentVehicle.status} />
               ) : (
-                <span className="text-xs text-zinc-500 font-medium">Not Assigned</span>
+                <span className="text-xs font-medium text-slate-400">Not assigned</span>
               )}
             </div>
 
             {currentVehicle ? (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 p-4 sm:p-5">
                 {currentVehicle.imageUrl && (
                   <img
                     src={currentVehicle.imageUrl}
                     alt={currentVehicle.brand}
-                    className="w-full h-44 object-cover rounded border border-zinc-200"
+                    className="h-44 w-full rounded-lg border border-slate-200 object-cover"
                   />
                 )}
 
                 <div>
-                  <h2 className="text-lg font-bold text-zinc-900">
+                  <h2 className="text-lg font-semibold leading-tight tracking-tight text-slate-900">
                     {currentVehicle.brand} {currentVehicle.model}
                   </h2>
-                  <div className="font-mono text-sm font-semibold text-zinc-700 mt-0.5">
+                  <div className="mt-1 inline-block rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wide text-slate-700 tabular-nums">
                     {currentVehicle.plateNumber}
                   </div>
                 </div>
 
                 {/* Location Badges */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {currentVehicle.homeLocation && (
                     <LocationBadge
                       type="home"
@@ -217,59 +223,71 @@ function DriverVehicleContent() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-zinc-100">
+                <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
                   <div>
-                    <span className="text-zinc-400 block uppercase font-semibold text-[10px]">
-                      Vehicle Type
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                      Vehicle type
                     </span>
-                    <span className="font-medium text-zinc-800">{currentVehicle.vehicleType}</span>
+                    <span className="font-medium text-slate-700">{currentVehicle.vehicleType}</span>
                   </div>
                   <div>
-                    <span className="text-zinc-400 block uppercase font-semibold text-[10px]">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                       Capacity
                     </span>
-                    <span className="font-medium text-zinc-800">{currentVehicle.seatingCapacity} seats</span>
+                    <span className="font-medium text-slate-700 tabular-nums">
+                      {currentVehicle.seatingCapacity} seats
+                    </span>
                   </div>
                   <div>
-                    <span className="text-zinc-400 block uppercase font-semibold text-[10px]">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                       Transmission
                     </span>
-                    <span className="font-medium text-zinc-800">{currentVehicle.transmission || 'Automatic'}</span>
+                    <span className="font-medium text-slate-700">
+                      {currentVehicle.transmission || 'Automatic'}
+                    </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="py-12 text-center text-zinc-500 text-xs border border-dashed border-zinc-200 rounded">
+              <div className="px-5 py-12 text-center text-xs font-medium text-slate-400">
                 No permanent vehicle assignment. Search below to inspect available vehicles.
               </div>
             )}
           </div>
 
           {/* Driver Badge & Info */}
-          <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 block">
-              Driver Credentials
+          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+              Driver credentials
             </span>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-3">
               <div>
-                <span className="text-zinc-400 text-[10px] uppercase font-semibold">Duty Status</span>
-                <div className="mt-0.5">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Duty status
+                </span>
+                <div className="mt-1">
                   <StatusBadge status={driverStatus} />
                 </div>
               </div>
 
               {licenseNumber && (
                 <div>
-                  <span className="text-zinc-400 text-[10px] uppercase font-semibold">Driver License</span>
-                  <p className="font-mono font-semibold text-zinc-800 mt-0.5">{licenseNumber}</p>
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Driver license
+                  </span>
+                  <p className="mt-1 font-mono text-sm font-semibold text-slate-700 tabular-nums">
+                    {licenseNumber}
+                  </p>
                 </div>
               )}
             </div>
 
-            <div className="pt-4 border-t border-zinc-100 text-xs text-zinc-500">
+            <div className="flex items-start gap-2 border-t border-slate-100 pt-4 text-[11px] leading-relaxed text-slate-500">
+              <Icon name="info" className="mt-px size-3.5 shrink-0 text-slate-400" />
               <p>
-                Vehicle assignments are authorized by company fleet dispatchers. Contact dispatch if your assignment requires updates.
+                Vehicle assignments are authorized by company fleet dispatchers. Contact dispatch if your
+                assignment requires updates.
               </p>
             </div>
           </div>
@@ -277,12 +295,15 @@ function DriverVehicleContent() {
       )}
 
       {/* Fleet Search / Inspection */}
-      <div className="bg-white border border-zinc-200 rounded-lg p-5 space-y-4">
+      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-800">
-            Inspect Fleet Vehicles
-          </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Inspect fleet
+          </p>
+          <h2 className="mt-1.5 text-base font-semibold tracking-tight text-slate-900">
+            Available vehicles by hub
+          </h2>
+          <p className="mt-1 text-xs font-medium text-slate-500">
             Filter by operational hub and check vehicle availability
           </p>
         </div>
@@ -292,10 +313,10 @@ function DriverVehicleContent() {
           <button
             type="button"
             onClick={() => setLocationFilter('')}
-            className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black transition-all cursor-pointer ${
+            className={`cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
               !locationFilter
-                ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
-                : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                ? 'border-brand-200 bg-brand-50 text-brand-700'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             Semua Hub
@@ -307,16 +328,20 @@ function DriverVehicleContent() {
                 key={loc.id}
                 type="button"
                 onClick={() => setLocationFilter(isSelected ? '' : loc.id)}
-                className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                className={`cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                   isSelected
-                    ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
-                    : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                    ? 'border-brand-200 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
                 <span>{loc.name}</span>
-                <span className={`ml-1 text-[10px] font-mono px-1 py-0.2 rounded border ${
-                  isSelected ? 'border-white/40 bg-white/20 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
-                }`}>
+                <span
+                  className={`ml-1.5 rounded border px-1 font-mono text-[10px] tabular-nums ${
+                    isSelected
+                      ? 'border-brand-200 bg-white text-brand-700'
+                      : 'border-slate-200 bg-slate-50 text-slate-500'
+                  }`}
+                >
                   {loc.code}
                 </span>
               </button>
@@ -325,19 +350,25 @@ function DriverVehicleContent() {
         </div>
 
         {/* Filter bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <input
-            type="text"
-            placeholder="Search license plate, brand, model..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-          />
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Icon
+              name="search"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Search license plate, brand, model..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
+            />
+          </div>
 
           <select
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
             <option value="">All Locations</option>
             {locations.map((loc) => (
@@ -350,7 +381,7 @@ function DriverVehicleContent() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
             <option value="">All Statuses</option>
             <option value="AVAILABLE">Available</option>
@@ -361,23 +392,28 @@ function DriverVehicleContent() {
           <button
             type="button"
             onClick={handleSearch}
-            className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer shrink-0"
+            className="button-primary shrink-0"
           >
             {isSearching ? <Spinner size="sm" /> : 'Filter'}
           </button>
         </div>
 
         {searchResults.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {searchResults.map((v) => {
               const currentLoc = v.currentLocation || v.currentOperationalLocation;
               return (
-                <div key={v.id} className="p-3 bg-zinc-50 border border-zinc-200 rounded text-xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-zinc-900">{v.plateNumber}</span>
+                <div
+                  key={v.id}
+                  className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="rounded border border-slate-200 bg-white px-1.5 py-0.5 font-mono font-semibold text-slate-800 tabular-nums">
+                      {v.plateNumber}
+                    </span>
                     <StatusBadge status={v.status} />
                   </div>
-                  <div className="text-zinc-600 font-medium">
+                  <div className="font-medium text-slate-600">
                     {v.brand} {v.model}
                   </div>
                   <div className="flex flex-wrap items-center gap-1">
@@ -396,8 +432,8 @@ function DriverVehicleContent() {
                       />
                     )}
                   </div>
-                  <div className="text-zinc-400 text-[11px] pt-1">
-                    {v.seatingCapacity} seats • {v.vehicleType}
+                  <div className="border-t border-slate-200 pt-1.5 text-[11px] tabular-nums text-slate-400">
+                    {v.seatingCapacity} seats &middot; {v.vehicleType}
                   </div>
                 </div>
               );
@@ -413,7 +449,7 @@ export default function DriverVehiclePage() {
   return (
     <Suspense
       fallback={
-        <div className="py-20 text-center text-zinc-500 text-sm">
+        <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
           <p>Loading vehicle profile...</p>
         </div>

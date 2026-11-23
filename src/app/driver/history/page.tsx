@@ -73,14 +73,14 @@ export default function DriverTripHistoryPage() {
       header: 'Date & Time',
       cell: (t) => (
         <div className="text-xs">
-          <div className="font-semibold text-zinc-900">
+          <div className="font-semibold text-slate-900 tabular-nums">
             {new Date(t.startedAt).toLocaleDateString([], {
               month: 'short',
               day: 'numeric',
               year: 'numeric',
             })}
           </div>
-          <div className="text-zinc-500">
+          <div className="text-slate-500 tabular-nums">
             {new Date(t.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
@@ -90,8 +90,10 @@ export default function DriverTripHistoryPage() {
       header: 'Vehicle',
       cell: (t) => (
         <div className="text-xs">
-          <span className="font-mono font-semibold text-zinc-900">{t.vehicle.plateNumber}</span>
-          <span className="text-zinc-500 block">{t.vehicle.brand} {t.vehicle.model}</span>
+          <span className="font-mono font-semibold text-slate-900 tabular-nums">
+            {t.vehicle.plateNumber}
+          </span>
+          <span className="block text-slate-500">{t.vehicle.brand} {t.vehicle.model}</span>
         </div>
       ),
     },
@@ -100,26 +102,35 @@ export default function DriverTripHistoryPage() {
       cell: (t) =>
         t.booking ? (
           <div className="text-xs">
-            <span className="font-semibold text-zinc-800">{t.booking.bookingNumber}</span>
-            <span className="text-zinc-500 block truncate max-w-[150px]">{t.booking.purpose}</span>
+            <span className="font-semibold text-slate-800 tabular-nums">{t.booking.bookingNumber}</span>
+            <span className="block max-w-[150px] truncate text-slate-500">{t.booking.purpose}</span>
           </div>
         ) : (
-          <span className="text-xs text-zinc-400 italic">Ad-hoc trip</span>
+          <span className="text-xs italic text-slate-400">Ad-hoc trip</span>
         ),
     },
     {
       header: 'Duration',
       cell: (t) => {
-        if (!t.endedAt) return <span className="text-xs text-emerald-600 font-semibold">Active</span>;
+        if (!t.endedAt)
+          return (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700">
+              <span className="relative inline-flex size-1.5 shrink-0 rounded-full" aria-hidden="true">
+                <span className="absolute inset-0 rounded-full bg-brand-600" />
+                <span className="absolute inset-0 rounded-full bg-brand-600 status-ping" />
+              </span>
+              Active
+            </span>
+          );
         const diffMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
         const mins = Math.round(diffMs / 60000);
-        return <span className="text-xs text-zinc-700">{mins} mins</span>;
+        return <span className="text-xs text-slate-700 tabular-nums">{mins} mins</span>;
       },
     },
     {
       header: 'Distance',
       cell: (t) => (
-        <span className="text-xs font-mono text-zinc-700">
+        <span className="font-mono text-xs text-slate-700 tabular-nums">
           {t.distanceMeters !== null && t.distanceMeters !== undefined
             ? `${(t.distanceMeters / 1000).toFixed(1)} km`
             : '—'}
@@ -136,7 +147,7 @@ export default function DriverTripHistoryPage() {
         <button
           type="button"
           onClick={() => setSelectedTrip(t)}
-          className="px-2.5 py-1 text-xs border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
         >
           View
         </button>
@@ -145,10 +156,15 @@ export default function DriverTripHistoryPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="pb-4 border-b border-zinc-200">
-        <h1 className="text-xl font-bold tracking-tight text-zinc-900">Trip History</h1>
-        <p className="text-xs text-zinc-500 mt-0.5">Log of completed and active vehicle trips</p>
+    <div className="space-y-5">
+      <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow">KCIC Fleet / Driver log</p>
+          <h1 className="page-heading mt-2">Trip history.</h1>
+          <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
+            Log of completed and active vehicle trips
+          </p>
+        </div>
       </div>
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -177,32 +193,38 @@ export default function DriverTripHistoryPage() {
       >
         {selectedTrip && (
           <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <span className="text-zinc-400 uppercase font-semibold">Status</span>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Status
+              </span>
               <StatusBadge status={selectedTrip.status} />
             </div>
 
-            <div className="space-y-2 pb-3 border-b border-zinc-100">
-              <span className="text-zinc-400 uppercase font-semibold">Timestamps</span>
+            <div className="space-y-2 border-b border-slate-100 pb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Timestamps
+              </span>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="text-zinc-400 block text-[10px]">Started</span>
-                  <span className="font-medium text-zinc-800">
+                  <span className="block text-[10px] text-slate-400">Started</span>
+                  <span className="font-medium text-slate-800 tabular-nums">
                     {new Date(selectedTrip.startedAt).toLocaleString()}
                   </span>
                 </div>
                 <div>
-                  <span className="text-zinc-400 block text-[10px]">Ended</span>
-                  <span className="font-medium text-zinc-800">
+                  <span className="block text-[10px] text-slate-400">Ended</span>
+                  <span className="font-medium text-slate-800 tabular-nums">
                     {selectedTrip.endedAt ? new Date(selectedTrip.endedAt).toLocaleString() : 'In Progress'}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-2 pb-3 border-b border-zinc-100">
-              <span className="text-zinc-400 uppercase font-semibold">Coordinates</span>
-              <div className="p-2.5 bg-zinc-50 rounded border border-zinc-200 font-mono text-[11px] space-y-1">
+            <div className="space-y-2 border-b border-slate-100 pb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Coordinates
+              </span>
+              <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-[11px] text-slate-600 tabular-nums">
                 <div>Start: {selectedTrip.startLat.toFixed(5)}, {selectedTrip.startLng.toFixed(5)}</div>
                 {selectedTrip.endLat !== null && selectedTrip.endLat !== undefined && (
                   <div>End: {selectedTrip.endLat.toFixed(5)}, {selectedTrip.endLng?.toFixed(5)}</div>
@@ -211,12 +233,14 @@ export default function DriverTripHistoryPage() {
             </div>
 
             {selectedTrip.booking && (
-              <div className="p-3 bg-zinc-50 rounded border border-zinc-200 space-y-1">
-                <span className="text-zinc-400 uppercase font-semibold block text-[10px]">
-                  Linked Booking
+              <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Linked booking
                 </span>
-                <div className="font-bold text-zinc-900">{selectedTrip.booking.bookingNumber}</div>
-                <div className="text-zinc-600">{selectedTrip.booking.purpose}</div>
+                <div className="font-semibold text-slate-900 tabular-nums">
+                  {selectedTrip.booking.bookingNumber}
+                </div>
+                <div className="text-slate-600">{selectedTrip.booking.purpose}</div>
               </div>
             )}
           </div>

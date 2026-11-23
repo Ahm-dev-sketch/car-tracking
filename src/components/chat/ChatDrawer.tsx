@@ -40,6 +40,12 @@ const USER_CHIPS = [
   'Saya sudah di titik jemput',
 ];
 
+const ROLE_LABEL: Record<string, string> = {
+  DRIVER: 'Driver Operasional',
+  ADMIN: 'Dispatcher Admin',
+  USER: 'Penumpang',
+};
+
 export function ChatDrawer({
   isOpen,
   onClose,
@@ -94,40 +100,45 @@ export function ChatDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/45 p-0 backdrop-blur-xs animate-in fade-in duration-200 sm:items-center sm:p-5"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={`Chat dengan ${partnerName}`}
     >
       <div
-        className="flex w-full max-w-lg h-[620px] max-h-[88vh] flex-col rounded-2xl border-[3px] border-black bg-white shadow-[8px_8px_0px_0px_#000] animate-in zoom-in-95 duration-200 overflow-hidden"
+        className="flex h-[86dvh] max-h-[640px] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white animate-in zoom-in-95 duration-200 sm:h-[620px] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b-[2.5px] border-black bg-zinc-50 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#be123c] font-black text-white shadow-[2px_2px_0px_0px_#000]">
+        <header className="flex items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 font-mono text-xs font-semibold tracking-wide text-white tabular-nums">
               {partnerName.slice(0, 2).toUpperCase() || 'KC'}
             </div>
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-black text-zinc-950">{partnerName}</h3>
-              <div className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider">
-                  {partnerRole === 'DRIVER' ? 'Driver Operasional' : partnerRole === 'ADMIN' ? 'Dispatcher Admin' : 'Penumpang'}
+              <h2 className="truncate text-sm font-semibold tracking-tight text-slate-900">
+                {partnerName}
+              </h2>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <span className="relative inline-flex size-1.5 shrink-0 rounded-full" aria-hidden="true">
+                  <span className="absolute inset-0 rounded-full bg-success-600" />
+                  <span className="absolute inset-0 rounded-full bg-success-600 status-ping" />
+                </span>
+                <span className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  {ROLE_LABEL[partnerRole] || ROLE_LABEL[partnerRole.toUpperCase()] || partnerRole}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             {onStartCall && partnerId && (
               <button
                 type="button"
                 onClick={() => onStartCall(partnerId, partnerName, partnerRole)}
                 title="Panggilan Suara In-App"
-                className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-emerald-400 text-black shadow-[2px_2px_0px_0px_#000] hover:bg-emerald-300 transition cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                className="flex size-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
               >
                 <Icon name="phone" className="size-4" />
               </button>
@@ -136,112 +147,113 @@ export function ChatDrawer({
               type="button"
               onClick={onClose}
               title="Tutup Obrolan"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-white text-zinc-700 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 transition cursor-pointer"
+              className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
               <Icon name="close" className="size-4" />
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Message Container */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-zinc-100/60">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto bg-slate-50/80">
           {isLoading ? (
-            <div className="flex h-full flex-col items-center justify-center text-zinc-500">
-              <Spinner size="md" className="mb-2 text-[#be123c]" />
-              <p className="text-xs font-bold">Memuat percakapan real-time...</p>
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-500">
+              <Spinner size="md" />
+              <p className="text-xs font-medium">Memuat percakapan real-time...</p>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-center p-6 text-zinc-500">
-              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-amber-200 text-black shadow-[2px_2px_0px_0px_#000]">
+            <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+              <div className="mb-3 flex size-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                 <Icon name="message" className="size-6" />
               </div>
-              <h4 className="text-sm font-black text-black">Mulai Percakapan</h4>
-              <p className="mt-1 text-xs text-zinc-600 max-w-xs">
-                Kirim pesan langsung ke {partnerName} terkait penjemputan, armada, atau konfirmasi perjalanan tanpa membagikan nomor pribadi.
+              <h3 className="text-sm font-semibold tracking-tight text-slate-900">Mulai Percakapan</h3>
+              <p className="mt-1.5 max-w-xs text-xs leading-relaxed text-slate-500">
+                Kirim pesan langsung ke {partnerName} terkait penjemputan, armada, atau konfirmasi perjalanan
+                tanpa membagikan nomor pribadi.
               </p>
             </div>
           ) : (
-            messages.map((m) => {
-              const formattedTime = new Date(m.created_at).toLocaleTimeString('id-ID', {
-                hour: '2-digit',
-                minute: '2-digit',
-              });
+            <div className="space-y-2.5 p-4">
+              {messages.map((m) => {
+                const formattedTime = new Date(m.created_at).toLocaleTimeString('id-ID', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
 
-              // Special formatting for Voice Call History entry
-              if (m.message.startsWith('📞 Panggilan')) {
-                const lower = m.message.toLowerCase();
-                const isMissed = lower.includes('tak terjawab') || lower.includes('ditolak');
+                // Voice-call history entries render as a centred system pill.
+                // Older rows may carry a leading emoji marker; strip any such prefix.
+                const callText = m.message.replace(
+                  /^[\p{Extended_Pictographic}\p{Emoji}\uFE0F\u200D\s]+/u,
+                  ''
+                );
+                if (callText.startsWith('Panggilan')) {
+                  const lower = callText.toLowerCase();
+                  const isMissed = lower.includes('tak terjawab') || lower.includes('ditolak');
+                  return (
+                    <div key={m.id} className="flex justify-center py-1">
+                      <div
+                        className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium ${
+                          isMissed
+                            ? 'border-danger-200 bg-danger-50 text-danger-700'
+                            : 'border-slate-200 bg-white text-slate-600'
+                        }`}
+                      >
+                        <Icon name="phoneOff" className="size-3.5 shrink-0" />
+                        <span className="truncate">{callText}</span>
+                        <span className="font-mono text-[10px] tabular-nums opacity-60">{formattedTime}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const isMe = m.sender_id === currentUserId;
+
                 return (
-                  <div key={m.id} className="flex justify-center my-1.5">
+                  <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     <div
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-black shadow-[1.5px_1.5px_0px_0px_#000] text-[11px] font-bold ${
-                        isMissed ? 'bg-rose-100 text-rose-900' : 'bg-emerald-100 text-emerald-950'
+                      className={`max-w-[82%] rounded-2xl border px-3.5 py-2.5 ${
+                        isMe
+                          ? 'rounded-br-md border-brand-200 bg-brand-50'
+                          : 'rounded-bl-md border-slate-200 bg-white'
                       }`}
                     >
-                      <Icon name={isMissed ? 'phoneOff' : 'phone'} className="size-3.5" />
-                      <span>{m.message.replace('📞 ', '')}</span>
-                      <span className="text-[9px] font-mono opacity-60 ml-0.5">{formattedTime}</span>
+                      {!isMe && (
+                        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                          {m.sender_name || partnerName}
+                        </p>
+                      )}
+                      <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-slate-800">
+                        {m.message}
+                      </p>
+                      <div className="mt-1 flex items-center justify-end gap-1 text-[10px]">
+                        <span className="font-mono tabular-nums text-slate-400">{formattedTime}</span>
+                        {isMe && (
+                          <span
+                            title={m.is_read ? 'Sudah dibaca' : 'Terkirim'}
+                            className={m.is_read ? 'text-brand-600' : 'text-slate-400'}
+                          >
+                            <Icon name={m.is_read ? 'checkCheck' : 'check'} className="size-3.5" />
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
-              }
-
-              const isMe = m.sender_id === currentUserId;
-
-              return (
-                <div
-                  key={m.id}
-                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl p-3 text-xs shadow-[2px_2px_0px_0px_#000] border-2 border-black ${
-                      isMe
-                        ? 'bg-[#be123c] text-white rounded-br-none'
-                        : 'bg-white text-zinc-950 rounded-bl-none'
-                    }`}
-                  >
-                    {!isMe && (
-                      <p className="mb-1 text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                        {m.sender_name || partnerName}
-                      </p>
-                    )}
-                    <p className="font-medium whitespace-pre-wrap break-words leading-relaxed">
-                      {m.message}
-                    </p>
-                    <div
-                      className={`mt-1 flex items-center justify-end gap-1 text-[9px] font-mono ${
-                        isMe ? 'text-rose-200' : 'text-zinc-400'
-                      }`}
-                    >
-                      <span>{formattedTime}</span>
-                      {isMe && (
-                        <span
-                          title={m.is_read ? 'Sudah dibaca' : 'Terkirim'}
-                          className={`inline-flex items-center transition-colors ${
-                            m.is_read ? 'text-sky-300' : 'text-rose-200/60'
-                          }`}
-                        >
-                          <Icon name="checkCheck" className="size-3.5" />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+              })}
+              <div ref={messagesEndRef} />
+            </div>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Reply Chips (Role-Specific) */}
-        <div className="border-t border-zinc-200 bg-white p-2">
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {/* Quick reply chips */}
+        <div className="border-t border-slate-200 bg-white px-3 py-2">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {activeChips.map((chip, idx) => (
               <button
                 key={idx}
                 type="button"
                 onClick={() => handleQuickChip(chip)}
-                className="shrink-0 rounded-full border border-black bg-zinc-50 px-2.5 py-1 text-[11px] font-bold text-zinc-800 hover:bg-zinc-100 transition shadow-[1px_1px_0px_0px_#000] cursor-pointer"
+                className="shrink-0 cursor-pointer rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
               >
                 {chip}
               </button>
@@ -249,10 +261,13 @@ export function ChatDrawer({
           </div>
         </div>
 
-        {/* Input Bar */}
-        <form onSubmit={handleSend} className="border-t-[2.5px] border-black bg-white p-3">
+        {/* Composer */}
+        <form onSubmit={handleSend} className="border-t border-slate-200 bg-white p-3">
           {error && (
-            <p className="mb-2 text-[11px] font-bold text-rose-600 truncate">{error}</p>
+            <p className="mb-2 flex items-center gap-1.5 truncate text-[11px] font-medium text-danger-700">
+              <Icon name="alert" className="size-3.5 shrink-0" />
+              {error}
+            </p>
           )}
           <div className="flex items-center gap-2">
             <input
@@ -260,14 +275,15 @@ export function ChatDrawer({
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder={`Tulis pesan ke ${partnerName}...`}
-              className="flex-1 rounded-xl border-2 border-black bg-zinc-50 p-2.5 text-xs font-medium text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:bg-white"
+              className="h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             />
             <button
               type="submit"
               disabled={!inputText.trim() || isSending}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000] hover:bg-[#9f1239] disabled:opacity-50 transition cursor-pointer"
+              aria-label="Kirim pesan"
+              className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isSending ? <Spinner size="sm" className="text-white" /> : <Icon name="send" className="size-4" />}
+              {isSending ? <Spinner size="sm" /> : <Icon name="send" className="size-4" />}
             </button>
           </div>
         </form>

@@ -286,25 +286,31 @@ function UserTrackingContent() {
   }, [selectedVehicle?.lat, selectedVehicle?.lng]);
 
   const bookingSummary = selectedBooking && (
-    <section className="mb-6 space-y-4 rounded-2xl border-2.5 border-black bg-emerald-100 p-5 shadow-[4px_4px_0px_0px_#000]" aria-label="Active booking">
+    <section className="space-y-3" aria-label="Active booking">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-black uppercase tracking-wider text-emerald-950">Perjalanan Aktif Anda</span>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          Perjalanan aktif Anda
+        </p>
         <StatusBadge status={selectedBooking.status} />
       </div>
 
-      {/* Proximity / Gojek-style Status Headline */}
-      <div className="rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000] flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-3.5 w-3.5 shrink-0">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              selectedBooking.status === 'ARRIVED' ? 'bg-emerald-400' : 'bg-emerald-600'
-            }`} />
-            <span className={`relative inline-flex rounded-full h-3.5 w-3.5 border border-black ${
-              selectedBooking.status === 'ARRIVED' ? 'bg-emerald-400' : 'bg-emerald-500'
-            }`} />
+      {/* Proximity headline */}
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
+            <span
+              className={`absolute inset-0 rounded-full ${
+                selectedBooking.status === 'ARRIVED' ? 'bg-success-600' : 'bg-brand-600'
+              } status-ping`}
+            />
+            <span
+              className={`relative inline-flex size-2.5 rounded-full ${
+                selectedBooking.status === 'ARRIVED' ? 'bg-success-600' : 'bg-brand-600'
+              }`}
+            />
           </span>
-          <div>
-            <p className="font-black text-base text-zinc-950">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold leading-snug tracking-tight text-slate-900">
               {selectedBooking.status === 'ARRIVED'
                 ? 'Driver sudah tiba di titik jemput!'
                 : distanceToPickup?.proximity === 'near'
@@ -313,7 +319,7 @@ function UserTrackingContent() {
                 ? 'Perjalanan sedang berlangsung'
                 : 'Driver sedang menuju titik jemput'}
             </p>
-            <p className="text-xs font-medium text-zinc-600">
+            <p className="mt-0.5 text-xs font-medium text-slate-500">
               {distanceToPickup
                 ? `Jarak ke penjemputan: ${distanceToPickup.text}`
                 : selectedBooking.etaSeconds
@@ -323,17 +329,21 @@ function UserTrackingContent() {
           </div>
         </div>
         {distanceToPickup && (
-          <span className="rounded-md border-2 border-black bg-amber-200 px-3 py-1 font-mono text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000] shrink-0">
+          <span className="shrink-0 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 font-mono text-xs font-semibold text-brand-700 tabular-nums">
             {distanceToPickup.text}
           </span>
         )}
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border-2 border-black bg-white p-3 text-xs shadow-[2px_2px_0px_0px_#000]">
-        <Icon name="route" className="mt-0.5 shrink-0 text-emerald-800" />
+      <div className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white p-3 text-xs">
+        <Icon name="route" className="mt-0.5 size-4 shrink-0 text-slate-400" />
         <div className="min-w-0 flex-1">
-          <p className="text-zinc-600 truncate"><span className="font-bold text-zinc-900">Jemput:</span> {selectedBooking.pickupLocation}</p>
-          <p className="mt-1 font-bold text-zinc-950 truncate"><span className="font-bold text-zinc-900">Tujuan:</span> {selectedBooking.destination}</p>
+          <p className="truncate font-medium text-slate-500">
+            <span className="font-semibold text-slate-700">Jemput:</span> {selectedBooking.pickupLocation}
+          </p>
+          <p className="mt-1 truncate font-semibold text-slate-900">
+            <span className="font-semibold text-slate-700">Tujuan:</span> {selectedBooking.destination}
+          </p>
         </div>
       </div>
 
@@ -344,31 +354,34 @@ function UserTrackingContent() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="page-intro">
+      <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="eyebrow mb-3">Closer to your next stop</span>
-          <h1 className="page-heading">Your journey, live.</h1>
-          <p className="text-xs font-semibold text-zinc-600 mt-0.5">
+          <p className="eyebrow">Closer to your next stop</p>
+          <h1 className="page-heading mt-2">Your journey, live.</h1>
+          <p className="mt-3 text-sm font-medium leading-relaxed text-slate-500">
             Keep your vehicle and driver in view.
           </p>
         </div>
 
         {/* Realtime WS status indicator */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="font-bold text-zinc-600">Location feed</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Location feed
+          </span>
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider ${
               connectionState === 'open'
-                ? 'bg-emerald-200 text-zinc-950'
-                : 'bg-zinc-200 text-zinc-800'
+                ? 'border-success-200 bg-success-50 text-success-700'
+                : 'border-slate-200 bg-slate-50 text-slate-500'
             }`}
           >
             <span
-              className={`w-2 h-2 rounded-full border border-black ${
-                connectionState === 'open' ? 'bg-emerald-500' : 'bg-zinc-400'
+              aria-hidden="true"
+              className={`size-1.5 rounded-full ${
+                connectionState === 'open' ? 'bg-success-600' : 'bg-slate-400'
               }`}
             />
-            {connectionState === 'open' ? 'CONNECTED' : 'POLLING'}
+            {connectionState === 'open' ? 'Connected' : 'Polling'}
           </span>
         </div>
       </div>
@@ -378,22 +391,26 @@ function UserTrackingContent() {
       {(isLoading || mergedVehicles.length === 0) && bookingSummary}
 
       {isLoading ? (
-        <div className="surface py-24 text-center text-zinc-500 text-sm" role="status">
+        <div className="surface py-20 text-center text-sm font-medium text-slate-500" role="status">
           <Spinner size="lg" className="mb-2" />
-          <p className="font-bold">Locating active vehicles...</p>
+          <p>Locating active vehicles...</p>
         </div>
       ) : mergedVehicles.length === 0 ? (
-        <div className="surface p-8 sm:p-12 text-center text-zinc-500 text-sm">
-          <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border-2 border-black bg-amber-200 text-zinc-950 shadow-[3px_3px_0px_0px_#000]"><Icon name="pin" className="size-6" /></span>
-          <p className="font-black text-lg text-zinc-950">No active vehicle trips reporting live GPS</p>
-          <p className="text-xs font-medium text-zinc-600 mt-1">
+        <div className="surface px-6 py-12 text-center sm:py-16">
+          <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400">
+            <Icon name="pin" className="size-6" />
+          </span>
+          <p className="text-base font-semibold tracking-tight text-slate-900">
+            No active vehicle trips reporting live GPS
+          </p>
+          <p className="mx-auto mt-1.5 max-w-sm text-xs font-medium leading-relaxed text-slate-500">
             Tracking is displayed once a driver starts a trip or an online driver shares telemetry.
           </p>
         </div>
       ) : (
         <div className="tracking-layout">
           {/* Main Map */}
-          <div className="bezel min-w-0">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
             <FleetMap
               vehicles={mergedVehicles}
               selectedVehicleId={selectedVehicleId}
@@ -404,12 +421,13 @@ function UserTrackingContent() {
           </div>
 
           {/* Vehicle & Driver Side Panel */}
-          <div className="surface tracking-panel p-5 sm:p-6 flex flex-col justify-between">
-            <div>
+          <div className="surface tracking-panel flex flex-col justify-between p-4 sm:p-5">
+            <div className="space-y-4">
               {bookingSummary}
-              <div className="border-b-2 border-black/10 pb-3 mb-3">
-                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                  Tracked Vehicles ({mergedVehicles.length})
+
+              <div className="border-b border-slate-100 pb-3">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Tracked vehicles ({mergedVehicles.length})
                 </span>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {mergedVehicles.map((v) => (
@@ -418,10 +436,10 @@ function UserTrackingContent() {
                       type="button"
                       onClick={() => setSelectedVehicleId(v.vehicleId)}
                       aria-pressed={v.vehicleId === selectedVehicleId}
-                      className={`min-h-11 px-4 py-2 text-xs rounded-xl font-mono font-bold border-2 border-black cursor-pointer transition ${
+                      className={`min-h-9 cursor-pointer rounded-lg border px-3 font-mono text-xs font-semibold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                         v.vehicleId === selectedVehicleId
-                          ? 'bg-emerald-400 text-zinc-950 shadow-[3px_3px_0px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
-                          : 'bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000]'
+                          ? 'border-brand-200 bg-brand-50 text-brand-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
                       {v.plateNumber}
@@ -431,30 +449,32 @@ function UserTrackingContent() {
               </div>
 
               {selectedVehicle ? (
-                <div className="space-y-4 text-sm">
+                <div className="space-y-3 text-sm">
                   {/* Driver Profile Card */}
                   {selectedVehicle.driverName && (
-                    <div className="rounded-xl border-2 border-black bg-emerald-100 p-4 space-y-3 shadow-[3px_3px_0px_0px_#000]">
+                    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-emerald-400 text-zinc-950 font-black text-base shadow-[2px_2px_0px_0px_#000]">
+                        <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 font-mono text-sm font-semibold tracking-wide text-white">
                           {selectedVehicle.driverName.slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-black text-zinc-950 truncate">{selectedVehicle.driverName}</span>
-                            <span className="rounded-md border-1.5 border-black bg-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase text-zinc-950 shadow-[1px_1px_0px_0px_#000] shrink-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-sm font-semibold tracking-tight text-slate-900">
+                              {selectedVehicle.driverName}
+                            </span>
+                            <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-brand-700">
                               Driver KCIC
                             </span>
                           </div>
-                          <p className="text-[11px] text-zinc-600 font-bold mt-0.5 flex items-center gap-1.5">
-                            <span className="size-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                          <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                            <span className="inline-block size-1.5 rounded-full bg-success-600" aria-hidden="true" />
                             <span>Kontak Terproteksi (In-App Saja)</span>
                           </p>
                         </div>
                       </div>
 
-                      {/* In-App Real-time Chat & Voice Call (Gojek Style) */}
-                      <div className="pt-2 border-t-2 border-black/10">
+                      {/* In-App Real-time Chat & Voice Call */}
+                      <div className="border-t border-slate-100 pt-3">
                         <TripCommunicationWidget
                           bookingId={selectedBooking?.id}
                           currentUserId={(session?.user as any)?.id || 'passenger-user'}
@@ -470,67 +490,68 @@ function UserTrackingContent() {
                   )}
 
                   {/* Vehicle Information */}
-                  <div className="rounded-xl border-2 border-black bg-zinc-50 p-4 space-y-3 shadow-[3px_3px_0px_0px_#000]">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-block px-3 py-1 bg-zinc-950 text-white font-mono font-black tracking-wider rounded-md border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000]">
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-block rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-sm font-semibold tracking-wide text-slate-900 tabular-nums">
                         {selectedVehicle.plateNumber}
                       </span>
                       <StatusBadge status={selectedVehicle.status} />
                     </div>
                     {selectedVehicle.brand && (
-                      <p className="text-xs text-zinc-700 font-bold">
+                      <p className="text-xs font-medium text-slate-500">
                         {selectedVehicle.brand} {selectedVehicle.model}
                       </p>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/10 text-xs">
+                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs">
                       <div>
-                        <span className="text-[10px] text-zinc-500 uppercase font-black">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                           Movement
                         </span>
-                        <div className="mt-0.5">
+                        <div className="mt-1">
                           <MovementBadge movement={selectedVehicle.movement} />
                         </div>
                       </div>
                       <div>
-                        <span className="text-[10px] text-zinc-500 uppercase font-black">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                           Accuracy
                         </span>
-                        <div className="mt-0.5">
+                        <div className="mt-1">
                           <GPSBadge accuracyM={selectedVehicle.accuracyM} />
                         </div>
                         {typeof selectedVehicle.accuracyM === 'number' && selectedVehicle.accuracyM > 100 && (
-                          <div className="mt-1 rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                            ⚠️ Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(selectedVehicle.accuracyM)} m)
+                          <div className="mt-1.5 flex items-start gap-1 rounded border border-warning-200 bg-warning-50 px-1.5 py-1 text-[10px] font-medium leading-snug text-warning-700">
+                            <Icon name="alert" className="mt-px size-3 shrink-0" />
+                            <span>Posisi estimasi seluler/Wi-Fi (radius &plusmn;{Math.round(selectedVehicle.accuracyM)} m)</span>
                           </div>
                         )}
                       </div>
                     </div>
 
                     {driverCurrentAddress && (
-                      <div className="pt-2 border-t-2 border-black/10 text-xs">
-                        <span className="text-[10px] text-zinc-500 uppercase font-black">
-                          Posisi Terkini Armada
+                      <div className="border-t border-slate-100 pt-3 text-xs">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                          Posisi terkini armada
                         </span>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-zinc-900 font-bold line-clamp-2">
-                          <Icon name="pin" className="size-3.5 shrink-0 text-emerald-700" />
-                          <span>{driverCurrentAddress}</span>
+                        <p className="mt-1 flex items-start gap-1.5 font-medium text-slate-700">
+                          <Icon name="pin" className="mt-px size-3.5 shrink-0 text-brand-600" />
+                          <span className="line-clamp-2">{driverCurrentAddress}</span>
                         </p>
                       </div>
                     )}
 
-                    <div className="pt-2 border-t-2 border-black/10 flex items-center justify-between text-xs">
-                      <span className="text-[10px] text-zinc-500 uppercase font-black">
-                        Last Update
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Last update
                       </span>
-                      <div className="text-zinc-800 font-mono font-bold text-[11px]">
+                      <div className="font-medium text-slate-500">
                         <RelativeTime date={selectedVehicle.recordedAt} />
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-zinc-400 italic">Pilih kendaraan untuk melihat detail posisi</p>
+                <p className="text-xs italic text-slate-400">Pilih kendaraan untuk melihat detail posisi</p>
               )}
             </div>
           </div>
@@ -544,7 +565,7 @@ export default function UserTrackingPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-20 text-center text-zinc-500 text-sm">
+        <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
           <p>Loading tracking map...</p>
         </div>

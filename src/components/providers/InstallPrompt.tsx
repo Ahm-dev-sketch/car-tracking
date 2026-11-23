@@ -212,34 +212,33 @@ export function InstallPrompt() {
 
   return (
     <aside
-      className="install-toast fixed inset-x-4 bottom-24 z-50 mx-auto max-w-md rounded-2xl border-[2.5px] border-black bg-white p-5 shadow-[6px_6px_0px_0px_#000] sm:bottom-8 sm:right-8 sm:left-auto"
+      className="install-toast overflow-hidden rounded-2xl border border-slate-200 bg-white"
       aria-label="Install KCIC Fleet application"
     >
-      <div className="flex flex-col gap-4">
+      {/* KCIC accent rule */}
+      <div className="h-0.5 w-full bg-brand-600" aria-hidden="true" />
+      <div className="flex flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-xl border-2 border-black bg-amber-300 shadow-[2px_2px_0px_0px_#000]">
-              <Icon name="download" className="size-5 text-black" />
+            <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700">
+              <Icon name="download" className="size-5" />
             </span>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="rounded border border-black bg-emerald-200 px-1.5 py-0.2 text-[9px] font-black uppercase text-black">
-                  App PWA
-                </span>
-                <span className="text-[10px] font-bold text-zinc-500">Fast Access</span>
-              </div>
-              <h2 className="mt-0.5 text-base font-black text-black">
-                Install KCIC Fleet
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Aplikasi PWA
+              </p>
+              <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-900">
+                Pasang KCIC Fleet
               </h2>
-              <p className="mt-1 text-xs font-semibold leading-relaxed text-zinc-600">
-                Akses cepat dari layar utama HP/laptop tanpa buka browser. Offline-ready & notifikasi realtime.
+              <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+                Akses cepat dari layar utama HP/laptop tanpa buka browser. Offline-ready &amp; notifikasi realtime.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleDismissLater}
-            className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border-1.5 border-black bg-zinc-100 hover:bg-zinc-200"
+            className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             aria-label="Tutup saran install"
           >
             <Icon name="close" className="size-4" />
@@ -250,15 +249,15 @@ export function InstallPrompt() {
           <button
             type="button"
             onClick={handleInstallClick}
-            className="flex-1 inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_0px_#000] hover:bg-emerald-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
+            className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
             <span>Install Sekarang</span>
-            <Icon name="arrowUp" className="size-4" />
+            <Icon name="download" className="size-4" />
           </button>
           <button
             type="button"
             onClick={handleDismissLater}
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border-2 border-black bg-zinc-100 px-4 py-2 text-sm font-black text-black shadow-[3px_3px_0px_0px_#000] hover:bg-zinc-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
             Nanti saja
           </button>
@@ -291,18 +290,19 @@ export function IosInstallHint() {
 
   return (
     <aside
-      className="flex items-start justify-between gap-3 rounded-2xl border-2 border-black bg-emerald-100 p-4 text-sm shadow-[3px_3px_0px_0px_#000]"
+      className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm"
       aria-label="Add KCIC Fleet to your home screen"
     >
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000]">
-          <Icon name="share" className="size-5" />
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700">
+          <Icon name="share" className="size-4" />
         </span>
         <div className="leading-relaxed">
-          <p className="font-black text-black">Pasang di Layar Utama iPhone/iPad</p>
-          <p className="mt-1 text-xs font-semibold text-emerald-950">
-            Di browser Safari, ketuk tombol <strong>Share</strong> (ikon kotak tanda panah ke atas), lalu pilih{' '}
-            <strong className="underline">Add to Home Screen (Tambah ke Layar Utama)</strong>.
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Tip instalasi iOS</p>
+          <p className="mt-1 text-sm font-semibold tracking-tight text-slate-900">Pasang di Layar Utama iPhone/iPad</p>
+          <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+            Di browser Safari, ketuk tombol <strong className="font-semibold text-slate-700">Share</strong> (ikon kotak tanda panah ke atas), lalu pilih{' '}
+            <strong className="font-semibold text-slate-700 underline decoration-brand-300 underline-offset-2">Add to Home Screen (Tambah ke Layar Utama)</strong>.
           </p>
         </div>
       </div>
@@ -316,7 +316,7 @@ export function IosInstallHint() {
             // ignore
           }
         }}
-        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg border-1.5 border-black bg-white hover:bg-zinc-100 shadow-[1px_1px_0px_0px_#000]"
+        className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
         aria-label="Dismiss iOS install tip"
       >
         <Icon name="close" className="size-4" />

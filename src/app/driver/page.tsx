@@ -133,17 +133,28 @@ function isOfflineError(error: unknown): boolean {
 
 function TripRoute({ pickup, destination }: { pickup: string; destination: string }) {
   return (
-    <div className="relative space-y-5 py-1 pl-8">
-      <span aria-hidden="true" className="absolute bottom-6 left-[7px] top-4 border-l-2 border-dashed border-zinc-950" />
+    <div className="relative space-y-4 py-1 pl-7">
+      <span
+        aria-hidden="true"
+        className="absolute bottom-2.5 left-[5px] top-3 border-l border-dashed border-slate-300"
+      />
       <div className="relative min-w-0">
-        <span aria-hidden="true" className="absolute -left-8 top-0.5 flex h-4 w-4 items-center justify-center rounded-sm border-2 border-black bg-white shadow-[1px_1px_0px_0px_#000]"><span className="h-1.5 w-1.5 bg-black" /></span>
-        <p className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Pickup</p>
-        <p className="mt-0.5 wrap-anywhere text-sm font-bold leading-snug text-zinc-800">{pickup}</p>
+        <span
+          aria-hidden="true"
+          className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-slate-300 ring-2 ring-white"
+        />
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Pickup</p>
+        <p className="mt-1 wrap-anywhere text-sm font-medium leading-snug text-slate-600">{pickup}</p>
       </div>
       <div className="relative min-w-0">
-        <span aria-hidden="true" className="absolute -left-8 top-0.5 flex h-4 w-4 items-center justify-center rounded-sm border-2 border-black bg-emerald-400 shadow-[1px_1px_0px_0px_#000]"><span className="h-1.5 w-1.5 bg-black" /></span>
-        <p className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Destination</p>
-        <p className="mt-0.5 wrap-anywhere text-base font-black leading-snug tracking-tight text-zinc-950">{destination}</p>
+        <span
+          aria-hidden="true"
+          className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-brand-600 ring-2 ring-white"
+        />
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Destination</p>
+        <p className="mt-1 wrap-anywhere text-base font-semibold leading-snug tracking-tight text-slate-900">
+          {destination}
+        </p>
       </div>
     </div>
   );
@@ -915,14 +926,16 @@ export default function DriverDashboardPage() {
   const stoppingPickup = Boolean(activeTrip?.booking && currentBookingStatus !== 'IN_PROGRESS');
 
   return (
-    <div className="min-w-0 space-y-6 text-zinc-900">
+    <div className="min-w-0 space-y-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-900 lg:space-y-4">
       <GreetingClock userName={session?.user?.name} roleLabel="Driver" />
 
-      <header className="page-intro">
+      <header className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow">KCIC Fleet / Driver workspace</p>
           <h1 className="page-heading mt-2">Your driving day.</h1>
-          <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-zinc-600">Your availability, assigned journeys, and live trip details, in one place.</p>
+          <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
+            Your availability, assigned journeys, and live trip details, in one place.
+          </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <button
@@ -931,133 +944,150 @@ export default function DriverDashboardPage() {
             onClick={handleToggleOnline}
             className={`${
               isOnline
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-black shadow-[3px_3px_0px_0px_#000]'
+                ? 'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900'
                 : 'button-primary'
-            } min-h-12 w-full disabled:cursor-not-allowed sm:w-auto font-black flex items-center justify-center gap-2 px-5 rounded-xl transition cursor-pointer`}
+            } min-h-12 w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto`}
           >
             {isTogglingOnline ? <Spinner size="sm" /> : <Icon name={isOnline ? 'check' : 'signal'} />}
             {isOnline ? 'Online (Go offline)' : 'Go online'}
           </button>
-          <p className="text-xs font-semibold leading-relaxed text-zinc-600">{activeTrip ? 'Finish your trip before changing availability.' : isOnline ? 'Location sharing is on.' : 'Share your location to receive offers.'}</p>
+          <p className="text-xs font-medium leading-relaxed text-slate-500">
+            {activeTrip
+              ? 'Finish your trip before changing availability.'
+              : isOnline
+              ? 'Location sharing is on.'
+              : 'Share your location to receive offers.'}
+          </p>
         </div>
       </header>
 
-      {/* Live tracking remains in the page flow, clear of the navigation dock. */}
+      {/* Live tracking strip — sits in page flow, clear of the navigation dock */}
       {activeTrip && (
-        <div
-          className={`driver-live-banner ${
-            isSignalLostOrStale
-              ? 'bg-amber-100 text-amber-950 border-amber-950!'
-              : 'bg-emerald-100 text-emerald-950 border-emerald-950!'
-          }`}
-        >
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-start sm:items-center gap-3">
-              <span className="relative flex h-4 w-4 shrink-0 mt-0.5 sm:mt-0">
+        <div className="driver-live-banner">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3 sm:items-center">
+              <span className="relative mt-0.5 flex size-2.5 shrink-0 sm:mt-0" aria-hidden="true">
                 <span
-                  className={`relative inline-flex rounded-full h-4 w-4 border-2 border-black ${
-                    isSignalLostOrStale ? 'bg-amber-400' : 'bg-emerald-500'
+                  className={`absolute inset-0 rounded-full ${
+                    isSignalLostOrStale ? 'bg-warning-600' : 'bg-success-600'
                   }`}
                 />
+                {!isSignalLostOrStale && (
+                  <span className="absolute inset-0 rounded-full bg-success-600 status-ping" />
+                )}
               </span>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-base font-black text-zinc-950">
+                  <span className="text-sm font-semibold tracking-tight text-slate-900">
                     {isSignalLostOrStale ? 'GPS signal interrupted' : 'Tracking active'}
                   </span>
                   <span
-                    className={`rounded-md border-2 border-black px-2.5 py-0.5 text-xs font-black shadow-[2px_2px_0px_0px_#000] ${
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                       isSignalLostOrStale
-                        ? 'bg-amber-300 text-zinc-950'
-                        : 'bg-emerald-300 text-zinc-950'
+                        ? 'border-warning-200 bg-warning-50 text-warning-700'
+                        : 'border-success-200 bg-success-50 text-success-700'
                     }`}
                   >
                     {isSignalLostOrStale ? 'Signal lost / paused' : 'Broadcasting live'}
                   </span>
                   {currentBookingStatus && (
-                    <span className="rounded-md border-2 border-black bg-white px-2.5 py-0.5 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000]">
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                       Status: {currentBookingStatus.replace(/_/g, ' ').toLowerCase()}
                     </span>
                   )}
                 </div>
                 {isSignalLostOrStale ? (
-                  <p className="mt-1 max-w-xl text-xs font-medium leading-relaxed text-amber-900">
+                  <p className="mt-1 max-w-xl text-xs font-medium leading-relaxed text-warning-700">
                     Location updates pause when this tab is backgrounded or screen locks — reopen to resume
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs font-medium leading-relaxed text-emerald-900">
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
                     Transmitting telemetry every {tripIntervalSec} seconds
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="driver-trip-actions flex-wrap border-t-2 border-black/10 pt-4 text-sm md:border-0 md:pt-0">
+            <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 md:border-0 md:pt-0">
               <div className="flex flex-wrap items-center gap-2">
                 <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-md border-2 border-black px-2.5 py-1 text-xs font-black shadow-[2px_2px_0px_0px_#000] capitalize ${
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize ${
                     signalStatus === 'green'
-                      ? 'bg-emerald-300 text-zinc-950'
+                      ? 'border-success-200 bg-success-50 text-success-700'
                       : signalStatus === 'amber'
-                      ? 'bg-amber-300 text-zinc-950'
-                      : 'bg-rose-300 text-zinc-950'
+                      ? 'border-warning-200 bg-warning-50 text-warning-700'
+                      : 'border-danger-200 bg-danger-50 text-danger-700'
                   }`}
                 >
                   <span
-                    className={`w-2 h-2 rounded-full border border-black ${
+                    aria-hidden="true"
+                    className={`size-1.5 rounded-full ${
                       signalStatus === 'green'
-                        ? 'bg-emerald-500'
+                        ? 'bg-success-600'
                         : signalStatus === 'amber'
-                        ? 'bg-amber-500'
-                        : 'bg-rose-500'
+                        ? 'bg-warning-600'
+                        : 'bg-danger-600'
                     }`}
                   />
                   {confidenceScore > 0 ? `${confidenceScore}% Akurat` : signalStatus}
                 </span>
 
-                <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-black bg-white px-2 py-0.5 text-[11px] font-bold text-zinc-900 shadow-[2px_2px_0px_0px_#000]">
-                  <Icon name={locationSource === 'wifi_cell_triangulation' ? 'wifi' : 'satellite'} className="size-3 text-zinc-700" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600">
+                  <Icon
+                    name={locationSource === 'wifi_cell_triangulation' ? 'wifi' : 'satellite'}
+                    className="size-3 text-slate-400"
+                  />
                   <span>{locationSource === 'wifi_cell_triangulation' ? 'Wi-Fi/Cell' : 'GPS Presisi'}</span>
                 </span>
 
                 {jumpyDiscardCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-black bg-teal-200 px-2 py-0.5 text-[11px] font-bold text-teal-950 shadow-[2px_2px_0px_0px_#000]" title="Titik jumpy akibat sinyal dipantulkan telah dibersihkan otomatis">
-                    <Icon name="shield" className="size-3 text-teal-900" />
-                    <span>{jumpyDiscardCount} jumpy difilter</span>
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border border-info-200 bg-info-50 px-2 py-1 text-[11px] font-medium text-info-700"
+                    title="Titik jumpy akibat sinyal dipantulkan telah dibersihkan otomatis"
+                  >
+                    <Icon name="shield" className="size-3" />
+                    <span className="tabular-nums">{jumpyDiscardCount} jumpy difilter</span>
                   </span>
                 )}
               </div>
 
-              <div className="rounded-md border-2 border-black bg-white px-3 py-1 shadow-[2px_2px_0px_0px_#000]">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Duration</span>
-                <span className="font-mono text-base font-black tabular-nums text-zinc-950">{elapsedDuration || '00:00:00'}</span>
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-1">
+                <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Duration
+                </span>
+                <span className="font-mono text-sm font-semibold tabular-nums text-slate-900">
+                  {elapsedDuration || '00:00:00'}
+                </span>
               </div>
 
-              <div className="rounded-md border-2 border-black bg-white px-3 py-1 shadow-[2px_2px_0px_0px_#000]">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Last update</span>
-                <span className="text-xs font-bold text-zinc-900">
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-1">
+                <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Last update
+                </span>
+                <span className="text-xs font-medium text-slate-600">
                   {lastUpdated ? <RelativeTime date={lastUpdated} /> : 'Waiting...'}
                 </span>
               </div>
 
-              {/* Arrival Action when DRIVER_EN_ROUTE */}
+              {/* Arrival action when DRIVER_EN_ROUTE */}
               {currentBookingStatus === 'DRIVER_EN_ROUTE' && (
                 <button
                   type="button"
                   onClick={handleArriveAtPickup}
                   disabled={isAdvancingTrip || isEndingTrip}
-                  className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-5 py-3 text-sm font-black text-zinc-950 shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000]"
+                  className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Icon name="check" /><span>Mark arrived</span>
+                  <Icon name="check" className="size-4" /><span>Mark arrived</span>
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={() => setShowEndConfirm(true)}
-                className="hidden min-h-12 cursor-pointer items-center justify-center rounded-xl border-2 border-black bg-rose-500 px-5 py-3 text-sm font-black text-white shadow-[3px_3px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] sm:inline-flex"
+                className="hidden min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-danger-200 bg-white px-5 text-sm font-semibold text-danger-700 transition-colors hover:border-danger-300 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:inline-flex"
               >
+                <Icon name="close" className="size-4" />
                 {stoppingPickup ? 'Stop pickup trip' : 'End trip'}
               </button>
             </div>
@@ -1065,23 +1095,28 @@ export default function DriverDashboardPage() {
         </div>
       )}
 
-      {/* Persistent Online Banner when NOT on active trip */}
+      {/* Persistent online banner when NOT on an active trip */}
       {!activeTrip && isOnline && (
-        <div className="flex flex-col gap-4 rounded-2xl border-2.5 border-black bg-emerald-100 p-5 shadow-[4px_4px_0px_0px_#000] sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3.5 w-3.5 shrink-0">
-              <span className="relative inline-flex rounded-full h-3.5 w-3.5 border border-black bg-emerald-500" />
+        <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-start gap-3">
+            <span className="relative mt-1.5 flex size-2.5 shrink-0" aria-hidden="true">
+              <span className="absolute inset-0 rounded-full bg-success-600" />
+              <span className="absolute inset-0 rounded-full bg-success-600 status-ping" />
             </span>
             <div>
-              <span className="block text-sm font-black text-emerald-950">
+              <span className="block text-sm font-semibold tracking-tight text-slate-900">
                 Online and sharing location
               </span>
               {activeSession?.vehicle && (
-                <p className="mt-0.5 text-xs font-bold text-emerald-900">
-                  Vehicle: <span className="font-mono font-black text-zinc-950">{activeSession.vehicle.plateNumber}</span> · {activeSession.vehicle.brand} {activeSession.vehicle.model}
+                <p className="mt-0.5 text-xs font-medium text-slate-500">
+                  Vehicle:{' '}
+                  <span className="font-mono font-semibold text-slate-800 tabular-nums">
+                    {activeSession.vehicle.plateNumber}
+                  </span>{' '}
+                  &middot; {activeSession.vehicle.brand} {activeSession.vehicle.model}
                 </p>
               )}
-              <p className="mt-1 text-xs font-medium leading-relaxed text-emerald-900">
+              <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
                 Eligible for auto-dispatch offers. Keep this browser tab open.
               </p>
             </div>
@@ -1107,45 +1142,56 @@ export default function DriverDashboardPage() {
       {actionError && (
         <ErrorBanner
           message={actionError}
-          className="rounded-2xl! p-4! [&_button]:min-h-11 [&_button]:min-w-11"
+          className="rounded-xl! p-4! [&_button]:min-h-11 [&_button]:min-w-11"
           onDismiss={() => setActionError(null)}
         />
       )}
       {geoError && (
         <ErrorBanner
           message={geoError}
-          className="rounded-2xl! p-4!"
+          className="rounded-xl! p-4!"
           onDismiss={() => clearGeoError()}
         />
       )}
       {telemetryWarning && (
         <ErrorBanner
           message={`GPS upload warning: ${telemetryWarning}`}
-          className="rounded-2xl! p-4!"
+          className="rounded-xl! p-4!"
           onDismiss={() => setTelemetryWarning(null)}
         />
       )}
-      {isStartingTrip && <p role="status" aria-live="polite" className="flex items-center gap-3 text-sm font-bold text-emerald-950"><Spinner size="sm" />{startLabel} Please allow location access when prompted.</p>}
+      {isStartingTrip && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-3 text-sm font-medium text-slate-600"
+        >
+          <Spinner size="sm" />
+          {startLabel} Please allow location access when prompted.
+        </p>
+      )}
 
-      {/* Permission Denied Banner with instructions */}
+      {/* Permission denied banner with instructions */}
       {permissionDenied && (
-        <div className="space-y-3 rounded-2xl border-2.5 border-black bg-amber-100 p-5 text-sm leading-relaxed text-zinc-950 shadow-[4px_4px_0px_0px_#000]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-black text-zinc-950">
-              <Icon name="pin" className="shrink-0 text-amber-700" /><span>Izin Lokasi (GPS) Wajib Diaktifkan</span>
+        <div className="space-y-3 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm leading-relaxed text-warning-700 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 font-semibold text-warning-700">
+              <Icon name="pin" className="size-4 shrink-0" />
+              <span>Izin Lokasi (GPS) Wajib Diaktifkan</span>
             </div>
             <button
               type="button"
               onClick={() => void getCurrentPosition().catch(() => {})}
-              className="px-3.5 py-1.5 text-xs font-black bg-amber-400 hover:bg-amber-500 text-zinc-950 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000]"
+              className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-warning-200 bg-white px-3.5 text-xs font-semibold text-warning-700 transition-colors hover:border-warning-600 hover:bg-warning-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
               Aktifkan Lokasi Sekarang
             </button>
           </div>
-          <p className="text-xs font-semibold text-zinc-800">
-            Browser Anda menolak atau belum memberikan akses GPS. Pengemudi wajib menyalakan lokasi agar dapat menerima penawaran trip dan menyiarkan armada.
+          <p className="text-xs font-medium text-warning-700/90">
+            Browser Anda menolak atau belum memberikan akses GPS. Pengemudi wajib menyalakan lokasi agar
+            dapat menerima penawaran trip dan menyiarkan armada.
           </p>
-          <ul className="list-disc list-inside text-zinc-800 space-y-1 text-xs font-medium">
+          <ul className="list-inside list-disc space-y-1 text-xs font-medium text-warning-700/90">
             <li>Klik ikon gembok / izin situs di address bar browser.</li>
             <li>Ubah opsi Lokasi (Location) menjadi &quot;Izinkan&quot; (Allow).</li>
             <li>Klik tombol &quot;Aktifkan Lokasi Sekarang&quot; di atas atau muat ulang halaman.</li>
@@ -1153,18 +1199,25 @@ export default function DriverDashboardPage() {
         </div>
       )}
 
-      {/* DISPATCH OFFERS PANEL (Realtime + Polling) */}
+      {/* DISPATCH OFFERS PANEL (realtime + polling) */}
       {offers.length > 0 && (
-        <div className="surface space-y-5 p-5 sm:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="section-title flex items-center gap-2 text-zinc-900">
-              <Icon name="bell" className="text-emerald-800" />
-              Incoming offers ({offers.length})
+        <section className="surface space-y-4 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="section-title flex items-center gap-2">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                <Icon name="bell" className="size-4" />
+              </span>
+              Incoming offers
+              <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-brand-700">
+                {offers.length}
+              </span>
             </h2>
-            <span className="text-xs font-bold text-zinc-600">Respond before the 1-minute timer expires</span>
+            <span className="text-[11px] font-medium text-slate-500">
+              Respond before the 1-minute timer expires
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             {offers.map((offer) => (
               <OfferCard
                 key={offer.id}
@@ -1175,24 +1228,33 @@ export default function DriverDashboardPage() {
               />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* MAIN VIEW: ACTIVE TRIP TELEMETRY */}
       {activeTrip ? (
-        <section className="surface space-y-6 p-5 sm:p-8" aria-label="Active trip">
-          <div className="flex flex-col justify-between gap-4 border-b-2 border-black/10 pb-6 sm:flex-row sm:items-start">
+        <section className="surface space-y-5 p-4 sm:p-6" aria-label="Active trip">
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start">
             <div className="min-w-0">
               <p className="eyebrow">Current journey</p>
-              <h2 className="mt-2 wrap-anywhere text-2xl font-black tracking-tight sm:text-3xl text-zinc-950">{activeTrip.vehicle.brand} {activeTrip.vehicle.model}</h2>
-              <p className="mt-2 flex items-center gap-2 font-mono text-sm font-bold text-zinc-700"><Icon name="car" className="shrink-0 text-emerald-800" />{activeTrip.vehicle.plateNumber}</p>
+              <h2 className="mt-2 wrap-anywhere text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                {activeTrip.vehicle.brand} {activeTrip.vehicle.model}
+              </h2>
+              <p className="mt-2 flex items-center gap-2 font-mono text-sm font-medium text-slate-600 tabular-nums">
+                <Icon name="car" className="size-4 shrink-0 text-slate-400" />
+                {activeTrip.vehicle.plateNumber}
+              </p>
             </div>
-            <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
+            <div className="flex shrink-0 flex-col items-start gap-2.5 sm:items-end">
               <StatusBadge status={activeTrip.status} />
               {activeTrip.booking && (
-                <div className="rounded-lg border-2 border-black bg-zinc-50 p-2.5 shadow-[2px_2px_0px_0px_#000] text-left sm:text-right">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Booking reference</span>
-                  <p className="mt-0.5 wrap-anywhere font-mono text-xs font-black text-zinc-900">{activeTrip.booking.bookingNumber}</p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-left sm:text-right">
+                  <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Booking reference
+                  </span>
+                  <p className="mt-0.5 wrap-anywhere font-mono text-xs font-semibold text-slate-800 tabular-nums">
+                    {activeTrip.booking.bookingNumber}
+                  </p>
                 </div>
               )}
             </div>
@@ -1200,30 +1262,32 @@ export default function DriverDashboardPage() {
 
           {activeTrip.booking ? (
             <div className="space-y-4">
-              {/* PASSENGER PROFILE & CONTACT CARD (Gojek-style for Driver) */}
-              <div className="rounded-xl border-2 border-black bg-emerald-50 p-4 space-y-3 shadow-[3px_3px_0px_0px_#000]">
+              {/* Passenger profile & contact */}
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-emerald-400 text-zinc-950 font-black text-base shadow-[2px_2px_0px_0px_#000]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 font-mono text-sm font-semibold tracking-wide text-white">
                       {(activeTrip.booking.user?.name || 'Penumpang').slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-black text-zinc-950 text-base">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h4 className="truncate text-sm font-semibold tracking-tight text-slate-900">
                           {activeTrip.booking.user?.name || 'Penumpang KCIC'}
                         </h4>
-                        <span className="rounded-md border-1.5 border-black bg-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase text-zinc-950 shadow-[1px_1px_0px_0px_#000]">
+                        <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
                           Penumpang
                         </span>
                       </div>
-                      <p className="text-xs font-semibold text-zinc-600 mt-0.5">
-                        {activeTrip.booking.passengerCount ? `${activeTrip.booking.passengerCount} Penumpang` : '1 Penumpang'}
+                      <p className="mt-0.5 text-xs font-medium text-slate-500">
+                        {activeTrip.booking.passengerCount
+                          ? `${activeTrip.booking.passengerCount} Penumpang`
+                          : '1 Penumpang'}
                       </p>
                     </div>
                   </div>
 
-                  {/* In-App Real-time Chat & Voice Call (Gojek Style) */}
-                  <div className="pt-2 border-t-2 border-black/10">
+                  {/* In-app realtime chat & voice call */}
+                  <div className="w-full border-t border-slate-100 pt-3 sm:w-auto sm:border-0 sm:pt-0">
                     <TripCommunicationWidget
                       bookingId={activeTrip.booking?.id}
                       tripId={activeTrip.id}
@@ -1242,11 +1306,11 @@ export default function DriverDashboardPage() {
               {/* Route details */}
               <TripRoute pickup={activeTrip.booking.pickupLocation} destination={activeTrip.booking.destination} />
 
-              {/* DRIVER LIVE NAVIGATION MAP */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-zinc-500">
-                    Navigasi & Posisi Langsung Armada
+              {/* Driver live navigation map */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Navigasi &amp; posisi langsung armada
                   </span>
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
@@ -1256,37 +1320,46 @@ export default function DriverDashboardPage() {
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-amber-200 px-3 py-1.5 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000] transition"
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                   >
                     <span>Buka Google Maps</span>
                     <Icon name="arrowUp" className="size-3.5" />
                   </a>
                 </div>
 
-                <div className="bezel overflow-hidden rounded-xl">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                   <FleetMap
                     vehicles={driverVehicleMarker}
                     selectedVehicleId={activeTrip.vehicle.id}
                     routePoints={driverRoutePoints}
                     zoom={15}
-                    className="h-[320px] sm:h-[380px] w-full"
+                    className="h-[320px] w-full sm:h-[380px]"
                   />
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-3 rounded-xl border-2 border-black bg-zinc-50 p-5 shadow-[3px_3px_0px_0px_#000]">
-              <Icon name="route" className="mt-0.5 shrink-0 text-emerald-800" />
-              <div><h3 className="text-base font-black text-zinc-950">Ad-hoc vehicle trip</h3><p className="mt-1 text-xs font-medium leading-relaxed text-zinc-600">This journey is not linked to a booking. Your live trip telemetry appears below.</p></div>
+            <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+              <Icon name="route" className="mt-0.5 size-4 shrink-0 text-slate-400" />
+              <div>
+                <h3 className="text-sm font-semibold tracking-tight text-slate-900">
+                  Ad-hoc vehicle trip
+                </h3>
+                <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+                  This journey is not linked to a booking. Your live trip telemetry appears below.
+                </p>
+              </div>
             </div>
           )}
 
-          {/* Workflow Stage Action Buttons for Driver */}
+          {/* Workflow stage action buttons */}
           {activeTrip.booking && (
-            <div className="flex flex-col justify-between gap-4 rounded-xl border-2 border-black bg-emerald-100 p-5 shadow-[3px_3px_0px_0px_#000] lg:flex-row lg:items-center">
+            <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:flex-row lg:items-center sm:p-5">
               <div>
-                <span className="block text-xs font-black uppercase tracking-wider text-emerald-900">Current trip stage</span>
-                <span className="mt-1 block text-base font-black leading-relaxed text-zinc-950">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Current trip stage
+                </span>
+                <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-900">
                   {currentBookingStatus === 'DRIVER_EN_ROUTE'
                     ? 'En route to pickup location'
                     : currentBookingStatus === 'ARRIVED'
@@ -1297,7 +1370,7 @@ export default function DriverDashboardPage() {
                 </span>
               </div>
 
-              <div className="driver-trip-actions shrink-0">
+              <div className="flex shrink-0 flex-wrap items-center gap-3">
                 {currentBookingStatus === 'DRIVER_EN_ROUTE' && (
                   <button
                     type="button"
@@ -1323,66 +1396,73 @@ export default function DriverDashboardPage() {
             </div>
           )}
 
-          {/* Warning banner when GPS is stale or signal lost */}
+          {/* GPS stale / signal lost warning */}
           {isSignalLostOrStale && (
-            <div className="flex items-start gap-3 rounded-xl border-2 border-black bg-amber-100 p-5 text-sm leading-relaxed text-zinc-950 shadow-[3px_3px_0px_0px_#000]">
-              <Icon name="signal" className="mt-0.5 shrink-0 text-amber-700" />
+            <div className="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm leading-relaxed text-warning-700 sm:p-5">
+              <Icon name="signal" className="mt-0.5 size-4 shrink-0" />
               <div>
-                <span className="block font-black text-amber-950">GPS signal paused</span>
-                <p className="mt-0.5 text-xs font-semibold text-amber-900 leading-relaxed">
+                <span className="block font-semibold">GPS signal paused</span>
+                <p className="mt-0.5 text-xs font-medium leading-relaxed text-warning-700/90">
                   Location updates pause when this tab is backgrounded or screen locks — reopen to resume.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Realtime Telemetry Grid */}
+          {/* Realtime telemetry grid */}
           <div>
-            <h3 className="section-title mb-4 text-zinc-950">
-              Live telemetry
-            </h3>
+            <h3 className="section-title mb-3">Live telemetry</h3>
 
-            <div className="grid grid-cols-1 gap-3 text-sm min-[380px]:grid-cols-2 lg:grid-cols-4">
-              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
-                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">Signal</span>
-                <div className="mt-1 flex items-center gap-2">
+            <div className="grid grid-cols-1 gap-2.5 text-sm min-[380px]:grid-cols-2 lg:grid-cols-4">
+              <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Signal
+                </span>
+                <div className="mt-1.5 flex items-center gap-2">
                   <span
-                    className={`w-3.5 h-3.5 rounded-full border border-black ${
+                    aria-hidden="true"
+                    className={`size-2 rounded-full ${
                       signalStatus === 'green'
-                        ? 'bg-emerald-400'
+                        ? 'bg-success-600'
                         : signalStatus === 'amber'
-                        ? 'bg-amber-400'
-                        : 'bg-rose-400'
+                        ? 'bg-warning-600'
+                        : 'bg-danger-600'
                     }`}
                   />
-                  <span className="font-black capitalize text-zinc-950">{signalStatus}</span>
+                  <span className="font-semibold capitalize text-slate-900">{signalStatus}</span>
                 </div>
               </div>
 
-              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
-                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">GPS accuracy</span>
-                <div className="mt-1">
+              <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  GPS accuracy
+                </span>
+                <div className="mt-1.5">
                   <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
                 </div>
               </div>
 
-              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
-                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">Movement</span>
-                <div className="mt-1">
+              <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Movement
+                </span>
+                <div className="mt-1.5">
                   <MovementBadge movement={movement} />
                 </div>
               </div>
 
-              <div className="min-w-0 rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000]">
-                <span className="block text-[11px] font-black uppercase tracking-wider text-zinc-500">Last update</span>
-                <div className="mt-2 text-sm font-bold text-zinc-900">
+              <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  Last update
+                </span>
+                <div className="mt-1.5 text-sm font-medium text-slate-600">
                   <RelativeTime date={lastUpdated} />
                 </div>
               </div>
             </div>
 
             {currentPosition && (
-              <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border-2 border-black bg-zinc-100 p-4 font-mono text-xs font-bold text-zinc-800 shadow-[2px_2px_0px_0px_#000] min-[380px]:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-2.5 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3.5 font-mono text-xs font-medium text-slate-600 tabular-nums min-[380px]:grid-cols-2 lg:grid-cols-4">
                 <span>Lat: {currentPosition.lat.toFixed(5)}</span>
                 <span>Lng: {currentPosition.lng.toFixed(5)}</span>
                 <span>
@@ -1401,73 +1481,94 @@ export default function DriverDashboardPage() {
             )}
           </div>
 
-          <div className="driver-trip-actions justify-end border-t-2 border-black/10 pt-6">
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
             <button
               type="button"
               onClick={() => setShowEndConfirm(true)}
-              className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-rose-500 px-6 py-3 text-sm font-black text-white shadow-[4px_4px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] sm:w-auto"
+              className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-danger-200 bg-white px-6 text-sm font-semibold text-danger-700 transition-colors hover:border-danger-300 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:w-auto"
             >
-              <Icon name="check" />{stoppingPickup ? 'Stop pickup trip' : 'Finish and end trip'}
+              <Icon name="close" className="size-4" />
+              {stoppingPickup ? 'Stop pickup trip' : 'Finish and end trip'}
             </button>
           </div>
         </section>
       ) : (
         /* NO ACTIVE TRIP: START TRIP INTERFACE */
-        <div className="space-y-6">
-          {/* Assigned Bookings Section */}
-          <section className="surface space-y-5 p-5 sm:p-7" aria-label="Assigned bookings">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="eyebrow">Your next pickup</p>
-                <h2 className="section-title mt-2 text-zinc-900">
-                  Assigned bookings <span className="ml-2 rounded-md border-2 border-black bg-emerald-200 px-2.5 py-0.5 text-xs font-black text-zinc-950 shadow-[1px_1px_0px_0px_#000]">{assignedBookings.length}</span>
-                </h2>
-                <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">Start an assigned trip to begin the drive to pickup.</p>
-              </div>
+        <div className="space-y-3.5 lg:space-y-4">
+          {/* Assigned bookings */}
+          <section className="surface space-y-4 p-4 sm:p-5" aria-label="Assigned bookings">
+            <div>
+              <p className="eyebrow">Your next pickup</p>
+              <h2 className="section-title mt-2 flex flex-wrap items-center gap-2">
+                Assigned bookings
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-slate-600">
+                  {assignedBookings.length}
+                </span>
+              </h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
+                Start an assigned trip to begin the drive to pickup.
+              </p>
             </div>
 
             {assignedBookings.length === 0 ? (
-              <div className="flex flex-col items-center rounded-2xl border-2 border-black bg-zinc-50 px-5 py-10 text-center shadow-[3px_3px_0px_0px_#000]">
+              <div className="flex flex-col items-center rounded-xl border border-slate-200 bg-slate-50/60 px-5 py-10 text-center">
                 {isLoading ? (
-                  <div role="status" className="flex items-center gap-3 text-sm font-bold text-zinc-700"><Spinner size="md" />Loading your assigned bookings...</div>
+                  <div
+                    role="status"
+                    className="flex items-center gap-3 text-sm font-medium text-slate-500"
+                  >
+                    <Spinner size="md" />Loading your assigned bookings...
+                  </div>
                 ) : (
                   <>
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-emerald-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]"><Icon name="route" /></div>
-                    <h3 className="text-base font-black text-zinc-900">Ready for your next assignment.</h3>
-                    <p className="mt-2 max-w-sm text-xs font-medium leading-relaxed text-zinc-600">No active bookings are assigned to you. Go online above to receive dispatch offers.</p>
+                    <div className="mb-4 flex size-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400">
+                      <Icon name="route" />
+                    </div>
+                    <h3 className="text-sm font-semibold tracking-tight text-slate-900">
+                      Ready for your next assignment.
+                    </h3>
+                    <p className="mt-2 max-w-sm text-xs font-medium leading-relaxed text-slate-500">
+                      No active bookings are assigned to you. Go online above to receive dispatch offers.
+                    </p>
                   </>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
                 {assignedBookings.map((b) => (
                   <div
                     key={b.id}
-                    className="flex min-w-0 flex-col justify-between gap-5 rounded-2xl border-2 border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000]"
+                    className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4"
                   >
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="wrap-anywhere font-mono text-xs font-bold text-zinc-800 bg-zinc-100 px-2 py-1 rounded border border-black">{b.bookingNumber}</span>
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="wrap-anywhere rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700 tabular-nums">
+                          {b.bookingNumber}
+                        </span>
                         <StatusBadge status={b.status} />
                       </div>
 
                       <TripRoute pickup={b.pickupLocation} destination={b.destination} />
 
-                      <div className="rounded-lg border border-black bg-zinc-50 p-2.5 text-xs font-semibold text-zinc-700">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-medium text-slate-600">
                         Departure:{' '}
-                        {new Date(b.departureAt).toLocaleDateString([], {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}{' '}
-                        • {b.passengerCount} passengers
+                        <span className="tabular-nums">
+                          {new Date(b.departureAt).toLocaleDateString([], {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>{' '}
+                        &middot; <span className="tabular-nums">{b.passengerCount}</span> passengers
                       </div>
 
                       {b.vehicle && (
-                        <div className="wrap-anywhere flex items-center gap-1.5 border-t-2 border-black/10 pt-3 text-sm font-bold text-zinc-800">
-                          <Icon name="car" className="size-4 shrink-0 text-zinc-700" />
-                          <span>{b.vehicle.plateNumber} ({b.vehicle.brand} {b.vehicle.model})</span>
+                        <div className="wrap-anywhere flex items-center gap-1.5 border-t border-slate-100 pt-3 text-sm font-medium text-slate-600">
+                          <Icon name="car" className="size-4 shrink-0 text-slate-400" />
+                          <span>
+                            {b.vehicle.plateNumber} ({b.vehicle.brand} {b.vehicle.model})
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1489,24 +1590,22 @@ export default function DriverDashboardPage() {
             )}
           </section>
 
-          {/* Ad-hoc Vehicle Trip Start & Pool Selection */}
-          <section id="vehicle-selection" className="surface space-y-5 p-5 sm:p-7" aria-label="Vehicle selection and trip start">
+          {/* Ad-hoc vehicle trip start & pool selection */}
+          <section id="vehicle-selection" className="surface space-y-4 p-4 sm:p-5" aria-label="Vehicle selection and trip start">
             <div>
-              <h2 className="section-title text-zinc-900">
-                Select vehicle from pool
-              </h2>
-              <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-600">
+              <h2 className="section-title">Select vehicle from pool</h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
                 Pick an available vehicle to go online for dispatches or start an ad-hoc trip immediately.
               </p>
             </div>
 
             <div className="max-w-md space-y-3">
-              {/* Hub Location Filter */}
-              <div className="rounded-xl border-2 border-black bg-zinc-50 p-3 shadow-[2px_2px_0px_0px_#000] space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
-                    <Icon name="pin" className="h-3.5 w-3.5 text-[#be123c]" />
-                    Filter Lokasi Hub:
+              {/* Hub location filter */}
+              <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <Icon name="pin" className="size-3.5 text-brand-600" />
+                    Filter lokasi hub
                   </span>
                   {selectedLocationId && (
                     <button
@@ -1515,9 +1614,9 @@ export default function DriverDashboardPage() {
                         setSelectedLocationId('');
                         void fetchPoolVehicles('');
                       }}
-                      className="text-[11px] font-black text-[#be123c] hover:underline cursor-pointer"
+                      className="cursor-pointer text-[11px] font-semibold text-brand-700 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                     >
-                      Reset Filter
+                      Reset filter
                     </button>
                   )}
                 </div>
@@ -1529,10 +1628,10 @@ export default function DriverDashboardPage() {
                       setSelectedLocationId('');
                       void fetchPoolVehicles('');
                     }}
-                    className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-black transition-all cursor-pointer ${
+                    className={`cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                       !selectedLocationId
-                        ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
-                        : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                        ? 'border-brand-200 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                     }`}
                   >
                     Semua Hub
@@ -1548,16 +1647,20 @@ export default function DriverDashboardPage() {
                           setSelectedLocationId(next);
                           void fetchPoolVehicles(next);
                         }}
-                        className={`rounded-lg border-2 border-black px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                        className={`cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                           isSelected
-                            ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
-                            : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
+                            ? 'border-brand-200 bg-brand-50 text-brand-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                         }`}
                       >
                         <span>{loc.name}</span>
-                        <span className={`ml-1 text-[10px] font-mono px-1 py-0.2 rounded border ${
-                          isSelected ? 'border-white/40 bg-white/20 text-white' : 'border-zinc-300 bg-zinc-100 text-zinc-600'
-                        }`}>
+                        <span
+                          className={`ml-1.5 rounded border px-1 font-mono text-[10px] tabular-nums ${
+                            isSelected
+                              ? 'border-brand-200 bg-white text-brand-700'
+                              : 'border-slate-200 bg-slate-50 text-slate-500'
+                          }`}
+                        >
                           {loc.code}
                         </span>
                       </button>
@@ -1567,8 +1670,13 @@ export default function DriverDashboardPage() {
               </div>
 
               <div>
-                <label htmlFor="vehicle-plate" className="mb-2 block text-xs font-black uppercase tracking-wider text-zinc-700">
-                  Search license plate {selectedLocationId && `(di ${locations.find((l) => l.id === selectedLocationId)?.name || 'hub'})`}
+                <label
+                  htmlFor="vehicle-plate"
+                  className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"
+                >
+                  Search license plate{' '}
+                  {selectedLocationId &&
+                    `(di ${locations.find((l) => l.id === selectedLocationId)?.name || 'hub'})`}
                 </label>
                 <input
                   id="vehicle-plate"
@@ -1577,23 +1685,23 @@ export default function DriverDashboardPage() {
                   value={manualPlate}
                   disabled={isStartingTrip || isTogglingOnline}
                   onChange={(e) => searchVehicle(e.target.value)}
-                  className="min-h-14 w-full rounded-xl border-2 border-black bg-white px-4 py-3 font-mono text-base font-bold text-zinc-950 shadow-[3px_3px_0px_0px_#000] outline-none placeholder:font-sans placeholder:font-normal placeholder:text-zinc-400 focus:shadow-[4px_4px_0px_0px_#be123c]"
+                  className="min-h-12 w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-mono text-base font-medium text-slate-900 outline-none transition placeholder:font-sans placeholder:text-sm placeholder:font-normal placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </div>
 
               {poolVehicles.length > 0 && !selectedVehicle && !manualPlate && (
-                <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-black uppercase tracking-wider text-zinc-500">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                       Available in pool ({poolVehicles.length})
                     </p>
                     {selectedLocationId && (
-                      <span className="text-[11px] font-bold text-zinc-600">
+                      <span className="text-[11px] font-medium text-slate-500">
                         Hub: {locations.find((l) => l.id === selectedLocationId)?.name}
                       </span>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {poolVehicles.map((v) => {
                       const hub = v.currentOperationalLocation || v.homeLocation;
                       return (
@@ -1607,18 +1715,21 @@ export default function DriverDashboardPage() {
                             setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
                             setMatchingVehicles([]);
                           }}
-                          className="flex flex-col items-start gap-1 rounded-xl border-2 border-black bg-white p-3 text-left shadow-[2px_2px_0px_0px_#000] transition hover:bg-rose-50 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0px_0px_#000] cursor-pointer"
+                          className="flex cursor-pointer flex-col items-start gap-1.5 rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:border-brand-200 hover:bg-brand-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                         >
-                          <div className="flex w-full items-center justify-between gap-1">
-                            <span className="font-mono text-sm font-black text-zinc-950">{v.plateNumber}</span>
+                          <div className="flex w-full flex-wrap items-center justify-between gap-1">
+                            <span className="font-mono text-sm font-semibold text-slate-900 tabular-nums">
+                              {v.plateNumber}
+                            </span>
                             {hub && (
-                              <span className="rounded border border-black/30 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-800">
+                              <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                                 {hub.name} ({hub.code})
                               </span>
                             )}
                           </div>
-                          <span className="text-xs font-medium text-zinc-600">
-                            {v.brand} {v.model} • {v.seatingCapacity} seats
+                          <span className="text-xs font-medium text-slate-500">
+                            {v.brand} {v.model} &middot;{' '}
+                            <span className="tabular-nums">{v.seatingCapacity}</span> seats
                           </span>
                         </button>
                       );
@@ -1628,9 +1739,10 @@ export default function DriverDashboardPage() {
               )}
 
               {poolVehicles.length === 0 && !selectedVehicle && !manualPlate && selectedLocationId && (
-                <div className="rounded-xl border-2 border-dashed border-zinc-300 p-4 text-center">
-                  <p className="text-xs font-bold text-zinc-600">
-                    Tidak ada armada AVAILABLE di hub {locations.find((l) => l.id === selectedLocationId)?.name || 'ini'}.
+                <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center">
+                  <p className="text-xs font-medium text-slate-500">
+                    Tidak ada armada AVAILABLE di hub{' '}
+                    {locations.find((l) => l.id === selectedLocationId)?.name || 'ini'}.
                   </p>
                   <button
                     type="button"
@@ -1638,7 +1750,7 @@ export default function DriverDashboardPage() {
                       setSelectedLocationId('');
                       void fetchPoolVehicles('');
                     }}
-                    className="mt-2 text-xs font-black text-[#be123c] underline cursor-pointer"
+                    className="mt-2 cursor-pointer text-xs font-semibold text-brand-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                   >
                     Tampilkan armada di semua hub
                   </button>
@@ -1646,7 +1758,7 @@ export default function DriverDashboardPage() {
               )}
 
               {matchingVehicles.length > 0 && !selectedVehicle && (
-                <div className="overflow-hidden rounded-xl border-2 border-black bg-white divide-y-2 divide-black shadow-[4px_4px_0px_0px_#000]">
+                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
                   {matchingVehicles.map((v) => {
                     const hub = v.currentOperationalLocation || v.homeLocation;
                     return (
@@ -1660,18 +1772,20 @@ export default function DriverDashboardPage() {
                           setManualPlate(`${v.plateNumber} (${v.brand} ${v.model})`);
                           setMatchingVehicles([]);
                         }}
-                        className="flex min-h-14 w-full cursor-pointer flex-wrap items-center justify-between gap-3 p-4 text-left text-sm hover:bg-zinc-50"
+                        className="flex min-h-14 w-full cursor-pointer flex-wrap items-center justify-between gap-3 p-3.5 text-left text-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-900"
                       >
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-black text-zinc-950">{v.plateNumber}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono font-semibold text-slate-900 tabular-nums">
+                              {v.plateNumber}
+                            </span>
                             {hub && (
-                              <span className="rounded border border-black/30 bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-zinc-800">
+                              <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                                 {hub.name} ({hub.code})
                               </span>
                             )}
                           </div>
-                          <span className="text-zinc-600 text-xs font-medium">
+                          <span className="text-xs font-medium text-slate-500">
                             {v.brand} {v.model}
                           </span>
                         </div>
@@ -1683,19 +1797,22 @@ export default function DriverDashboardPage() {
               )}
 
               {selectedVehicle && (
-                <div className="space-y-4 rounded-xl border-2 border-black bg-rose-50 p-5 text-sm shadow-[4px_4px_0px_0px_#000]">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-zinc-950 text-base">{selectedVehicle.plateNumber}</span>
+                <div className="space-y-3 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-base font-semibold text-slate-900 tabular-nums">
+                          {selectedVehicle.plateNumber}
+                        </span>
                         {(selectedVehicle.currentOperationalLocation || selectedVehicle.homeLocation) && (
-                          <span className="rounded border border-black bg-amber-200 px-1.5 py-0.5 text-[10px] font-black text-zinc-900 shadow-[1px_1px_0px_0px_#000]">
+                          <span className="rounded border border-brand-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
                             {(selectedVehicle.currentOperationalLocation || selectedVehicle.homeLocation)?.name}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs font-semibold text-zinc-700">
-                        {selectedVehicle.brand} {selectedVehicle.model} ({selectedVehicle.seatingCapacity} seats)
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        {selectedVehicle.brand} {selectedVehicle.model} (
+                        <span className="tabular-nums">{selectedVehicle.seatingCapacity}</span> seats)
                       </p>
                     </div>
                     <button
@@ -1707,12 +1824,12 @@ export default function DriverDashboardPage() {
                         setSelectedVehicle(null);
                         setManualPlate('');
                       }}
-                      className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border-2 border-black bg-white px-3 text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000]"
+                      className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Change
                     </button>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     {!isOnline && (
                       <button
                         type="button"
@@ -1735,8 +1852,12 @@ export default function DriverDashboardPage() {
                       <span>{isStartingTrip ? startLabel : `Start trip with ${selectedVehicle.plateNumber}`}</span>
                     </button>
                   </div>
-                  <p role="status" aria-live="polite" className="text-xs font-semibold leading-relaxed text-emerald-950">
-                    {startPhase === 'gps' ? 'Allow location access in the browser prompt. GPS can take up to 15 seconds.' : startPhase === 'request' ? 'Saving your trip. Please wait without closing this screen.' : 'GPS permission and HTTPS (or localhost) are required. Keep this screen open while driving.'}
+                  <p role="status" aria-live="polite" className="text-[11px] font-medium leading-relaxed text-slate-500">
+                    {startPhase === 'gps'
+                      ? 'Allow location access in the browser prompt. GPS can take up to 15 seconds.'
+                      : startPhase === 'request'
+                      ? 'Saving your trip. Please wait without closing this screen.'
+                      : 'GPS permission and HTTPS (or localhost) are required. Keep this screen open while driving.'}
                   </p>
                 </div>
               )}
@@ -1746,7 +1867,7 @@ export default function DriverDashboardPage() {
         </div>
       )}
 
-      {/* Confirmation Dialog to End Trip */}
+      {/* Confirmation dialog to end trip */}
       <ConfirmDialog
         isOpen={showEndConfirm}
         onClose={() => setShowEndConfirm(false)}
@@ -1758,7 +1879,7 @@ export default function DriverDashboardPage() {
         isLoading={isEndingTrip}
       />
 
-      {/* Trip Completed Summary Modal */}
+      {/* Trip completed summary modal */}
       {completedTripSummary && (
         <Modal
           isOpen={Boolean(completedTripSummary)}
@@ -1779,30 +1900,40 @@ export default function DriverDashboardPage() {
             </button>
           }
         >
-          <div className="space-y-5 text-sm">
+          <div className="space-y-4 text-sm">
             {completedTripSummary.pendingSync && (
-              <div className="rounded-xl border-2 border-black bg-amber-50 p-3.5 text-xs text-amber-950 shadow-[2px_2px_0px_0px_#000]">
-                <span className="font-black block mb-0.5">Trip selesai (Menunggu Sinkronisasi)</span>
-                <p className="text-[11px] font-medium text-amber-900">
+              <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-700">
+                <span className="mb-0.5 block font-semibold">Trip selesai (Menunggu Sinkronisasi)</span>
+                <p className="text-[11px] font-medium leading-relaxed text-warning-700/90">
                   Perjalanan selesai offline. Data akan dikirim otomatis saat koneksi kembali.
                 </p>
               </div>
             )}
-            <div className="rounded-xl border-2 border-black bg-emerald-100 p-4 leading-relaxed text-zinc-950 shadow-[3px_3px_0px_0px_#000]">
-              <span className="block font-black">{completedTripSummary.aborted ? 'Trip stopped, booking not completed' : 'Trip closed'}</span>
-              <p className="mt-1 text-xs font-medium text-emerald-950">{completedTripSummary.telemetryUploaded ? 'Trip and online session closed. Valid GPS updates received by the server are retained.' : 'Trip closed, but some final GPS updates could not be uploaded. Your earlier stored updates are retained.'}</p>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 leading-relaxed">
+              <span className="block font-semibold text-slate-900">
+                {completedTripSummary.aborted ? 'Trip stopped, booking not completed' : 'Trip closed'}
+              </span>
+              <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+                {completedTripSummary.telemetryUploaded
+                  ? 'Trip and online session closed. Valid GPS updates received by the server are retained.'
+                  : 'Trip closed, but some final GPS updates could not be uploaded. Your earlier stored updates are retained.'}
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div className="rounded-xl border-2 border-black bg-zinc-50 p-3 shadow-[2px_2px_0px_0px_#000]">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Duration</span>
-                <span className="font-black text-sm text-zinc-950">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Duration
+                </span>
+                <span className="font-mono text-sm font-semibold text-slate-900 tabular-nums">
                   {completedTripSummary.durationMinutes} minutes
                 </span>
               </div>
-              <div className="rounded-xl border-2 border-black bg-zinc-50 p-3 shadow-[2px_2px_0px_0px_#000]">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">Distance</span>
-                <span className="font-black text-sm text-zinc-950">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Distance
+                </span>
+                <span className="font-mono text-sm font-semibold text-slate-900 tabular-nums">
                   {completedTripSummary.distanceMeters
                     ? `${(completedTripSummary.distanceMeters / 1000).toFixed(2)} km`
                     : 'Tracked via GPS'}
@@ -1811,10 +1942,11 @@ export default function DriverDashboardPage() {
             </div>
 
             {!completedTripSummary.aborted && (
-              <div className="rounded-xl border-2 border-black bg-amber-50 p-3.5 text-xs text-amber-950 shadow-[2px_2px_0px_0px_#000]">
-                <span className="font-black block mb-0.5">Status: Menunggu Approval Nota Dinas</span>
-                <p className="text-[11px] font-medium text-amber-900">
-                  Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum diselesaikan resmi oleh admin KCIC.
+              <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-700">
+                <span className="mb-0.5 block font-semibold">Status: Menunggu Approval Nota Dinas</span>
+                <p className="text-[11px] font-medium leading-relaxed text-warning-700/90">
+                  Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum diselesaikan
+                  resmi oleh admin KCIC.
                 </p>
               </div>
             )}

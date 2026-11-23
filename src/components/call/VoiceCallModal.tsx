@@ -139,170 +139,191 @@ export function VoiceCallModal({
 
   if (callStatus === 'idle') return null;
 
+  const isMissedOrRejected =
+    errorMessage?.toLowerCase().includes('tidak ada jawaban') ||
+    errorMessage?.toLowerCase().includes('tak terjawab') ||
+    errorMessage?.toLowerCase().includes('ditolak');
+
+  /* Circular control recipe: shared by mute / speaker / hang-up */
+  const controlBase =
+    'flex size-12 cursor-pointer items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900';
+  const controlIdle = 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50';
+  const controlActive = 'border-slate-900 bg-slate-900 text-white';
+  const controlLabel = 'text-[11px] font-medium text-slate-500';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4 backdrop-blur-xs">
       {/* Hidden audio element for WebRTC audio playback */}
       <audio ref={audioRef} autoPlay playsInline muted={false} />
 
-      <div className="w-full max-w-sm rounded-2xl border-[3px] border-black bg-white p-6 text-center text-black shadow-[6px_6px_0px_0px_#000] animate-in fade-in zoom-in-95 duration-150">
-        {/* Caller Avatar / Animation */}
-        <div className="relative mx-auto mb-4 flex h-24 w-24 items-center justify-center">
-          {(callStatus === 'calling' || callStatus === 'ringing') && (
-            <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-30 animate-ping" />
-          )}
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-black bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]">
-            <span className="text-2xl font-black">
-              {partnerName.slice(0, 2).toUpperCase() || 'KC'}
-            </span>
-          </div>
-        </div>
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white text-center animate-in fade-in zoom-in-95 duration-150">
+        {/* Crimson state rule: the only brand colour on this surface */}
+        <div
+          aria-hidden="true"
+          className={`h-0.5 w-full ${
+            callStatus === 'ringing' ? 'bg-success-600' : 'bg-brand-600'
+          }`}
+        />
 
-        {/* Partner Name & Role */}
-        <h3 className="text-lg font-black text-zinc-950 truncate">{partnerName}</h3>
-        <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">
-          {partnerRole === 'DRIVER' ? 'Pengemudi Armada' : partnerRole === 'ADMIN' ? 'Dispatcher Admin' : 'Penumpang'}
-        </p>
-
-        {/* Call Status Label */}
-        <div className="mb-6">
-          {callStatus === 'calling' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
-              <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
-              Memanggil...
-            </span>
-          )}
-          {callStatus === 'ringing' && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300 animate-bounce">
-              <span className="size-2 rounded-full bg-emerald-500 animate-ping" />
-              Panggilan Masuk...
-            </span>
-          )}
-          {callStatus === 'connected' && (
-            <div className="space-y-1">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
-                <span className="size-2 rounded-full bg-emerald-500" />
-                Tersambung
+        <div className="p-6">
+          {/* Caller monogram */}
+          <div className="relative mx-auto mb-4 flex size-24 items-center justify-center">
+            {(callStatus === 'calling' || callStatus === 'ringing') && (
+              <span
+                aria-hidden="true"
+                className={`absolute inset-0 rounded-full motion-safe:animate-ping ${
+                  callStatus === 'ringing' ? 'bg-success-100' : 'bg-slate-100'
+                }`}
+              />
+            )}
+            <div className="relative flex size-20 items-center justify-center rounded-full bg-slate-900 text-white">
+              <span className="font-mono text-xl font-semibold tracking-[0.08em]">
+                {partnerName.slice(0, 2).toUpperCase() || 'KC'}
               </span>
-              <p className="font-mono text-xs font-extrabold text-zinc-700">
-                {formatDuration(callDuration)}
-              </p>
+            </div>
+          </div>
+
+          {/* Partner Name & Role */}
+          <h3 className="truncate text-lg font-semibold tracking-tight text-slate-900">{partnerName}</h3>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            {partnerRole === 'DRIVER' ? 'Pengemudi Armada' : partnerRole === 'ADMIN' ? 'Dispatcher Admin' : 'Penumpang'}
+          </p>
+
+          {/* Call Status Label */}
+          <div className="mb-6 mt-4">
+            {callStatus === 'calling' && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                <span className="relative inline-flex size-1.5 shrink-0 rounded-full" aria-hidden="true">
+                  <span className="absolute inset-0 rounded-full bg-slate-400" />
+                  <span className="absolute inset-0 rounded-full bg-slate-400 status-ping" />
+                </span>
+                Memanggil...
+              </span>
+            )}
+            {callStatus === 'ringing' && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-3 py-1 text-xs font-medium text-success-700">
+                <span className="relative inline-flex size-1.5 shrink-0 rounded-full" aria-hidden="true">
+                  <span className="absolute inset-0 rounded-full bg-success-600" />
+                  <span className="absolute inset-0 rounded-full bg-success-600 status-ping" />
+                </span>
+                Panggilan Masuk...
+              </span>
+            )}
+            {callStatus === 'connected' && (
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-3 py-1 text-xs font-medium text-success-700">
+                  <span className="inline-flex size-1.5 shrink-0 rounded-full bg-success-600" aria-hidden="true" />
+                  Tersambung
+                </span>
+                <p className="font-mono text-base font-semibold tabular-nums text-slate-900">
+                  {formatDuration(callDuration)}
+                </p>
+              </div>
+            )}
+            {callStatus === 'ended' && (
+              <span
+                className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                  isMissedOrRejected
+                    ? 'border-danger-200 bg-danger-50 text-danger-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-600'
+                }`}
+              >
+                {isMissedOrRejected ? (
+                  <Icon name="phoneOff" className="size-3.5 shrink-0" />
+                ) : null}
+                <span className="truncate">{errorMessage || 'Panggilan Berakhir'}</span>
+              </span>
+            )}
+          </div>
+
+          {errorMessage && callStatus !== 'ended' && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2.5 text-left text-xs font-medium leading-relaxed text-danger-700">
+              <Icon name="alert" className="mt-px size-3.5 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
           )}
-          {callStatus === 'ended' && (
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border ${
-                errorMessage?.toLowerCase().includes('tidak ada jawaban') ||
-                errorMessage?.toLowerCase().includes('tak terjawab') ||
-                errorMessage?.toLowerCase().includes('ditolak')
-                  ? 'bg-rose-100 text-rose-900 border-rose-300'
-                  : 'bg-zinc-100 text-zinc-700 border-zinc-300'
-              }`}
-            >
-              {errorMessage?.toLowerCase().includes('tak terjawab') ||
-              errorMessage?.toLowerCase().includes('tidak ada jawaban') ? (
-                <Icon name="phoneOff" className="size-3.5 text-rose-600" />
-              ) : null}
-              {errorMessage || 'Panggilan Berakhir'}
-            </span>
-          )}
-        </div>
 
-        {errorMessage && callStatus !== 'ended' && (
-          <div className="mb-4 p-2.5 bg-rose-50 border border-rose-300 rounded-lg text-xs font-medium text-rose-800">
-            {errorMessage}
+          {/* Action Controls */}
+          <div className="flex items-center justify-center gap-6 border-t border-slate-100 pt-5">
+            {/* Ringing: Show Accept & Reject */}
+            {callStatus === 'ringing' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onReject}
+                  className="group flex min-h-11 cursor-pointer flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                >
+                  <span className="flex size-14 items-center justify-center rounded-full bg-danger-600 text-white transition-colors group-hover:bg-danger-700">
+                    <Icon name="phoneOff" className="size-6" />
+                  </span>
+                  <span className="text-[11px] font-semibold text-danger-700">Tolak</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAccept}
+                  className="group flex min-h-11 cursor-pointer flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                >
+                  <span className="relative flex size-14 items-center justify-center rounded-full bg-success-600 text-white transition-colors group-hover:bg-success-700">
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-full bg-success-600 opacity-25 motion-safe:animate-ping"
+                    />
+                    <Icon name="phone" className="relative size-6" />
+                  </span>
+                  <span className="text-[11px] font-semibold text-success-700">Terima</span>
+                </button>
+              </>
+            ) : (
+              /* Calling or Connected: Show Mute, Speaker, and Hang up */
+              <>
+                {callStatus === 'connected' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onToggleMute}
+                      className="group flex cursor-pointer flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                      title={isMuted ? 'Aktifkan Mikrofon' : 'Bisukan Mikrofon'}
+                    >
+                      <span className={`${controlBase} ${isMuted ? controlActive : controlIdle}`}>
+                        <Icon name={isMuted ? 'micOff' : 'mic'} className="size-5" />
+                      </span>
+                      <span className={controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={toggleSpeaker}
+                      className="group flex cursor-pointer flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                      title={
+                        isSinkIdSupported
+                          ? isSpeakerOn
+                            ? 'Matikan Loudspeaker'
+                            : 'Aktifkan Loudspeaker'
+                          : 'Output audio dikelola sistem perangkat'
+                      }
+                    >
+                      <span className={`${controlBase} ${isSpeakerOn ? controlActive : controlIdle}`}>
+                        <Icon name={isSpeakerOn ? 'speaker' : 'speakerOff'} className="size-5" />
+                      </span>
+                      <span className={controlLabel}>{isSpeakerOn ? 'Speaker On' : 'Speaker Off'}</span>
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={onEndCall}
+                  className="group flex cursor-pointer flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+                >
+                  <span className="flex size-12 items-center justify-center rounded-full border border-danger-200 bg-danger-50 text-danger-600 transition-colors group-hover:border-danger-600 group-hover:bg-danger-600 group-hover:text-white">
+                    <Icon name="phoneOff" className="size-5" />
+                  </span>
+                  <span className="text-[11px] font-semibold text-danger-700">Akhiri</span>
+                </button>
+              </>
+            )}
           </div>
-        )}
-
-        {/* Action Controls */}
-        <div className="flex items-center justify-center gap-4 pt-2 border-t border-zinc-100">
-          {/* Ringing: Show Accept & Reject */}
-          {callStatus === 'ringing' ? (
-            <>
-              <button
-                type="button"
-                onClick={onReject}
-                className="flex flex-col items-center gap-1.5 cursor-pointer group"
-              >
-                <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-black bg-rose-600 text-white shadow-[3px_3px_0px_0px_#000] group-hover:bg-rose-700 transition">
-                  <Icon name="phoneOff" className="size-6" />
-                </span>
-                <span className="text-[11px] font-black text-rose-700">Tolak</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleAccept}
-                className="flex flex-col items-center gap-1.5 cursor-pointer group"
-              >
-                <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-black bg-emerald-500 text-black shadow-[3px_3px_0px_0px_#000] group-hover:bg-emerald-400 transition animate-pulse">
-                  <Icon name="phone" className="size-6" />
-                </span>
-                <span className="text-[11px] font-black text-emerald-800">Terima</span>
-              </button>
-            </>
-          ) : (
-            /* Calling or Connected: Show Mute, Speaker, and Hang up */
-            <>
-              {callStatus === 'connected' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={onToggleMute}
-                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
-                    title={isMuted ? 'Aktifkan Mikrofon' : 'Bisukan Mikrofon'}
-                  >
-                    <span
-                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] transition ${
-                        isMuted ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                      }`}
-                    >
-                      <Icon name={isMuted ? 'micOff' : 'mic'} className="size-5" />
-                    </span>
-                    <span className="text-[11px] font-bold text-zinc-700">
-                      {isMuted ? 'Unmute' : 'Mute'}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={toggleSpeaker}
-                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
-                    title={
-                      isSinkIdSupported
-                        ? isSpeakerOn
-                          ? 'Matikan Loudspeaker'
-                          : 'Aktifkan Loudspeaker'
-                        : 'Output audio dikelola sistem perangkat'
-                    }
-                  >
-                    <span
-                      className={`flex h-12 w-12 items-center justify-center rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] transition ${
-                        isSpeakerOn
-                          ? 'bg-emerald-400 text-zinc-950 shadow-[3px_3px_0px_0px_#000]'
-                          : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                      }`}
-                    >
-                      <Icon name={isSpeakerOn ? 'speaker' : 'speakerOff'} className="size-5" />
-                    </span>
-                    <span className="text-[11px] font-bold text-zinc-700">
-                      {isSpeakerOn ? 'Speaker On' : 'Speaker Off'}
-                    </span>
-                  </button>
-                </>
-              )}
-
-              <button
-                type="button"
-                onClick={onEndCall}
-                className="flex flex-col items-center gap-1.5 cursor-pointer group"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-black bg-rose-600 text-white shadow-[2px_2px_0px_0px_#000] group-hover:bg-rose-700 transition">
-                  <Icon name="phoneOff" className="size-5" />
-                </span>
-                <span className="text-[11px] font-black text-rose-700">Akhiri</span>
-              </button>
-            </>
-          )}
         </div>
       </div>
     </div>

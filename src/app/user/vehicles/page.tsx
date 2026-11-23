@@ -182,13 +182,13 @@ function UserVehiclesContent() {
   }, [bookingVehicle]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="page-intro">
+      <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="eyebrow mb-3">A ride for your workday</span>
-          <h1 className="page-heading">Find your next ride.</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="eyebrow">A ride for your workday</p>
+          <h1 className="page-heading mt-2">Find your next ride.</h1>
+          <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
             Choose a vehicle. Make room for your next journey.
           </p>
         </div>
@@ -197,38 +197,41 @@ function UserVehiclesContent() {
           onClick={() => handleOpenBooking()}
           className="button-primary self-start"
         >
-          <Icon name="plus" className="size-4" /><span>New reservation</span>
+          <Icon name="plus" className="size-4" /><span>Reservasi baru</span>
         </button>
       </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
       {/* Filter and Search Bar */}
-      <div className="surface p-5 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
-        <form onSubmit={handleSearchSubmit} className="min-w-0 flex-1 flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Search vehicles..."
-                        aria-label="Search by plate number, brand or model"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
-          />
-          <button
-            type="submit"
-            className="button-secondary"
-          >
-            Search
+      <div className="surface flex flex-col items-stretch justify-between gap-3 p-3.5 xl:flex-row xl:items-center sm:p-4">
+        <form onSubmit={handleSearchSubmit} className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Icon
+              name="search"
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Search vehicles..."
+              aria-label="Search by plate number, brand or model"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
+            />
+          </div>
+          <button type="submit" className="button-secondary">
+            Cari
           </button>
         </form>
 
-        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-2 xl:flex xl:flex-wrap">
+        <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 xl:flex xl:flex-wrap">
           {/* Operational Location Filter */}
           <select
             aria-label="Filter by operational location"
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
             <option value="">All Locations</option>
             {locations.map((loc) => (
@@ -243,7 +246,7 @@ function UserVehiclesContent() {
             aria-label="Filter by seating capacity"
             value={seatsFilter}
             onChange={(e) => setSeatsFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
             <option value="">All Capacities</option>
             <option value="4">4+ Seats</option>
@@ -257,7 +260,7 @@ function UserVehiclesContent() {
             aria-label="Filter by availability"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-700 focus:outline-none focus:ring-1 focus:ring-zinc-800"
+            className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
             <option value="">All Statuses</option>
             <option value="AVAILABLE">Available</option>
@@ -270,118 +273,118 @@ function UserVehiclesContent() {
 
       {/* Grid of Vehicles */}
       {isLoading ? (
-        <div className="py-20 text-center text-zinc-500 text-sm">
+        <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
           <div>Loading fleet catalog...</div>
         </div>
       ) : vehicles.length === 0 ? (
-        <div className="surface p-8 sm:p-12 text-center text-zinc-500 text-sm">
+        <div className="surface px-6 py-14 text-center text-sm font-medium text-slate-500">
           No vehicles match the selected criteria.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
           {vehicles.map((v) => {
             const currentLoc = v.currentLocation || v.currentOperationalLocation;
             return (
-              <div
+              <article
                 key={v.id}
-                className="bezel flex flex-col justify-between"
+                className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors hover:border-slate-300"
               >
-                <div className="bezel-core overflow-hidden flex-1">
-                  {/* Image placeholder / thumbnail */}
-                  <div className="h-48 sm:h-44 bg-zinc-50 flex items-center justify-center relative overflow-hidden">
-                    {v.imageUrl ? (
-                      <img
-                        src={v.imageUrl}
-                        alt={`${v.brand} ${v.model}`}
-                        loading="lazy"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-zinc-400 flex flex-col items-center">
-                        <svg viewBox="0 0 200 88" className="mb-2 h-24 w-48 text-emerald-800" fill="none" aria-hidden="true">
-                          <ellipse cx="100" cy="73" rx="79" ry="5" fill="currentColor" opacity=".05" />
-                          <path d="m29 49 19-5 20-22h57l28 23 24 6 7 17H18l2-13 9-6Z" fill="#e5eee8" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                          <path d="m56 44 17-16h25v16H56Zm49-16h17l20 16h-37V28Z" fill="white" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
-                          <path d="M28 53h14m117 0h17M102 48v13m7-12h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                          <circle cx="52" cy="65" r="12" fill="#f4f7f5" stroke="currentColor" strokeWidth="1.2" /><circle cx="52" cy="65" r="5" stroke="currentColor" strokeWidth="1.2" />
-                          <circle cx="151" cy="65" r="12" fill="#f4f7f5" stroke="currentColor" strokeWidth="1.2" /><circle cx="151" cy="65" r="5" stroke="currentColor" strokeWidth="1.2" />
-                        </svg>
-                        <span className="text-[10px] uppercase font-mono mt-1">{v.vehicleType}</span>
-                      </div>
-                    )}
-                    <div className="absolute top-4 right-4">
-                      <StatusBadge status={v.status} />
+                {/* Thumbnail */}
+                <div className="relative flex h-44 items-center justify-center overflow-hidden border-b border-slate-100 bg-slate-50">
+                  {v.imageUrl ? (
+                    <img
+                      src={v.imageUrl}
+                      alt={`${v.brand} ${v.model}`}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center text-slate-300">
+                      <Icon name="car" className="size-10" />
+                      <span className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                        {v.vehicleType}
+                      </span>
                     </div>
-                  </div>
-
-                  <div className="p-5 space-y-3">
-                    <div className="flex items-start justify-between gap-1">
-                      <div>
-                        <h3 className="font-semibold text-xl tracking-tight text-zinc-900 leading-tight">
-                          {v.brand} {v.model}
-                        </h3>
-                        <div className="text-xs font-mono font-semibold text-zinc-600 mt-0.5">
-                          {v.plateNumber}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Operational Locations Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      {v.homeLocation && (
-                        <LocationBadge
-                          type="home"
-                          name={v.homeLocation.name}
-                          code={v.homeLocation.code}
-                        />
-                      )}
-                      {currentLoc && (
-                        <LocationBadge
-                          type="current"
-                          name={currentLoc.name}
-                          code={currentLoc.code}
-                        />
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-100 text-xs text-zinc-600">
-                      <div>
-                        <span className="text-zinc-400 block text-[10px] uppercase">Capacity</span>
-                        <span className="font-medium">{v.seatingCapacity} seats</span>
-                      </div>
-                      <div>
-                        <span className="text-zinc-400 block text-[10px] uppercase">Gearbox</span>
-                        <span className="font-medium">{v.transmission || 'Automatic'}</span>
-                      </div>
-                    </div>
-
-                    {v.currentDriver?.user && (
-                      <div className="pt-2 border-t border-zinc-100 text-[11px] text-zinc-500 truncate">
-                        Driver: <span className="font-medium text-zinc-800">{v.currentDriver.user.name}</span>
-                      </div>
-                    )}
+                  )}
+                  <div className="absolute right-3 top-3">
+                    <StatusBadge status={v.status} />
                   </div>
                 </div>
 
+                <div className="flex flex-1 flex-col gap-3 p-4">
+                  <div>
+                    <h3 className="text-lg font-semibold leading-tight tracking-tight text-slate-900">
+                      {v.brand} {v.model}
+                    </h3>
+                    <div className="mt-1 inline-block rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-slate-600 tabular-nums">
+                      {v.plateNumber}
+                    </div>
+                  </div>
+
+                  {/* Operational Locations Badges */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {v.homeLocation && (
+                      <LocationBadge
+                        type="home"
+                        name={v.homeLocation.name}
+                        code={v.homeLocation.code}
+                      />
+                    )}
+                    {currentLoc && (
+                      <LocationBadge
+                        type="current"
+                        name={currentLoc.name}
+                        code={currentLoc.code}
+                      />
+                    )}
+                  </div>
+
+                  <div className="mt-auto grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
+                    <div>
+                      <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Capacity
+                      </span>
+                      <span className="font-medium text-slate-700 tabular-nums">
+                        {v.seatingCapacity} seats
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        Gearbox
+                      </span>
+                      <span className="font-medium text-slate-700">
+                        {v.transmission || 'Automatic'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {v.currentDriver?.user && (
+                    <div className="truncate border-t border-slate-100 pt-3 text-[11px] font-medium text-slate-500">
+                      Driver:{' '}
+                      <span className="font-semibold text-slate-700">{v.currentDriver.user.name}</span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Action buttons */}
-                <div className="px-4 pb-4 pt-3 bg-white rounded-b-[1.625rem] flex items-center gap-2">
+                <div className="flex items-center gap-2 border-t border-slate-100 bg-white px-4 py-3">
                   <button
                     type="button"
                     onClick={() => setSelectedVehicle(v)}
                     className="button-secondary flex-1"
                   >
-                    Details
+                    Detail
                   </button>
                   <button
                     type="button"
                     onClick={() => handleOpenBooking(v)}
                     className="button-primary flex-1"
                   >
-                    Reserve
+                    Pesan
                   </button>
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
@@ -410,9 +413,9 @@ function UserVehiclesContent() {
                 setSelectedVehicle(null);
                 handleOpenBooking(target);
               }}
-              className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer"
+              className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
-              Reserve this Vehicle
+              Pesan kendaraan ini
             </button>
           ) : null
         }
@@ -423,19 +426,19 @@ function UserVehiclesContent() {
               <img
                 src={selectedVehicle.imageUrl}
                 alt={selectedVehicle.brand}
-                className="w-full h-48 object-cover rounded border border-zinc-200"
+                className="h-48 w-full rounded-xl border border-slate-200 object-cover"
               />
             )}
 
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-              <span className="text-xs font-semibold uppercase text-zinc-500">Status</span>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Status</span>
               <StatusBadge status={selectedVehicle.status} />
             </div>
 
             {/* Locations in Drawer */}
-            <div className="space-y-2 pb-3 border-b border-zinc-100 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-500 font-medium">Home Base:</span>
+            <div className="space-y-2 border-b border-slate-100 pb-3 text-xs">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-slate-500">Home Base:</span>
                 {selectedVehicle.homeLocation ? (
                   <LocationBadge
                     type="home"
@@ -443,11 +446,11 @@ function UserVehiclesContent() {
                     code={selectedVehicle.homeLocation.code}
                   />
                 ) : (
-                  <span className="text-zinc-400">Not assigned</span>
+                  <span className="text-slate-400">Not assigned</span>
                 )}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-500 font-medium">Current Location:</span>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-slate-500">Current Location:</span>
                 {(selectedVehicle.currentLocation || selectedVehicle.currentOperationalLocation) ? (
                   <LocationBadge
                     type="current"
@@ -455,42 +458,44 @@ function UserVehiclesContent() {
                     code={(selectedVehicle.currentLocation || selectedVehicle.currentOperationalLocation)?.code}
                   />
                 ) : (
-                  <span className="text-zinc-400">Not assigned</span>
+                  <span className="text-slate-400">Not assigned</span>
                 )}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pb-3 border-b border-zinc-100">
+            <div className="grid grid-cols-2 gap-4 border-b border-slate-100 pb-3">
               <div>
-                <span className="text-xs font-semibold uppercase text-zinc-500 block">Type</span>
-                <span className="font-medium text-zinc-800">{selectedVehicle.vehicleType}</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Type</span>
+                <span className="font-medium text-slate-800">{selectedVehicle.vehicleType}</span>
               </div>
               <div>
-                <span className="text-xs font-semibold uppercase text-zinc-500 block">Capacity</span>
-                <span className="font-medium text-zinc-800">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Capacity</span>
+                <span className="font-medium text-slate-800 tabular-nums">
                   {selectedVehicle.seatingCapacity} Passengers
                 </span>
               </div>
               <div>
-                <span className="text-xs font-semibold uppercase text-zinc-500 block">Transmission</span>
-                <span className="font-medium text-zinc-800">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Transmission</span>
+                <span className="font-medium text-slate-800">
                   {selectedVehicle.transmission || 'Automatic'}
                 </span>
               </div>
               <div>
-                <span className="text-xs font-semibold uppercase text-zinc-500 block">Plate</span>
-                <span className="font-mono font-medium text-zinc-800">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Plate</span>
+                <span className="font-mono font-medium tabular-nums text-slate-800">
                   {selectedVehicle.plateNumber}
                 </span>
               </div>
             </div>
 
             {selectedVehicle.currentDriver?.user && (
-              <div className="pt-2">
-                <span className="text-xs font-semibold uppercase text-zinc-500 block">Assigned Driver</span>
+              <div className="pt-1">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Assigned Driver
+                </span>
                 <div className="mt-1">
-                  <div className="font-medium text-zinc-800">{selectedVehicle.currentDriver.user.name}</div>
-                  <div className="text-xs text-zinc-500">{selectedVehicle.currentDriver.user.phone}</div>
+                  <div className="font-medium text-slate-800">{selectedVehicle.currentDriver.user.name}</div>
+                  <div className="text-xs tabular-nums text-slate-500">{selectedVehicle.currentDriver.user.phone}</div>
                 </div>
               </div>
             )}
@@ -521,7 +526,7 @@ export default function UserVehiclesPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-20 text-center text-zinc-500 text-sm">
+        <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
           <p>Loading fleet...</p>
         </div>

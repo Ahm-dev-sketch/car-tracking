@@ -14,88 +14,146 @@ export default function OpengraphImage() {
         style={{
           width: '100%',
           height: '100%',
-          background: '#faf9f5',
-          color: '#000',
+          background: '#F8FAFC',
           display: 'flex',
           flexDirection: 'column',
-          padding: 56,
+          padding: 72,
           position: 'relative',
           fontFamily: 'Geist, sans-serif',
+          color: '#0F172A',
         }}
       >
-        {/* thick black frame */}
+        {/* crimson speed-line accent across the top edge */}
         <div
           style={{
             position: 'absolute',
             top: 0,
             left: 0,
-            width: '100%',
-            height: '100%',
-            border: '12px solid #000',
-            boxSizing: 'border-box',
+            width: 168,
+            height: 4,
+            background: '#C8102E',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 168,
+            width: 56,
+            height: 4,
+            background: '#C8102E',
+            opacity: 0.35,
           }}
         />
 
-        {/* header */}
+        {/* brand row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div
               style={{
-                width: 32,
-                height: 32,
-                background: '#be123c',
-                border: '3px solid #000',
-                boxShadow: '5px 5px 0 0 #000',
+                width: 34,
+                height: 34,
+                background: '#C8102E',
+                borderRadius: 7,
+                display: 'flex',
               }}
             />
-            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -1 }}>KCIC FLEET</div>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: 4.5,
+                color: '#0F172A',
+              }}
+            >
+              KCIC FLEET
+            </div>
           </div>
           <div
             style={{
-              fontSize: 22,
-              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              fontSize: 17,
+              fontWeight: 600,
               letterSpacing: 3,
-              border: '3px solid #000',
-              background: '#fff',
-              padding: '8px 20px',
-              boxShadow: '6px 6px 0 0 #000',
+              color: '#64748B',
+              textTransform: 'uppercase',
             }}
           >
-            LIVE
+            <div
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 4,
+                background: '#C8102E',
+                display: 'flex',
+              }}
+            />
+            Live
           </div>
         </div>
 
-        {/* wordmark */}
+        {/* headline block */}
         <div
           style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            gap: 28,
+            gap: 30,
           }}
         >
-          <div style={{ fontSize: 128, fontWeight: 900, letterSpacing: -7, lineHeight: '120px' }}>
+          <div
+            style={{
+              fontSize: 112,
+              fontWeight: 800,
+              letterSpacing: -5.5,
+              lineHeight: '108px',
+              color: '#0F172A',
+            }}
+          >
             KCIC FLEET
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-            <div style={{ width: 88, height: 18, background: '#be123c', border: '3px solid #000' }} />
-            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: 6 }}>
-              WORKPLACE MOBILITY · LIVE TRACKING
+            <div style={{ width: 64, height: 3, background: '#C8102E', display: 'flex' }} />
+            <div
+              style={{
+                fontSize: 25,
+                fontWeight: 600,
+                letterSpacing: 5,
+                color: '#475569',
+                textTransform: 'uppercase',
+              }}
+            >
+              Workplace Mobility · Live Tracking
             </div>
           </div>
         </div>
 
+        {/* hairline divider */}
+        <div style={{ height: 1, background: '#E2E8F0', width: '100%', display: 'flex' }} />
+
         {/* footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <div style={{ fontSize: 26, color: '#3f3f46' }}>Vehicle tracking & driver dispatch</div>
-          <svg width="176" height="176" viewBox="0 0 176 176">
-            <circle cx="88" cy="88" r="80" fill="none" stroke="#000" strokeWidth="5" />
-            <circle cx="88" cy="88" r="46" fill="none" stroke="#000" strokeWidth="5" />
-            <line x1="8" y1="88" x2="168" y2="88" stroke="#000" strokeWidth="4" />
-            <line x1="88" y1="8" x2="88" y2="168" stroke="#000" strokeWidth="4" />
-            <line x1="88" y1="88" x2="146" y2="38" stroke="#be123c" strokeWidth="9" />
-            <circle cx="146" cy="38" r="13" fill="#be123c" stroke="#000" strokeWidth="4" />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: 34,
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 500, color: '#64748B' }}>
+            Vehicle tracking &amp; driver dispatch
+          </div>
+          <svg width="132" height="132" viewBox="0 0 176 176">
+            <circle cx="88" cy="88" r="80" fill="none" stroke="#CBD5E1" strokeWidth="1.5" />
+            <circle cx="88" cy="88" r="46" fill="none" stroke="#CBD5E1" strokeWidth="1.5" />
+            <line x1="8" y1="88" x2="168" y2="88" stroke="#CBD5E1" strokeWidth="1.5" />
+            <line x1="88" y1="8" x2="88" y2="168" stroke="#CBD5E1" strokeWidth="1.5" />
+            <line x1="88" y1="88" x2="146" y2="38" stroke="#C8102E" strokeWidth="2.5" />
+            <circle cx="146" cy="38" r="7" fill="#C8102E" />
           </svg>
         </div>
       </div>

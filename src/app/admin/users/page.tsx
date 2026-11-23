@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
 
 interface UserItem {
   id: string;
@@ -204,27 +205,27 @@ export default function AdminUsersPage() {
       header: 'User',
       cell: (u) => (
         <div>
-          <span className="font-semibold text-zinc-900">{u.name}</span>
-          <span className="text-zinc-500 block text-xs">{u.email}</span>
+          <span className="font-medium text-slate-900">{u.name}</span>
+          <span className="block text-xs text-slate-500">{u.email}</span>
         </div>
       ),
     },
     {
       header: 'Phone',
       accessorKey: 'phone',
-      cell: (u) => <span className="font-mono text-xs">{u.phone}</span>,
+      cell: (u) => <span className="font-mono text-xs tabular-nums text-slate-700">{u.phone}</span>,
     },
     {
       header: 'Role',
       cell: (u) => {
         const color =
           u.role.code === 'ADMIN'
-            ? 'bg-rose-50 text-rose-800 border-rose-200'
+            ? 'border-brand-200 bg-brand-50 text-brand-700'
             : u.role.code === 'DRIVER'
-            ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
-            : 'bg-zinc-100 text-zinc-800 border-zinc-200';
+            ? 'border-info-200 bg-info-100 text-info-700'
+            : 'border-slate-200 bg-white text-slate-600';
         return (
-          <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold border ${color}`}>
+          <span className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${color}`}>
             {u.role.code}
           </span>
         );
@@ -234,10 +235,10 @@ export default function AdminUsersPage() {
       header: 'Status',
       cell: (u) => (
         <span
-          className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${
+          className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${
             u.isActive
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              : 'bg-zinc-100 text-zinc-500 border-zinc-200'
+              ? 'border-success-200 bg-success-50 text-success-700'
+              : 'border-slate-200 bg-slate-100 text-slate-500'
           }`}
         >
           {u.isActive ? 'ACTIVE' : 'INACTIVE'}
@@ -247,7 +248,7 @@ export default function AdminUsersPage() {
     {
       header: 'Actions',
       cell: (u) => (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => {
@@ -255,7 +256,7 @@ export default function AdminUsersPage() {
               setNewPassword('');
               setResetError(null);
             }}
-            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+            className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
             Reset Password
           </button>
@@ -263,10 +264,10 @@ export default function AdminUsersPage() {
           <button
             type="button"
             onClick={() => setTogglingUser(u)}
-            className={`px-2.5 py-1 text-xs font-black rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] cursor-pointer ${
+            className={`cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
               u.isActive
-                ? 'text-rose-700 bg-rose-50 hover:bg-rose-100'
-                : 'text-emerald-950 bg-emerald-200 hover:bg-emerald-300'
+                ? 'border-danger-200 bg-white text-danger-700 hover:bg-danger-50'
+                : 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100'
             }`}
           >
             {u.isActive ? 'Deactivate' : 'Activate'}
@@ -276,35 +277,65 @@ export default function AdminUsersPage() {
     },
   ];
 
+  const activeCount = users.filter((u) => u.isActive).length;
+  const adminCount = users.filter((u) => u.role.code === 'ADMIN').length;
+  const driverCount = users.filter((u) => u.role.code === 'DRIVER').length;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
+      <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-zinc-950">User Management</h1>
-          <p className="text-xs font-medium text-zinc-600 mt-0.5">Control employee and system user accounts, roles, and credentials</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">User Management</h1>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">Control employee and system user accounts, roles, and credentials</p>
         </div>
         <button
           type="button"
           onClick={handleOpenCreate}
-          className="button-primary cursor-pointer inline-flex items-center gap-1.5"
+          className="button-primary inline-flex cursor-pointer items-center gap-1.5 self-start sm:self-auto"
         >
-          <span>+ Create User</span>
+          <Icon name="plus" className="size-4" />
+          <span>Create User</span>
         </button>
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total User</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Aktif</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{activeCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Admin</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{adminCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Driver</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{driverCount}</p>
+        </div>
       </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
       {/* Search */}
-      <div className="surface p-4 flex items-center justify-between gap-3">
-        <form onSubmit={(e) => { e.preventDefault(); fetchUsers(1); }} className="w-full sm:w-80 flex gap-2">
-          <input
-            type="text"
-            placeholder="Search user name or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
-          />
-          <button type="submit" className="button-primary px-3 py-1.5 text-xs font-black">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <form onSubmit={(e) => { e.preventDefault(); fetchUsers(1); }} className="flex w-full gap-2 sm:w-96">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+              <Icon name="search" className="size-4 text-slate-400" />
+            </span>
+            <input
+              type="text"
+              placeholder="Search user name or email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+            />
+          </div>
+          <button type="submit" className="button-primary shrink-0 px-3 text-xs">
             Search
           </button>
         </form>
@@ -341,11 +372,10 @@ export default function AdminUsersPage() {
               placeholder="Jane Doe"
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
             />
           </FormField>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Email Address" required>
               <input
                 type="email"
@@ -353,7 +383,6 @@ export default function AdminUsersPage() {
                 placeholder="user@company.com"
                 value={formEmail}
                 onChange={(e) => setFormEmail(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
 
@@ -364,18 +393,17 @@ export default function AdminUsersPage() {
                 placeholder="081234567890"
                 value={formPhone}
                 onChange={(e) => setFormPhone(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="tabular-nums"
               />
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Assign Role" required>
               <select
                 required
                 value={formRoleId}
                 onChange={(e) => setFormRoleId(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
               >
                 {roles.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -392,24 +420,23 @@ export default function AdminUsersPage() {
                 minLength={8}
                 value={formPassword}
                 onChange={(e) => setFormPassword(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
           </div>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-3">
             <button
               type="button"
               disabled={isSubmittingCreate}
               onClick={() => setIsCreateOpen(false)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmittingCreate}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isSubmittingCreate && <Spinner size="sm" className="text-white" />}
               Create User
@@ -437,23 +464,22 @@ export default function AdminUsersPage() {
               placeholder="••••••••"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
             />
           </FormField>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-3">
             <button
               type="button"
               disabled={isSubmittingReset}
               onClick={() => setResettingUser(null)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmittingReset || newPassword.length < 8}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isSubmittingReset && <Spinner size="sm" className="text-white" />}
               Update Password

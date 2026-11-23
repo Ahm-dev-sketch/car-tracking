@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Icon } from '@/components/ui/Icon';
 
 interface OperationalLocation {
   id: string;
@@ -374,7 +375,7 @@ function AdminVehiclesContent() {
     {
       header: 'Plate Number',
       accessorKey: 'plateNumber',
-      cell: (v) => <span className="font-mono font-bold text-zinc-900">{v.plateNumber}</span>,
+      cell: (v) => <span className="font-mono font-semibold tabular-nums text-slate-900">{v.plateNumber}</span>,
     },
     {
       header: 'Vehicle',
@@ -384,15 +385,15 @@ function AdminVehiclesContent() {
             <img
               src={v.imageUrl}
               alt={`${v.brand} ${v.model}`}
-              className="w-10 h-8 object-cover rounded border border-zinc-200 shrink-0 bg-zinc-100"
+              className="h-8 w-10 shrink-0 rounded border border-slate-200 bg-slate-100 object-cover"
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
           )}
           <div>
-            <span className="font-semibold text-zinc-800">{v.brand} {v.model}</span>
-            <span className="text-zinc-500 block text-xs">{v.vehicleType} • {v.seatingCapacity} seats</span>
+            <span className="font-medium text-slate-900">{v.brand} {v.model}</span>
+            <span className="block text-xs text-slate-500">{v.vehicleType} • <span className="tabular-nums">{v.seatingCapacity}</span> seats</span>
           </div>
         </div>
       ),
@@ -416,7 +417,7 @@ function AdminVehiclesContent() {
             />
           )}
           {!v.homeLocation && !v.currentOperationalLocation && (
-            <span className="text-zinc-400 italic text-xs">—</span>
+            <span className="text-xs italic text-slate-400">—</span>
           )}
         </div>
       ),
@@ -426,11 +427,11 @@ function AdminVehiclesContent() {
       cell: (v) =>
         v.currentDriver ? (
           <div>
-            <span className="font-medium text-zinc-800">{v.currentDriver.user.name}</span>
-            <span className="text-[11px] text-zinc-500 block font-mono">{v.currentDriver.licenseNumber}</span>
+            <span className="font-medium text-slate-900">{v.currentDriver.user.name}</span>
+            <span className="block font-mono text-[11px] tabular-nums text-slate-500">{v.currentDriver.licenseNumber}</span>
           </div>
         ) : (
-          <span className="text-zinc-400 italic text-xs">Unassigned</span>
+          <span className="text-xs italic text-slate-400">Unassigned</span>
         ),
     },
     {
@@ -440,18 +441,18 @@ function AdminVehiclesContent() {
     {
       header: 'Actions',
       cell: (v) => (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => handleOpenAssign(v)}
-            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+            className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
             Assign
           </button>
           <button
             type="button"
             onClick={() => handleOpenEdit(v)}
-            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+            className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
             Edit
           </button>
@@ -459,7 +460,7 @@ function AdminVehiclesContent() {
             <button
               type="button"
               onClick={() => setDeactivatingVehicle(v)}
-              className="px-2.5 py-1 text-xs font-black text-rose-700 bg-rose-50 border-2 border-black rounded-lg hover:bg-rose-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+              className="cursor-pointer rounded-lg border border-danger-200 bg-white px-2.5 py-1 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
             >
               Deactivate
             </button>
@@ -469,46 +470,76 @@ function AdminVehiclesContent() {
     },
   ];
 
+  const availableCount = vehicles.filter((v) => v.status === 'AVAILABLE').length;
+  const inUseCount = vehicles.filter((v) => v.status === 'RESERVED' || v.status === 'IN_USE').length;
+  const maintenanceCount = vehicles.filter((v) => v.status === 'MAINTENANCE').length;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
+      <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Vehicle Inventory</h1>
-          <p className="text-xs font-medium text-zinc-600 mt-0.5">Manage fleet vehicles, specifications, and driver assignments</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Vehicle Inventory</h1>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">Manage fleet vehicles, specifications, and driver assignments</p>
         </div>
         <button
           type="button"
           onClick={handleOpenAdd}
-          className="button-primary cursor-pointer inline-flex items-center gap-1.5"
+          className="button-primary inline-flex cursor-pointer items-center gap-1.5 self-start sm:self-auto"
         >
-          <span>+ Add Vehicle</span>
+          <Icon name="plus" className="size-4" />
+          <span>Add Vehicle</span>
         </button>
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total Armada</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Tersedia</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{availableCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Digunakan</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{inUseCount}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Perawatan</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{maintenanceCount}</p>
+        </div>
       </div>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
       {/* Filter and Search */}
-      <div className="surface p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <form onSubmit={(e) => { e.preventDefault(); fetchVehicles(1); }} className="w-full sm:w-80 flex gap-2">
-          <input
-            type="text"
-            placeholder="Search plate, brand, model..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
-          />
-          <button type="submit" className="button-primary px-3 py-1.5 text-xs font-black">
+      <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row">
+        <form onSubmit={(e) => { e.preventDefault(); fetchVehicles(1); }} className="flex w-full gap-2 sm:w-96">
+          <div className="relative flex-1">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+              <Icon name="search" className="size-4 text-slate-400" />
+            </span>
+            <input
+              type="text"
+              placeholder="Search plate, brand, model..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+            />
+          </div>
+          <button type="submit" className="button-primary shrink-0 px-3 text-xs">
             Search
           </button>
         </form>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Hub</span>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="">All Hubs</option>
               {locations.map((loc) => (
@@ -520,11 +551,11 @@ function AdminVehiclesContent() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Status</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="">All Statuses</option>
               <option value="AVAILABLE">Available</option>
@@ -561,7 +592,7 @@ function AdminVehiclesContent() {
         {formError && <ErrorBanner message={formError} className="mb-4" onDismiss={() => setFormError(null)} />}
 
         <form onSubmit={handleFormSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Plate Number" required>
               <input
                 type="text"
@@ -569,7 +600,7 @@ function AdminVehiclesContent() {
                 placeholder="B 1234 ABC"
                 value={formPlate}
                 onChange={(e) => setFormPlate(e.target.value.toUpperCase())}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded font-mono uppercase focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="font-mono uppercase tabular-nums"
               />
             </FormField>
 
@@ -577,7 +608,6 @@ function AdminVehiclesContent() {
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
               >
                 <option value="SEDAN">SEDAN</option>
                 <option value="SUV">SUV</option>
@@ -588,7 +618,7 @@ function AdminVehiclesContent() {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Brand" required>
               <input
                 type="text"
@@ -596,7 +626,6 @@ function AdminVehiclesContent() {
                 placeholder="Toyota"
                 value={formBrand}
                 onChange={(e) => setFormBrand(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
 
@@ -607,18 +636,16 @@ function AdminVehiclesContent() {
                 placeholder="Innova Zenix"
                 value={formModel}
                 onChange={(e) => setFormModel(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Operational Hub" required>
               <select
                 value={formLocationId}
                 onChange={(e) => setFormLocationId(e.target.value)}
                 required
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800 font-medium"
               >
                 <option value="">-- Pilih Hub Operasional KCIC --</option>
                 {locations.map((loc) => (
@@ -633,7 +660,6 @@ function AdminVehiclesContent() {
               <select
                 value={formStatus}
                 onChange={(e) => setFormStatus(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
               >
                 <option value="AVAILABLE">AVAILABLE (Aktif di Pool)</option>
                 <option value="RESERVED">RESERVED</option>
@@ -644,7 +670,7 @@ function AdminVehiclesContent() {
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Seats" required>
               <input
                 type="number"
@@ -653,7 +679,7 @@ function AdminVehiclesContent() {
                 required
                 value={formSeats}
                 onChange={(e) => setFormSeats(parseInt(e.target.value) || 1)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="tabular-nums"
               />
             </FormField>
 
@@ -661,7 +687,6 @@ function AdminVehiclesContent() {
               <select
                 value={formTransmission}
                 onChange={(e) => setFormTransmission(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
               >
                 <option value="AUTOMATIC">AUTOMATIC</option>
                 <option value="MANUAL">MANUAL</option>
@@ -669,21 +694,22 @@ function AdminVehiclesContent() {
             </FormField>
           </div>
 
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-zinc-700">Vehicle Photo</label>
-              <span className="text-[11px] text-zinc-400">Max 5MB (JPG, PNG, WebP)</span>
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-medium text-slate-700">Vehicle Photo</label>
+              <span className="text-[11px] text-slate-400">Max 5MB (JPG, PNG, WebP)</span>
             </div>
 
             {uploadError && (
-              <div className="p-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-danger-200 bg-danger-50 p-2 text-xs text-danger-700">
                 <span>{uploadError}</span>
                 <button
                   type="button"
                   onClick={() => setUploadError(null)}
-                  className="text-rose-500 hover:text-rose-800 font-bold ml-2 cursor-pointer"
+                  className="cursor-pointer rounded p-0.5 text-danger-600 transition-colors hover:bg-danger-100"
+                  aria-label="Tutup pesan galat"
                 >
-                  ✕
+                  <Icon name="close" className="size-3.5" />
                 </button>
               </div>
             )}
@@ -697,25 +723,25 @@ function AdminVehiclesContent() {
             />
 
             {formImageUrl ? (
-              <div className="flex items-center gap-3 p-2.5 bg-zinc-50 border border-zinc-200 rounded">
-                <div className="w-16 h-12 bg-zinc-200 rounded overflow-hidden flex-shrink-0 border border-zinc-300">
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                <div className="h-12 w-16 flex-shrink-0 overflow-hidden rounded border border-slate-200 bg-slate-100">
                   <img
                     src={formImageUrl}
                     alt="Vehicle preview"
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="48" fill="%23d4d4d8" viewBox="0 0 24 24"><path fill="%2371717a" d="M5 7 7 3h10l2 4 2 3v8h-3v-2H6v2H3v-8l2-3Z"/></svg>';
                     }}
                   />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono text-zinc-600 truncate">{formImageUrl}</p>
-                  <div className="flex items-center gap-2 mt-1">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-xs text-slate-600">{formImageUrl}</p>
+                  <div className="mt-1 flex items-center gap-2">
                     <button
                       type="button"
                       disabled={isUploadingImage || formSubmitting}
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-2 py-0.5 text-[11px] font-medium border border-zinc-300 bg-white hover:bg-zinc-100 rounded text-zinc-700 cursor-pointer"
+                      className="cursor-pointer rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                     >
                       {isUploadingImage ? 'Uploading...' : 'Change Photo'}
                     </button>
@@ -723,7 +749,7 @@ function AdminVehiclesContent() {
                       type="button"
                       disabled={isUploadingImage || formSubmitting}
                       onClick={() => setFormImageUrl('')}
-                      className="px-2 py-0.5 text-[11px] font-medium border border-rose-200 bg-rose-50 hover:bg-rose-100 rounded text-rose-700 cursor-pointer"
+                      className="cursor-pointer rounded border border-danger-200 bg-white px-2 py-0.5 text-[11px] font-medium text-danger-700 transition-colors hover:bg-danger-50 disabled:opacity-50"
                     >
                       Remove
                     </button>
@@ -735,7 +761,7 @@ function AdminVehiclesContent() {
                 type="button"
                 disabled={isUploadingImage || formSubmitting}
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full px-3 py-3 border-2 border-dashed border-zinc-300 hover:border-zinc-500 rounded bg-zinc-50 hover:bg-zinc-100/80 text-xs text-zinc-700 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-3 text-xs text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50/40 disabled:opacity-50"
               >
                 {isUploadingImage ? (
                   <>
@@ -744,9 +770,7 @@ function AdminVehiclesContent() {
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
+                    <Icon name="download" className="size-4 text-slate-500" />
                     <span className="font-medium">Upload Vehicle Photo (Max 5MB)</span>
                   </>
                 )}
@@ -759,24 +783,24 @@ function AdminVehiclesContent() {
                 placeholder="Or paste image URL (https://... or /uploads/...)"
                 value={formImageUrl}
                 onChange={(e) => setFormImageUrl(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
               />
             </div>
           </div>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-3">
             <button
               type="button"
               disabled={formSubmitting}
               onClick={() => setIsModalOpen(false)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={formSubmitting}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {formSubmitting && <Spinner size="sm" className="text-white" />}
               {editingVehicle ? 'Update Vehicle' : 'Create Vehicle'}
@@ -813,7 +837,6 @@ function AdminVehiclesContent() {
               required
               value={selectedDriverId}
               onChange={(e) => setSelectedDriverId(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
             >
               <option value="">-- Choose Driver --</option>
               {availableDrivers.map((d) => (
@@ -824,19 +847,19 @@ function AdminVehiclesContent() {
             </select>
           </FormField>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-3">
             <button
               type="button"
               disabled={isAssigning}
               onClick={() => setAssigningVehicle(null)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isAssigning || !selectedDriverId}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isAssigning && <Spinner size="sm" className="text-white" />}
               Assign Driver
@@ -852,7 +875,7 @@ export default function AdminVehiclesPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-24 text-center text-zinc-500 text-xs">
+        <div className="py-24 text-center text-xs text-slate-500">
           <Spinner size="md" className="mb-2" />
           <p>Loading vehicle inventory...</p>
         </div>

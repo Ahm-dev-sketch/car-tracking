@@ -51,6 +51,58 @@ interface FleetMapProps {
   routePoints?: RoutePoint[];
 }
 
+/* Flat 2.0 chrome for Leaflet UI. Leaflet renders popups/tooltips outside React,
+   so the shared look is injected once per document through a single style tag. */
+const MAP_CHROME_ID = 'kcic-flat-leaflet-chrome';
+const MAP_CHROME_CSS = `
+.leaflet-container { font-family: var(--font-geist-sans), system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.leaflet-popup-content-wrapper {
+  border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #fff;
+  box-shadow: 0 8px 28px rgba(15,23,42,0.14); padding: 0;
+}
+.leaflet-popup-content { margin: 0.75rem; line-height: 1.45; }
+.leaflet-popup-tip { border: 1px solid #e2e8f0; box-shadow: none; background: #fff; }
+.leaflet-popup-close-button {
+  top: 0.5rem !important; right: 0.5rem !important; width: 1.5rem !important; height: 1.5rem !important;
+  border-radius: 0.375rem; color: #94a3b8 !important; font-size: 1rem !important; line-height: 1.5rem !important;
+}
+.leaflet-popup-close-button:hover { background: #f1f5f9; color: #0f172a !important; }
+.leaflet-tooltip {
+  border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #334155;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.08); padding: 0.25rem 0.5rem;
+}
+.leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before, .leaflet-tooltip-right:before { display: none; }
+.leaflet-bar, .leaflet-bar a { border-color: #e2e8f0; }
+.leaflet-control-attribution { background: rgba(255,255,255,0.82); border-radius: 0.375rem 0 0 0; color: #94a3b8; }
+.leaflet-control-attribution a { color: #64748b; }
+/* Leaflet builds divIcon HTML outside React, so the marker pulse is defined here
+   instead of relying on a Tailwind class that may not be emitted for this tree.
+   Values mirror condition.ts pulseColor: bg-orange-400 / bg-slate-400 / bg-amber-400 */
+.vehicle-div-icon .pulse-dot {
+  animation: kcic-marker-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  background-color: currentColor;
+}
+.vehicle-div-icon .pulse-orange { color: #fb923c; }
+.vehicle-div-icon .pulse-slate { color: #94a3b8; }
+.vehicle-div-icon .pulse-amber { color: #fbbf24; }
+@keyframes kcic-marker-ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vehicle-div-icon .pulse-dot { animation: none; opacity: 0.35; }
+}
+`;
+
+function injectMapChrome() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(MAP_CHROME_ID)) return;
+  const style = document.createElement('style');
+  style.id = MAP_CHROME_ID;
+  style.textContent = MAP_CHROME_CSS;
+  document.head.appendChild(style);
+}
+
 function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
   const [lat, lng] = center;
@@ -88,24 +140,37 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
   const isMoving = movement?.toUpperCase() === 'MOVING';
   const isEstimated = typeof accuracyM === 'number' && accuracyM > 100;
 
+  // condition.ts owns the pulse colour (bg-orange-400 / bg-slate-400 / bg-amber-400).
+  // Map it to a self-defined class so the pulse never depends on Tailwind emitting it.
+  const pulseTone =
+    visual.pulseColor === 'bg-slate-400'
+      ? 'pulse-slate'
+      : visual.pulseColor === 'bg-amber-400'
+      ? 'pulse-amber'
+      : 'pulse-orange';
+
   const pulseHtml = (isMoving || isSelected)
-    ? `<span class="absolute -inset-1.5 rounded-full ${visual.pulseColor} opacity-75 animate-ping"></span>`
+    ? `<span class="pulse-dot ${pulseTone} absolute -inset-1.5 rounded-full opacity-60"></span>`
     : '';
 
-  const selectedBorder = isSelected
-    ? 'border-2 border-black ring-2 ring-white scale-110 shadow-lg'
-    : 'border-2 border-white shadow-md';
+  // Flat 2.0 chrome only: 1px ring, soft shadow. The fill colour stays owned by condition.ts.
+  const ring = isSelected
+    ? 'ring-2 ring-slate-900 scale-110'
+    : 'ring-1 ring-white';
+  const shadow = isSelected
+    ? 'shadow-[0_4px_12px_rgba(15,23,42,0.35)]'
+    : 'shadow-[0_1px_3px_rgba(15,23,42,0.3)]';
 
   const badgeHtml = isEstimated
-    ? `<span class="absolute -top-2 -right-3.5 px-1 py-0.2 bg-amber-300 text-amber-950 border border-black rounded text-[9px] font-black shadow-[1px_1px_0px_0px_#000] z-20 pointer-events-none whitespace-nowrap" title="Akurasi Estimasi: ±${Math.round(accuracyM)}m">±${Math.round(accuracyM)}m</span>`
+    ? `<span class="absolute -top-2 -right-3.5 z-20 whitespace-nowrap rounded-full border border-warning-200 bg-warning-50 px-1.5 py-px text-[9px] font-semibold tabular-nums text-warning-700 pointer-events-none" title="Akurasi Estimasi: ±${Math.round(accuracyM as number)}m">±${Math.round(accuracyM as number)}m</span>`
     : '';
 
   return L.divIcon({
     className: 'vehicle-div-icon',
     html: `
-      <div class="relative flex items-center justify-center w-8 h-8 rounded-full text-white cursor-pointer transition-transform ${selectedBorder}" style="background-color: ${visual.color};">
+      <div class="relative flex items-center justify-center w-8 h-8 rounded-full text-white cursor-pointer transition-transform ${ring} ${shadow}" style="background-color: ${visual.color};">
         ${pulseHtml}
-        <svg class="w-4 h-4 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-4 h-4 relative z-10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
           ${visual.iconSvg}
         </svg>
         ${badgeHtml}
@@ -119,13 +184,17 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
 
 function createPointIcon(type: 'pickup' | 'destination', label: string) {
   const isPickup = type === 'pickup';
-  const bg = isPickup ? '#047857' : '#e11d48';
+  // Pickup = slate structure, destination = KCIC crimson
+  const bg = isPickup ? '#0f172a' : '#c8102e';
+  const dot = isPickup
+    ? '<span class="inline-block h-1.5 w-1.5 rounded-full bg-white/90"></span>'
+    : '<span class="inline-block h-1.5 w-1.5 rotate-45 bg-white/90"></span>';
   return L.divIcon({
     className: 'route-point-div-icon',
     html: `
       <div class="relative flex items-center justify-center -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold shadow-lg border-2 border-white" style="background-color: ${bg};">
-          <span>${isPickup ? '●' : '■'}</span>
+        <div class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-white ring-1 ring-white shadow-[0_2px_6px_rgba(15,23,42,0.28)]" style="background-color: ${bg};">
+          ${dot}
           <span class="max-w-[120px] truncate">${label}</span>
         </div>
       </div>
@@ -134,6 +203,13 @@ function createPointIcon(type: 'pickup' | 'destination', label: string) {
     iconAnchor: [0, 0],
   });
 }
+
+/* Inline SVG glyphs for Leaflet tooltips. Raw HTML cannot render React icons,
+   so these mirror Icon's alert / check paths with a uniform 2px stroke. */
+const ICON_ALERT_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4m0 4h.01" /></svg>';
+const ICON_CHECK_SVG =
+  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>';
 
 export default function FleetMap({
   vehicles,
@@ -144,6 +220,10 @@ export default function FleetMap({
   className = 'h-[500px] w-full',
   routePoints,
 }: FleetMapProps) {
+  useEffect(() => {
+    injectMapChrome();
+  }, []);
+
   // Center on selected vehicle if explicitly chosen, otherwise use center prop (e.g. selected Hub)
   const targetVehicle = selectedVehicleId
     ? vehicles.find((v) => v.vehicleId === selectedVehicleId)
@@ -166,7 +246,7 @@ export default function FleetMap({
   const shouldFitBounds = fitPoints.length >= 2;
 
   return (
-    <div className={`relative rounded-[1.625rem] overflow-hidden isolate ${className}`}>
+    <div className={`relative overflow-hidden isolate ${className}`}>
       <MapContainer
         center={mapCenter}
         zoom={zoom}
@@ -188,7 +268,6 @@ export default function FleetMap({
           const icon = createVehicleIcon(v.status, v.movement, isSelected, v.accuracyM);
           const rawPhone = v.driverPhone ? v.driverPhone.replace(/\D/g, '') : '';
           const waUrl = rawPhone ? `https://wa.me/${rawPhone}` : null;
-          const isMoving = v.movement === 'MOVING';
 
           return (
             <React.Fragment key={v.vehicleId}>
@@ -198,19 +277,19 @@ export default function FleetMap({
                   center={[v.lat, v.lng]}
                   radius={Math.max(v.accuracyM, 5)}
                   pathOptions={{
-                    color: '#2563eb',
-                    fillColor: '#3b82f6',
+                    color: '#94a3b8',
+                    fillColor: '#cbd5e1',
                     fillOpacity: isSelected ? 0.22 : 0.16,
                     weight: isSelected ? 1.5 : 1,
                     opacity: 0.7,
                   }}
                 >
                   <Tooltip direction="center" permanent={false} opacity={0.92}>
-                    <span className="font-sans text-xs font-bold text-zinc-900">
+                    <span className="font-sans text-xs font-medium text-slate-700">
                       {v.accuracyM > 100
-                        ? `⚠️ Akurasi Estimasi: ±${Math.round(v.accuracyM)} m (Wi-Fi/Seluler)`
+                        ? `Akurasi Estimasi: ±${Math.round(v.accuracyM)} m (Wi-Fi/Seluler)`
                         : v.accuracyM < 20
-                        ? `✓ Akurasi Tinggi: ±${Math.round(v.accuracyM)} m (Satelit Lock)`
+                        ? `Akurasi Tinggi: ±${Math.round(v.accuracyM)} m (Satelit Lock)`
                         : `Akurasi: ±${Math.round(v.accuracyM)} m`}
                     </span>
                   </Tooltip>
@@ -229,20 +308,21 @@ export default function FleetMap({
               >
                 {v.accuracyM > 100 && (
                   <Tooltip direction="top" offset={[0, -20]} permanent opacity={0.95}>
-                    <span className="font-sans text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-600 px-1.5 py-0.5 rounded shadow-xs">
-                      ⚠️ Akurasi Estimasi: ±{Math.round(v.accuracyM)} m
+                    <span className="inline-flex items-center gap-1 font-sans text-[10px] font-semibold tabular-nums text-warning-700">
+                      <span className="inline-flex shrink-0 text-warning-600" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_ALERT_SVG }} />
+                      Akurasi Estimasi: ±{Math.round(v.accuracyM)} m
                     </span>
                   </Tooltip>
                 )}
                 <Popup className="custom-leaflet-popup">
-                  <div className="p-1 min-w-[210px] text-zinc-900 font-sans">
-                    <div className="flex items-center justify-between gap-2 border-b border-zinc-200 pb-2 mb-2">
-                      <span className="font-bold text-sm tracking-tight">{v.plateNumber}</span>
+                  <div className="min-w-[210px] font-sans text-slate-900">
+                    <div className="mb-2 flex items-start justify-between gap-2 border-b border-slate-200 pb-2 pr-5">
+                      <span className="font-mono text-sm font-semibold tracking-wide tabular-nums text-slate-900">{v.plateNumber}</span>
                       <StatusBadge status={v.status} />
                     </div>
 
                     {(v.homeLocation || v.currentOperationalLocation) && (
-                      <div className="flex flex-wrap items-center gap-1 pb-2 mb-2 border-b border-zinc-100">
+                      <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-slate-100 pb-2">
                         {v.homeLocation && (
                           <LocationBadge
                             type="home"
@@ -262,50 +342,59 @@ export default function FleetMap({
 
                     <div className="space-y-1.5 text-xs">
                       {v.brand && (
-                        <div className="text-zinc-600 font-semibold">
+                        <div className="font-medium text-slate-500">
                           {v.brand} {v.model}
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between gap-1 pt-1 border-t border-zinc-100">
-                        <span className="text-zinc-500 font-medium">Condition:</span>
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <span className="font-medium text-slate-500">Condition:</span>
                         <span
-                          className="font-bold text-[10px] px-2 py-0.5 rounded text-white tracking-wide"
-                          style={{ backgroundColor: visual.color }}
+                          className="rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white"
+                          style={{ backgroundColor: visual.color, borderColor: visual.color }}
                         >
                           {visual.badgeText}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-zinc-500">Movement:</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-500">Movement:</span>
                         <MovementBadge movement={v.movement} />
                       </div>
 
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-zinc-500">Accuracy:</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-500">Accuracy:</span>
                         <GPSBadge accuracyM={v.accuracyM} showDetails={true} />
                       </div>
                       {typeof v.accuracyM === 'number' && v.accuracyM > 100 && (
-                        <div className="rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                          ⚠️ Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(v.accuracyM)} m)
+                        <div className="flex items-start gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-1 text-[10px] font-medium text-warning-700">
+                          <span className="mt-px inline-flex shrink-0 text-warning-600" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_ALERT_SVG }} />
+                          <span>Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(v.accuracyM)} m)</span>
                         </div>
                       )}
                       {typeof v.accuracyM === 'number' && v.accuracyM < 20 && (
-                        <div className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-900">
-                          ✓ Akurasi tinggi (satelit GPS terkunci)
+                        <div className="flex items-start gap-1.5 rounded-md border border-success-200 bg-success-50 px-1.5 py-1 text-[10px] font-medium text-success-700">
+                          <span className="mt-px inline-flex shrink-0 text-success-600" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_CHECK_SVG }} />
+                          <span>Akurasi tinggi (satelit GPS terkunci)</span>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-zinc-500">Updated:</span>
+                      {typeof v.speedMps === 'number' && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-500">Speed:</span>
+                          <span className="font-mono text-[11px] font-semibold tabular-nums text-slate-700">{(v.speedMps * 3.6).toFixed(0)} km/h</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-500">Updated:</span>
                         <RelativeTime date={v.recordedAt} />
                       </div>
 
                       {v.driverName ? (
-                        <div className="pt-2 border-t border-zinc-100">
-                          <div className="text-zinc-500 text-[11px]">Assigned Driver:</div>
-                          <div className="font-semibold text-zinc-800">{v.driverName}</div>
+                        <div className="border-t border-slate-100 pt-2">
+                          <div className="text-[11px] text-slate-500">Assigned Driver:</div>
+                          <div className="font-semibold text-slate-800">{v.driverName}</div>
                           {v.driverPhone && v.driverPhone !== 'REDACTED' && (
                             <div className="mt-1">
                               {waUrl ? (
@@ -313,18 +402,18 @@ export default function FleetMap({
                                   href={waUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-emerald-700 font-medium hover:underline text-xs"
+                                  className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 hover:underline"
                                 >
                                   <span>WhatsApp: {v.driverPhone}</span>
                                 </a>
                               ) : (
-                                <span className="text-zinc-600">{v.driverPhone}</span>
+                                <span className="text-slate-600">{v.driverPhone}</span>
                               )}
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className="pt-2 border-t border-zinc-100 text-[11px] text-zinc-400 italic">
+                        <div className="border-t border-slate-100 pt-2 text-[11px] italic text-slate-400">
                           {v.status === 'MAINTENANCE'
                             ? 'Unit under workshop maintenance'
                             : v.status === 'INACTIVE'
@@ -334,7 +423,7 @@ export default function FleetMap({
                       )}
 
                       {(v.tripOrigin || v.tripDestination) && (
-                        <div className="pt-1.5 border-t border-zinc-100 text-[11px] text-zinc-600">
+                        <div className="space-y-0.5 border-t border-slate-100 pt-1.5 text-[11px] text-slate-600">
                           {v.tripOrigin && <div>From: {v.tripOrigin}</div>}
                           {v.tripDestination && <div>To: {v.tripDestination}</div>}
                         </div>

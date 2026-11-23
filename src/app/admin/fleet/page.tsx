@@ -293,28 +293,29 @@ function AdminFleetMapContent() {
   return (
     <div className="space-y-4">
       <div className="page-intro">
-        <div>
+        <div className="min-w-0">
           <span className="eyebrow mb-3">Every vehicle, in view</span>
           <h1 className="page-heading">
             {selectedLocation ? `Fleet Map: ${selectedLocation.name} (${selectedLocation.code})` : 'Follow your fleet.'}
           </h1>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">
             {selectedLocation
               ? `Operational hub map for ${selectedLocation.name}. Fleet units: ${mergedVehicles.length}, Moving: ${movingCount}`
               : `Realtime GPS map of entire corporate vehicle operations (${mergedVehicles.length} reporting, ${movingCount} moving)`}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
+            <label htmlFor="fleet-hub-filter" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Hub</label>
             <select
+              id="fleet-hub-filter"
               value={locationFilter}
               onChange={(e) => {
                 setLocationFilter(e.target.value);
                 syncUrlParams({ locationId: e.target.value, location_id: '' });
               }}
-              className="px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="">All Hubs (Seluruh Wilayah)</option>
               {locations.map((loc) => (
@@ -326,15 +327,16 @@ function AdminFleetMapContent() {
           </div>
 
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] font-medium tabular-nums ${
               connectionState === 'open'
-                ? 'bg-emerald-200 text-zinc-950'
-                : 'bg-zinc-200 text-zinc-800'
+                ? 'border-success-200 bg-success-50 text-success-700'
+                : 'border-slate-200 bg-slate-50 text-slate-500'
             }`}
           >
             <span
-              className={`w-2 h-2 rounded-full border border-black ${
-                connectionState === 'open' ? 'bg-emerald-500' : 'bg-zinc-400'
+              aria-hidden="true"
+              className={`size-1.5 rounded-full ${
+                connectionState === 'open' ? 'bg-success-600 status-ping' : 'bg-slate-400'
               }`}
             />
             {connectionState === 'open' ? 'LIVE SOCKET' : 'POLLING'}
@@ -343,46 +345,46 @@ function AdminFleetMapContent() {
       </div>
 
       {/* Radar Condition Status Bar */}
-      <div className="flex flex-wrap items-center gap-2 p-2 sm:p-2.5 bg-white border-2 border-black rounded-xl shadow-[2px_2px_0px_0px_#000] text-xs font-mono">
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-100 font-bold text-zinc-900 border border-zinc-300">
-          <span>FLEET:</span>
-          <span className="text-zinc-600">{conditionStats.total} UNITS</span>
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-2 text-xs sm:p-2.5">
+        <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Fleet</span>
+          <span className="font-mono tabular-nums">{conditionStats.total} UNITS</span>
         </div>
 
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-teal-50 border border-teal-300 text-teal-900 font-bold">
-          <span className="w-2.5 h-2.5 rounded-full bg-teal-600 border border-white shadow-sm inline-block"></span>
-          <span>AVAILABLE ({conditionStats.available})</span>
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-2.5 py-1 font-medium text-success-700">
+          <span className="size-1.5 rounded-full bg-success-600" aria-hidden="true" />
+          <span className="font-mono tabular-nums">AVAILABLE ({conditionStats.available})</span>
+        </span>
 
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-rose-50 border border-rose-300 text-rose-900 font-bold">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-600 border border-white shadow-sm inline-block animate-ping"></span>
-          <span>IN USE / MOVING ({conditionStats.inUse})</span>
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-danger-200 bg-danger-50 px-2.5 py-1 font-medium text-danger-700">
+          <span className="relative size-1.5 rounded-full bg-danger-600 status-ping" aria-hidden="true" />
+          <span className="font-mono tabular-nums">IN USE / MOVING ({conditionStats.inUse})</span>
+        </span>
 
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-50 border border-amber-300 text-amber-900 font-bold">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-white shadow-sm inline-block"></span>
-          <span>RESERVED ({conditionStats.reserved})</span>
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50 px-2.5 py-1 font-medium text-warning-700">
+          <span className="size-1.5 rounded-full bg-warning-600" aria-hidden="true" />
+          <span className="font-mono tabular-nums">RESERVED ({conditionStats.reserved})</span>
+        </span>
 
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-orange-50 border border-orange-300 text-orange-900 font-bold">
-          <span className="w-2.5 h-2.5 rounded-full bg-orange-600 border border-white shadow-sm inline-block"></span>
-          <span>MAINTENANCE ({conditionStats.maintenance})</span>
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-white px-2.5 py-1 font-medium text-warning-700">
+          <span className="size-1.5 rounded-full" style={{ backgroundColor: '#ea580c' }} aria-hidden="true" />
+          <span className="font-mono tabular-nums">MAINTENANCE ({conditionStats.maintenance})</span>
+        </span>
 
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-100 border border-slate-300 text-slate-800 font-bold">
-          <span className="w-2.5 h-2.5 rounded-full bg-slate-600 border border-white shadow-sm inline-block"></span>
-          <span>INACTIVE ({conditionStats.inactive})</span>
-        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-info-200 bg-info-50 px-2.5 py-1 font-medium text-info-700">
+          <span className="size-1.5 rounded-full bg-slate-400" aria-hidden="true" />
+          <span className="font-mono tabular-nums">INACTIVE ({conditionStats.inactive})</span>
+        </span>
       </div>
 
       {isLoading ? (
-        <div className="surface py-24 text-center text-zinc-500 text-sm" role="status">
+        <div className="flex flex-col items-center rounded-xl border border-slate-200 bg-white py-24 text-center text-sm text-slate-500" role="status">
           <Spinner size="lg" className="mb-2" />
-          <p>Acquiring fleet telemetry...</p>
+          <p className="font-medium">Acquiring fleet telemetry...</p>
         </div>
       ) : (
         <div className="tracking-layout">
-          <div className="bezel min-w-0">
+          <div className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
             <FleetMap
               vehicles={mergedVehicles}
               selectedVehicleId={selectedVehicleId}
@@ -394,19 +396,19 @@ function AdminFleetMapContent() {
           </div>
 
           {/* Telemetry and Driver Details Panel */}
-          <div className="surface tracking-panel p-5 sm:p-6 flex flex-col justify-between">
+          <div className="tracking-panel flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             {mergedVehicles.length === 0 ? (
-              <div className="py-12 text-center text-zinc-500 text-xs">
-                <p className="font-semibold text-zinc-700 text-sm">Tidak ada armada aktif di wilayah ini</p>
-                <p className="mt-1 text-zinc-400">Peta wilayah {selectedLocation?.name || 'operasional'} tetap aktif di atas.</p>
+              <div className="py-12 text-center text-xs text-slate-500">
+                <p className="text-sm font-semibold text-slate-700">Tidak ada armada aktif di wilayah ini</p>
+                <p className="mt-1 text-slate-400">Peta wilayah {selectedLocation?.name || 'operasional'} tetap aktif di atas.</p>
               </div>
             ) : (
               <div>
-                <div className="border-b-2 border-black/10 pb-3 mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                    Fleet Units ({mergedVehicles.length}) {selectedLocation ? `— ${selectedLocation.name}` : ''}
+                <div className="mb-3 border-b border-slate-200 pb-3">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Fleet Units <span className="font-mono tabular-nums">({mergedVehicles.length})</span> {selectedLocation ? `— ${selectedLocation.name}` : ''}
                   </span>
-                  <div className="mt-2 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+                  <div className="mt-2 flex max-h-48 flex-wrap gap-1.5 overflow-y-auto pr-1">
                     {mergedVehicles.map((v) => {
                       const visual = getVehicleConditionVisual(v.status, v.movement);
                       const isSelected = v.vehicleId === selectedVehicleId;
@@ -416,15 +418,16 @@ function AdminFleetMapContent() {
                           type="button"
                           onClick={() => setSelectedVehicleId(v.vehicleId)}
                           aria-pressed={isSelected}
-                          className={`min-h-9 px-2.5 py-1 text-xs rounded-lg font-mono font-bold border-2 border-black cursor-pointer transition flex items-center gap-1.5 ${
+                          className={`flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-xs font-medium tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                             isSelected
-                              ? 'bg-zinc-950 text-white shadow-[3px_3px_0px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
-                              : 'bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100'
+                              ? 'border-brand-200 bg-brand-50 text-brand-700'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                           }`}
                         >
                           <span
-                            className="w-2 h-2 rounded-full border border-black/30 shrink-0"
+                            className="size-1.5 shrink-0 rounded-full"
                             style={{ backgroundColor: visual.color }}
+                            aria-hidden="true"
                           />
                           <span>{v.plateNumber}</span>
                         </button>
@@ -434,21 +437,21 @@ function AdminFleetMapContent() {
                 </div>
 
               {selectedVehicle ? (
-                <div className="space-y-4 rounded-xl border-2 border-black bg-zinc-50 p-4 text-sm shadow-[3px_3px_0px_0px_#000]">
+                <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
                   <div>
-                    <div className="flex items-center justify-between">
-                      <span className="inline-block px-3 py-1 bg-zinc-950 text-white font-mono font-black tracking-wider rounded-md border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="inline-block rounded-md border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-sm font-semibold tracking-wide tabular-nums text-slate-900">
                         {selectedVehicle.plateNumber}
                       </span>
                       <StatusBadge status={selectedVehicle.status} />
                     </div>
                     {selectedVehicle.brand && (
-                      <p className="text-zinc-700 font-bold mt-1 text-xs">
+                      <p className="mt-1 text-xs font-medium text-slate-500">
                         {selectedVehicle.brand} {selectedVehicle.model}
                       </p>
                     )}
                     {(selectedVehicle.homeLocation || selectedVehicle.currentOperationalLocation) && (
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         {selectedVehicle.homeLocation && (
                           <LocationBadge
                             type="home"
@@ -467,16 +470,17 @@ function AdminFleetMapContent() {
                     )}
 
                     <div
-                      className="flex items-center justify-between p-2 rounded-lg border border-black/10 text-xs mt-2.5"
+                      className="mt-2.5 flex items-center justify-between rounded-md border p-2 text-xs"
                       style={{
-                        backgroundColor: `${getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).color}15`,
+                        backgroundColor: `${getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).color}0F`,
+                        borderColor: `${getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).color}33`,
                       }}
                     >
-                      <span className="text-zinc-700 font-black text-[10px] uppercase tracking-wider">
-                        Radar Condition:
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        Radar Condition
                       </span>
                       <span
-                        className="font-black text-xs uppercase tracking-wide"
+                        className="text-xs font-semibold uppercase tracking-wide"
                         style={{
                           color: getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).color,
                         }}
@@ -486,45 +490,46 @@ function AdminFleetMapContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/10 text-xs">
+                  <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs">
                     <div>
-                      <span className="text-[10px] text-zinc-500 uppercase font-black">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                         Movement
                       </span>
-                      <div className="mt-0.5">
+                      <div className="mt-1">
                         <MovementBadge movement={selectedVehicle.movement} />
                       </div>
                     </div>
                     <div>
-                      <span className="text-[10px] text-zinc-500 uppercase font-black">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                         Accuracy
                       </span>
-                      <div className="mt-0.5">
+                      <div className="mt-1">
                         <GPSBadge accuracyM={selectedVehicle.accuracyM} />
                       </div>
                       {typeof selectedVehicle.accuracyM === 'number' && selectedVehicle.accuracyM > 100 && (
-                        <div className="mt-1 rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                          ⚠️ Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(selectedVehicle.accuracyM)} m)
+                        <div className="mt-1 flex items-start gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-1 text-[10px] font-medium text-warning-700">
+                          <Icon name="alert" className="mt-px size-3 shrink-0 text-warning-600" />
+                          <span>Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(selectedVehicle.accuracyM)} m)</span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t-2 border-black/10 space-y-0.5 text-xs">
-                    <span className="text-[10px] text-zinc-500 uppercase font-black">
+                  <div className="space-y-0.5 border-t border-slate-100 pt-3 text-xs">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                       Telemetry Time
                     </span>
-                    <div className="text-zinc-800 font-mono font-bold text-[11px]">
+                    <div className="font-mono text-[11px] font-medium tabular-nums text-slate-700">
                       <RelativeTime date={selectedVehicle.recordedAt} />
                     </div>
                   </div>
 
                   {selectedVehicle.driverName && (
-                    <div className="pt-2 border-t-2 border-black/10 space-y-1.5 text-xs">
-                      <span className="text-[10px] text-zinc-500 uppercase font-black">
+                    <div className="space-y-1.5 border-t border-slate-100 pt-3 text-xs">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                         Operator
                       </span>
-                      <div className="font-black text-zinc-950">{selectedVehicle.driverName}</div>
+                      <div className="font-semibold text-slate-900">{selectedVehicle.driverName}</div>
                       {selectedVehicle.driverPhone && (
                         <div>
                           {waUrl ? (
@@ -532,13 +537,13 @@ function AdminFleetMapContent() {
                               href={waUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-emerald-300 px-2.5 py-1 text-xs font-bold text-zinc-950 shadow-[1px_1px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[2px_2px_0px_0px_#000]"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                             >
                               <Icon name="message" className="size-3.5 shrink-0" />
-                              <span>WhatsApp {selectedVehicle.driverPhone}</span>
+                              <span className="tabular-nums">WhatsApp {selectedVehicle.driverPhone}</span>
                             </a>
                           ) : (
-                            <span className="font-mono text-zinc-700 font-bold">{selectedVehicle.driverPhone}</span>
+                            <span className="font-mono font-medium tabular-nums text-slate-600">{selectedVehicle.driverPhone}</span>
                           )}
                         </div>
                       )}
@@ -546,22 +551,22 @@ function AdminFleetMapContent() {
                   )}
 
                   {(selectedVehicle.tripOrigin || selectedVehicle.tripDestination) && (
-                    <div className="pt-2 border-t-2 border-black/10 text-xs text-zinc-700 space-y-1">
+                    <div className="space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-600">
                       {selectedVehicle.tripOrigin && (
                         <div>
-                          <strong className="text-zinc-900 font-bold">Origin:</strong> {selectedVehicle.tripOrigin}
+                          <strong className="font-semibold text-slate-800">Origin:</strong> {selectedVehicle.tripOrigin}
                         </div>
                       )}
                       {selectedVehicle.tripDestination && (
                         <div>
-                          <strong className="text-zinc-900 font-bold">Destination:</strong> {selectedVehicle.tripDestination}
+                          <strong className="font-semibold text-slate-800">Destination:</strong> {selectedVehicle.tripDestination}
                         </div>
                       )}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-xs font-semibold text-zinc-500 py-6 text-center">
+                <div className="py-6 text-center text-xs font-medium text-slate-400">
                   Select a marker on the map to inspect unit details.
                 </div>
               )}
@@ -578,9 +583,9 @@ export default function AdminFleetMapPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-24 text-center text-zinc-500 text-xs">
+        <div className="flex flex-col items-center rounded-xl border border-slate-200 bg-white py-24 text-center text-xs text-slate-500" role="status">
           <Spinner size="md" className="mb-2" />
-          <p>Loading fleet command...</p>
+          <p className="font-medium">Loading fleet command...</p>
         </div>
       }
     >

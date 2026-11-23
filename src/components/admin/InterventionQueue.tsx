@@ -170,110 +170,114 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
 
   if (loadingBookings && bookings.length === 0) {
     return (
-      <div className="p-8 text-center bg-white border-2 border-black rounded-xl text-zinc-600 text-xs shadow-[3px_3px_0px_0px_#000]">
+      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500" role="status">
         <Spinner size="md" className="mb-2" />
-        <p className="font-bold">Checking dispatch intervention queue...</p>
+        <p className="font-medium">Checking dispatch intervention queue...</p>
       </div>
     );
   }
 
   if (bookings.length === 0) {
     return (
-      <div className="p-4 bg-emerald-100 border-2 border-black rounded-xl flex items-center justify-between text-xs text-zinc-950 shadow-[3px_3px_0px_0px_#000]">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full border border-black bg-emerald-500" />
-          <span className="font-black">Intervention Queue Clear</span>
-          <span className="font-medium text-emerald-950">
+      <div className="flex flex-col gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3.5 text-xs sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="relative inline-flex size-2 shrink-0 rounded-full bg-success-600" aria-hidden="true" />
+          <span className="font-semibold text-success-700">Intervention Queue Clear</span>
+          <span className="font-medium text-success-700/80">
             — All auto-dispatch requests have been fulfilled or assigned.
           </span>
         </div>
-        <span className="text-[11px] font-mono font-black text-zinc-900 bg-white px-2 py-0.5 rounded border border-black">0 PENDING ESCALATIONS</span>
+        <span className="shrink-0 rounded-full border border-success-200 bg-white px-2.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-success-700">
+          0 PENDING ESCALATIONS
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border-2.5 border-black rounded-2xl p-5 space-y-4 shadow-[4px_4px_0px_0px_#000]">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b-2 border-black/10 gap-2">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 border border-black bg-amber-400" />
-          </span>
-          <h2 className="text-sm font-black uppercase tracking-wider text-zinc-950">
-            Admin Intervention Queue ({bookings.length})
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="relative inline-flex size-2 shrink-0 rounded-full bg-warning-600 status-ping" aria-hidden="true" />
+          <h2 className="text-sm font-semibold tracking-tight text-slate-900">
+            Admin Intervention Queue <span className="font-mono tabular-nums text-slate-400">({bookings.length})</span>
           </h2>
         </div>
-        <span className="text-xs text-amber-950 font-bold bg-amber-200 px-2 py-0.5 rounded border border-black">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50 px-2.5 py-0.5 text-[11px] font-medium text-warning-700">
+          <Icon name="alert" className="size-3 shrink-0" />
           Auto-dispatch timeout reached — Manual driver assignment required
         </span>
       </div>
 
       {actionError && <ErrorBanner message={actionError} onDismiss={() => setActionError(null)} />}
       {successMessage && (
-        <div className="flex items-center gap-1.5 p-3 bg-emerald-100 border-2 border-black rounded-xl text-zinc-950 text-xs font-bold shadow-[2px_2px_0px_0px_#000]">
-          <Icon name="check" className="size-4 shrink-0 text-emerald-800" />
+        <div className="flex items-center gap-2 rounded-lg border border-success-200 bg-success-50 px-3 py-2.5 text-xs font-medium text-success-700">
+          <Icon name="check" className="size-4 shrink-0 text-success-600" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {/* Select booking pill list if multiple */}
       {bookings.length > 1 && (
-        <div className="flex flex-wrap gap-2 pt-1">
-          {bookings.map((b) => (
-            <button
-              key={b.id}
-              type="button"
-              onClick={() => setSelectedBookingId(b.id)}
-              className={`px-3 py-1 text-xs rounded-lg font-bold border-2 border-black cursor-pointer transition ${
-                b.id === selectedBookingId
-                  ? 'bg-amber-300 text-zinc-950 shadow-[2px_2px_0px_0px_#000]'
-                  : 'bg-white text-zinc-800 shadow-[1px_1px_0px_0px_#000] hover:bg-zinc-100'
-              }`}
-            >
-              #{b.bookingNumber} ({b.pickupLocation} → {b.destination})
-            </button>
-          ))}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {bookings.map((b) => {
+            const active = b.id === selectedBookingId;
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setSelectedBookingId(b.id)}
+                aria-pressed={active}
+                className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                  active
+                    ? 'border-brand-200 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <span className="font-mono tabular-nums">#{b.bookingNumber}</span> ({b.pickupLocation} → {b.destination})
+              </button>
+            );
+          })}
         </div>
       )}
 
       {selectedBooking && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* Booking Summary Card */}
-          <div className="bg-zinc-50 border-2 border-black rounded-xl p-4 space-y-3 text-xs shadow-[3px_3px_0px_0px_#000]">
-            <div className="flex items-center justify-between">
-              <span className="font-black text-sm text-zinc-950">
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 text-xs">
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-mono text-sm font-semibold tabular-nums text-slate-900">
                 #{selectedBooking.bookingNumber}
               </span>
               <StatusBadge status="ADMIN_INTERVENTION" />
             </div>
 
             {selectedBooking.operationalLocation && (
-              <div className="text-zinc-700 font-medium">
-                <span className="font-bold text-zinc-900">Hub: </span>
+              <div className="font-medium text-slate-500">
+                <span className="font-semibold text-slate-700">Hub: </span>
                 {selectedBooking.operationalLocation.name} ({selectedBooking.operationalLocation.code})
               </div>
             )}
 
-            <div className="space-y-1.5 pt-2 border-t-2 border-black/10">
+            <div className="space-y-2 border-t border-slate-100 pt-2">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-500 block">Pickup</span>
-                <span className="font-bold text-zinc-900">{selectedBooking.pickupLocation}</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Pickup</span>
+                <span className="font-medium text-slate-800">{selectedBooking.pickupLocation}</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-500 block">Destination</span>
-                <span className="font-bold text-zinc-900">{selectedBooking.destination}</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Destination</span>
+                <span className="font-medium text-slate-800">{selectedBooking.destination}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/10 text-zinc-700">
+            <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-500 block">Passengers</span>
-                <span className="font-bold text-zinc-900">{selectedBooking.passengerCount} Persons</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Passengers</span>
+                <span className="font-medium tabular-nums text-slate-800">{selectedBooking.passengerCount} Persons</span>
               </div>
               <div>
-                <span className="text-[10px] uppercase font-black text-zinc-500 block">Departure</span>
-                <span className="font-bold text-zinc-900">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Departure</span>
+                <span className="font-mono font-medium tabular-nums text-slate-800">
                   {new Date(selectedBooking.departureAt).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -283,25 +287,25 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
             </div>
 
             {selectedBooking.purpose && (
-              <div className="pt-2 border-t-2 border-black/10 text-zinc-700">
-                <span className="text-[10px] uppercase font-black text-zinc-500 block">Purpose</span>
-                <p className="mt-0.5 font-medium">{selectedBooking.purpose}</p>
+              <div className="border-t border-slate-100 pt-2">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Purpose</span>
+                <p className="mt-0.5 font-medium text-slate-700">{selectedBooking.purpose}</p>
               </div>
             )}
           </div>
 
           {/* Candidate Drivers & Mini Map */}
-          <div className="lg:col-span-2 space-y-3">
+          <div className="space-y-3 lg:col-span-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-zinc-800">
-                Eligible Candidate Drivers ({candidates.length})
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Eligible Candidate Drivers <span className="font-mono tabular-nums">({candidates.length})</span>
               </span>
               {loadingCandidates && <Spinner size="sm" />}
             </div>
 
             {/* Mini Map of Candidate Drivers */}
             {candidateMarkers.length > 0 && (
-              <div className="h-44 w-full rounded-xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_0px_#000]">
+              <div className="h-44 w-full overflow-hidden rounded-lg border border-slate-200">
                 <FleetMap
                   vehicles={candidateMarkers}
                   className="h-full w-full"
@@ -311,13 +315,13 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
 
             {/* Candidate List */}
             {candidates.length === 0 ? (
-              <div className="p-6 bg-zinc-50 border-2 border-dashed border-zinc-400 rounded-xl text-center text-xs font-semibold text-zinc-600">
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center text-xs font-medium text-slate-500">
                 {loadingCandidates
                   ? 'Scanning online drivers near pickup location...'
                   : 'No active eligible drivers found with fresh GPS in this location.'}
               </div>
             ) : (
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {candidates.map((c) => {
                   const driverName = c.driverName || c.name || 'Driver';
                   const plate = c.plateNumber || c.vehiclePlateNumber || '—';
@@ -329,23 +333,23 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                   return (
                     <div
                       key={c.driverId}
-                      className="p-3 bg-white border-2 border-black rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs shadow-[2px_2px_0px_0px_#000]"
+                      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-xs transition-colors hover:border-slate-300 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-zinc-950">{driverName}</span>
-                          {c.phone && <span className="font-mono text-zinc-600">({c.phone})</span>}
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-900">{driverName}</span>
+                          {c.phone && <span className="font-mono tabular-nums text-slate-400">({c.phone})</span>}
                           {etaText && (
-                            <span className="font-mono text-[10px] font-black text-zinc-950 bg-amber-200 px-1.5 py-0.5 rounded border border-black">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-info-200 bg-info-50 px-2 py-0.5 font-mono text-[10px] font-medium tabular-nums text-info-700">
                               ETA: {etaText}
                             </span>
                           )}
                         </div>
 
-                        <div className="text-zinc-700 flex items-center gap-2 font-medium">
-                          <span className="font-mono font-bold text-zinc-900">{plate}</span>
+                        <div className="flex flex-wrap items-center gap-2 font-medium text-slate-500">
+                          <span className="font-mono font-semibold tracking-wide tabular-nums text-slate-700">{plate}</span>
                           {(c.vehicleBrand || c.vehicleModel) && (
-                            <span>
+                            <span className="truncate">
                               • {c.vehicleBrand} {c.vehicleModel}
                             </span>
                           )}
@@ -353,13 +357,13 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex shrink-0 items-center gap-2">
                         {waUrl && (
                           <a
                             href={waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-2.5 py-1.5 border-2 border-black bg-emerald-300 text-zinc-950 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-[1px_1px_0px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[2px_2px_0px_0px_#000]"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                           >
                             <Icon name="message" className="size-3.5 shrink-0" />
                             <span>WhatsApp</span>
@@ -370,9 +374,9 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                           type="button"
                           disabled={Boolean(assigningDriverId)}
                           onClick={() => handleManualAssign(c.driverId)}
-                          className="px-3.5 py-1.5 bg-zinc-900 hover:bg-black disabled:opacity-50 text-white rounded-lg border-2 border-black text-xs font-black cursor-pointer inline-flex items-center gap-1.5 shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {isAssigning ? <Spinner size="sm" /> : 'Assign Driver'}
+                          {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Assign Driver'}
                         </button>
                       </div>
                     </div>

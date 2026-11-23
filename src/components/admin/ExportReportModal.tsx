@@ -126,10 +126,10 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
 
         {/* Quick Period Presets */}
         <div>
-          <label className="block text-[11px] font-black uppercase tracking-wider text-black mb-1.5">
+          <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Pilihan Cepat Periode Laporan
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {[
               { id: 'THIS_MONTH', label: 'Bulan Ini' },
               { id: 'LAST_MONTH', label: 'Bulan Lalu' },
@@ -142,10 +142,11 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
                   key={p.id}
                   type="button"
                   onClick={() => handleSelectPreset(p.id as any)}
-                  className={`py-1.5 px-2 text-xs font-bold rounded-lg border-2 border-black transition-all cursor-pointer ${
+                  aria-pressed={active}
+                  className={`cursor-pointer rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
                     active
-                      ? 'bg-[#be123c] text-white shadow-[2px_2px_0px_0px_#000]'
-                      : 'bg-white text-zinc-800 hover:bg-zinc-100 shadow-[1px_1px_0px_0px_#000]'
+                      ? 'border-brand-600 bg-brand-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
                   {p.label}
@@ -156,10 +157,10 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
         </div>
 
         {/* Date Range Inputs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-zinc-50 border-2 border-black rounded-xl">
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 sm:grid-cols-2">
           <div>
-            <label htmlFor="startDate" className="block text-[11px] font-bold text-zinc-900 mb-1">
-              Tanggal Mulai <span className="text-[#be123c]">*</span>
+            <label htmlFor="startDate" className="mb-1 block text-[11px] font-medium text-slate-700">
+              Tanggal Mulai <span className="text-brand-500">*</span>
             </label>
             <input
               id="startDate"
@@ -170,12 +171,12 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
                 setStartDate(e.target.value);
                 setPeriodPreset('CUSTOM');
               }}
-              className="w-full px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 font-mono text-xs tabular-nums text-slate-900 outline-none transition-colors hover:border-slate-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             />
           </div>
           <div>
-            <label htmlFor="endDate" className="block text-[11px] font-bold text-zinc-900 mb-1">
-              Tanggal Selesai <span className="text-[#be123c]">*</span>
+            <label htmlFor="endDate" className="mb-1 block text-[11px] font-medium text-slate-700">
+              Tanggal Selesai <span className="text-brand-500">*</span>
             </label>
             <input
               id="endDate"
@@ -186,22 +187,22 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
                 setEndDate(e.target.value);
                 setPeriodPreset('CUSTOM');
               }}
-              className="w-full px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 font-mono text-xs tabular-nums text-slate-900 outline-none transition-colors hover:border-slate-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             />
           </div>
         </div>
 
         {/* Filters Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <label htmlFor="filterStatus" className="block text-[11px] font-bold text-zinc-800 mb-1">
+            <label htmlFor="filterStatus" className="mb-1 block text-[11px] font-medium text-slate-700">
               Status Perjalanan
             </label>
             <select
               id="filterStatus"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs font-semibold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none transition-colors hover:border-slate-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="ALL">Semua Status</option>
               <option value="COMPLETED">Selesai (Completed)</option>
@@ -214,14 +215,14 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
           </div>
 
           <div>
-            <label htmlFor="filterServiceType" className="block text-[11px] font-bold text-zinc-800 mb-1">
+            <label htmlFor="filterServiceType" className="mb-1 block text-[11px] font-medium text-slate-700">
               Tipe Layanan
             </label>
             <select
               id="filterServiceType"
               value={serviceType}
               onChange={(e) => setServiceType(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs font-semibold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none transition-colors hover:border-slate-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="ALL">Semua Layanan</option>
               <option value="DROP_OFF">Drop Off (Sekali Jalan)</option>
@@ -230,14 +231,14 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
           </div>
 
           <div>
-            <label htmlFor="filterLocation" className="block text-[11px] font-bold text-zinc-800 mb-1">
+            <label htmlFor="filterLocation" className="mb-1 block text-[11px] font-medium text-slate-700">
               Hub Operasional
             </label>
             <select
               id="filterLocation"
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs font-semibold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none transition-colors hover:border-slate-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="ALL">Semua Hub</option>
               {locations.map((loc) => (
@@ -250,23 +251,23 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
         </div>
 
         {/* Info Box */}
-        <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-xl text-xs space-y-1">
-          <div className="flex items-center gap-1.5 font-bold text-rose-900">
-            <Icon name="check" className="size-4 text-emerald-700" />
+        <div className="space-y-1 rounded-lg border border-info-200 bg-info-50 p-3 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-info-700">
+            <Icon name="check" className="size-4 text-success-600" />
             <span>Format Excel Khusus KCIC Fleet (.xlsx)</span>
           </div>
-          <p className="text-[11px] text-zinc-700">
-            Laporan didesain rapi dengan palet resmi KCIC, KPI ringkasan, rincian pengemudi/kendaraan, jarak tempuh GPS, status verifikasi, serta <span className="font-bold text-zinc-900 underline">foto fisik Nota Dinas</span> yang langsung tersemat di dalam sel Excel (dapat diklik untuk memperbesar ukuran asli).
+          <p className="text-[11px] leading-relaxed text-slate-600">
+            Laporan didesain rapi dengan palet resmi KCIC, KPI ringkasan, rincian pengemudi/kendaraan, jarak tempuh GPS, status verifikasi, serta <span className="font-semibold text-slate-800 underline">foto fisik Nota Dinas</span> yang langsung tersemat di dalam sel Excel (dapat diklik untuk memperbesar ukuran asli).
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
+        <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
           <button
             type="button"
             onClick={onClose}
             disabled={isDownloading}
-            className="px-3.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-700 hover:bg-zinc-100 cursor-pointer disabled:opacity-50"
+            className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Batal
           </button>
@@ -274,7 +275,7 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
             type="button"
             onClick={handleDownload}
             disabled={isDownloading}
-            className="px-4 py-1.5 text-xs font-black rounded-lg border-2 border-black bg-emerald-600 text-white shadow-[2px_2px_0px_0px_#000] hover:bg-emerald-700 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+            className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isDownloading ? (
               <>

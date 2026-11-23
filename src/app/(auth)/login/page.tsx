@@ -8,9 +8,6 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Icon as LoginIcon } from '@/components/ui/Icon';
 import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
 
-/** KCIC Halim–Tegalluar corridor, eastbound node order. */
-const CORRIDOR_NODES = ['Halim', 'Karawang', 'Padalarang', 'Tegalluar'];
-
 function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl');
@@ -114,29 +111,43 @@ function LoginForm() {
   };
 
   const fieldClass =
-    'min-h-12 w-full rounded-lg border border-slate-200 bg-white py-3 pl-11 text-[15px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15';
+    'h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10';
 
   const isUserDemo = email === 'user@demo.test';
   const isDriverDemo = email === 'driver1@demo.test';
   const isAdminDemo = email === 'admin@demo.test';
 
   const demoClass = (active: boolean) =>
-    `flex cursor-pointer flex-col items-start justify-center rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+    `flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
       active
-        ? 'border-brand-500 bg-brand-50'
-        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+        ? 'border-[#C8102E] bg-white'
+        : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-white'
     }`;
 
   return (
-    <div className="w-full rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm sm:p-7">
-      <div className="mb-6">
-        <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-          <span className="h-3 w-0.5 rounded-full bg-brand-500" aria-hidden="true" />
-          KCIC FLEET OPERATIONS
+    <div className="w-full">
+      {/* Brand lockup */}
+      <div className="mb-10 flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#C8102E] text-[#FFFFFF]">
+          <LoginIcon name="route" className="size-5" />
         </span>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">Masuk ke Sistem</h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-500">
-          Masuk untuk memesan perjalanan dan memantau operasional armada KCIC.
+        <span className="flex min-w-0 flex-col">
+          <span className="text-base font-bold tracking-tight text-slate-900">KCIC Fleet</span>
+          <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">
+            Operasional Armada
+          </span>
+        </span>
+      </div>
+
+      {/* Two-tone headline */}
+      <div className="mb-8">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Masuk Akun Operasional</p>
+        <h1 className="mt-3 text-3xl font-bold leading-[1.15] tracking-tight sm:text-4xl">
+          <span className="block text-slate-900">Armada terpantau.</span>
+          <span className="block text-[#C8102E]">Operasional lebih cepat.</span>
+        </h1>
+        <p className="mt-4 text-sm leading-relaxed text-slate-500">
+          Satu ruang kerja untuk pemesanan kendaraan, pelacakan GPS real-time, dan pengelolaan armada.
         </p>
       </div>
 
@@ -148,61 +159,11 @@ function LoginForm() {
         />
       )}
 
-      {/* Quick Demo Fill Buttons */}
-      <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-            Akun Demo Siap Pakai
-          </span>
-          <span className="font-mono text-[10px] font-medium text-slate-400">
-            Demo1234
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('user@demo.test');
-              setPassword('Demo1234');
-              setError(null);
-            }}
-            className={demoClass(isUserDemo)}
-          >
-            <span className="text-xs font-semibold text-slate-900">User</span>
-            <span className="text-[10px] text-slate-500">Penumpang</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('driver1@demo.test');
-              setPassword('Demo1234');
-              setError(null);
-            }}
-            className={demoClass(isDriverDemo)}
-          >
-            <span className="text-xs font-semibold text-slate-900">Driver</span>
-            <span className="text-[10px] text-slate-500">Budi (Halim)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('admin@demo.test');
-              setPassword('Demo1234');
-              setError(null);
-            }}
-            className={demoClass(isAdminDemo)}
-          >
-            <span className="text-xs font-semibold text-slate-900">Admin</span>
-            <span className="text-[10px] text-slate-500">Operasional</span>
-          </button>
-        </div>
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-4" aria-busy={isLoading}>
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-slate-700">Email Kantor</label>
+          <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-slate-700">Email Kantor</label>
           <div className="relative">
-            <LoginIcon name="mail" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <LoginIcon name="mail" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               id="email"
               type="email"
@@ -213,15 +174,15 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@demo.test"
-              className={`${fieldClass} pr-4`}
+              className={fieldClass}
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-slate-700">Kata Sandi</label>
+          <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-slate-700">Kata Sandi</label>
           <div className="relative">
-            <LoginIcon name="lock" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <LoginIcon name="lock" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
@@ -230,14 +191,14 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Demo1234"
-              className={`${fieldClass} pr-11`}
+              className={`${fieldClass} pr-10`}
             />
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
               aria-pressed={showPassword}
-              className="absolute right-1.5 top-1/2 flex size-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+              className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
               <LoginIcon name={showPassword ? 'eyeOff' : 'eye'} className="size-4" />
             </button>
@@ -247,19 +208,60 @@ function LoginForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="group mt-2 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 active:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+          className="mt-2 inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#C8102E] px-5 text-sm font-medium text-[#FFFFFF] transition-colors hover:bg-[#A60D26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading && <Spinner size="sm" className="text-white" />}
-          {isLoading ? 'Sedang masuk…' : 'Masuk'}
-          {!isLoading && <LoginIcon name="arrow" className="size-4 transition-transform group-hover:translate-x-0.5" />}
+          {isLoading && <Spinner size="sm" className="text-[#FFFFFF]" />}
+          {isLoading ? 'Sedang masuk…' : 'Masuk ke Sistem'}
         </button>
       </form>
 
-      <div className="mt-6 flex items-start gap-2.5 border-t border-slate-200 pt-5">
-        <LoginIcon name="shield" className="mt-0.5 size-4 shrink-0 text-slate-400" />
-        <p className="text-xs leading-relaxed text-slate-500">
-          Akun perusahaan Anda dikelola oleh administrasi armada. Hubungi administrator jika membutuhkan akses.
-        </p>
+      {/* Demo switcher */}
+      <div className="mt-8 border-t border-slate-100 pt-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Akun Demo</span>
+          <span className="font-mono text-[11px] tabular-nums text-slate-400">Demo1234</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('user@demo.test');
+              setPassword('Demo1234');
+              setError(null);
+            }}
+            aria-pressed={isUserDemo}
+            className={demoClass(isUserDemo)}
+          >
+            <span className={`size-1.5 rounded-full ${isUserDemo ? 'bg-[#C8102E]' : 'bg-slate-300'}`} aria-hidden="true" />
+            <span className="text-xs font-semibold text-slate-900">User</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('driver1@demo.test');
+              setPassword('Demo1234');
+              setError(null);
+            }}
+            aria-pressed={isDriverDemo}
+            className={demoClass(isDriverDemo)}
+          >
+            <span className={`size-1.5 rounded-full ${isDriverDemo ? 'bg-[#C8102E]' : 'bg-slate-300'}`} aria-hidden="true" />
+            <span className="text-xs font-semibold text-slate-900">Driver</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('admin@demo.test');
+              setPassword('Demo1234');
+              setError(null);
+            }}
+            aria-pressed={isAdminDemo}
+            className={demoClass(isAdminDemo)}
+          >
+            <span className={`size-1.5 rounded-full ${isAdminDemo ? 'bg-[#C8102E]' : 'bg-slate-300'}`} aria-hidden="true" />
+            <span className="text-xs font-semibold text-slate-900">Admin</span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -267,127 +269,62 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="relative isolate flex min-h-dvh flex-col bg-slate-50 text-slate-900">
-      <div className="mx-auto flex w-full max-w-[84rem] flex-1 flex-col px-5 py-6 sm:px-8 lg:px-12">
-        <header className="flex w-full shrink-0 items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-500 text-white">
-              <LoginIcon name="route" className="size-5" />
-            </div>
-            <span className="truncate text-base font-semibold tracking-tight text-slate-900">
-              KCIC <span className="font-bold text-brand-500">Fleet</span>
-            </span>
-          </div>
-          <span className="hidden shrink-0 items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400 sm:flex">
-            <span className="size-1.5 rounded-full bg-brand-500" aria-hidden="true" />
-            Operasional Armada
-          </span>
-        </header>
-
-        <div className="grid min-h-0 w-full flex-1 gap-8 py-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch lg:gap-10">
-          {/* LEFT — always-charcoal brand showcase (mode-independent) */}
-          <aside className="relative hidden min-w-0 flex-col overflow-hidden rounded-2xl bg-slate-950 p-7 lg:flex xl:p-9">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 opacity-[0.14] [background-image:linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_at_top_left,#000_18%,transparent_72%)]"
-            />
-            <span aria-hidden="true" className="absolute inset-x-0 top-0 h-0.5 bg-brand-500" />
-
-            <div className="relative flex min-h-0 flex-1 flex-col justify-center gap-6">
-              <div>
-                <span className="inline-flex items-center gap-2 self-start text-[11px] font-semibold uppercase tracking-[0.18em] text-[#94a3b8]">
-                  <span className="h-3 w-0.5 rounded-full bg-brand-500" aria-hidden="true" />
-                  KCIC FLEET OPERATIONS
-                </span>
-                <p className="mt-4 max-w-[22ch] text-[clamp(1.6rem,2.4vw,2.1rem)] font-semibold leading-[1.14] tracking-tight text-[#f8fafc]">
-                  Operasional armada lebih cepat dan terukur.
-                </p>
-                <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#94a3b8]">
-                  Dari booking pertama hingga kilometer terakhir — kendaraan, perjalanan, dan tim bergerak bersama.
-                </p>
+    <main className="grid min-h-screen grid-cols-1 bg-white lg:grid-cols-2">
+      {/* LEFT — light login canvas, borderless form */}
+      <section className="flex min-w-0 flex-col justify-center bg-white px-8 py-10 pb-24 text-slate-900 sm:px-14 lg:px-20 lg:pb-10">
+        <div className="mx-auto my-auto w-full max-w-md shrink-0">
+          <Suspense
+            fallback={
+              <div
+                role="status"
+                className="flex min-h-[22rem] flex-col items-center justify-center gap-3 text-sm text-slate-500"
+              >
+                <Spinner size="lg" className="text-slate-400" />
+                Menyiapkan halaman masuk…
               </div>
+            }
+          >
+            <LoginForm />
+          </Suspense>
+        </div>
+      </section>
 
-              {/* Corridor status strip */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8]">
-                    Koridor Halim–Tegalluar
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-medium tabular-nums text-[#94a3b8]">
-                    <span className="relative flex size-1.5">
-                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-500 opacity-70 motion-reduce:animate-none" />
-                      <span className="relative inline-flex size-1.5 rounded-full bg-brand-500" />
-                    </span>
-                    Sistem Pemantauan Aktif
-                  </span>
-                </div>
+      {/* RIGHT — full-bleed industrial charcoal panel */}
+      <aside className="relative hidden min-w-0 flex-col justify-between overflow-hidden bg-[#0F172A] px-14 py-12 text-[#F8FAFC] lg:flex xl:px-20">
+        {/* rail */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-[#C8102E] via-[#C8102E]/40 to-transparent"
+        />
 
-                <div className="relative mt-5">
-                  <div aria-hidden="true" className="absolute inset-x-[12.5%] top-1 h-px bg-white/15" />
-                  <div aria-hidden="true" className="absolute left-[12.5%] top-1 h-px w-[50%] bg-brand-500" />
-                  <div className="relative grid grid-cols-4 gap-1">
-                    {CORRIDOR_NODES.map((node, index) => {
-                      const reached = index < 3;
-                      return (
-                        <div key={node} className="flex min-w-0 flex-col items-center gap-1.5">
-                          <span className={`size-2 rounded-full ${reached ? 'bg-brand-500' : 'bg-white/25'}`} />
-                          <span className="w-full truncate text-center text-[10px] font-medium leading-tight text-[#94a3b8]">
-                            {node}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Bento highlight cards */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-500">
-                    <LoginIcon name="satellite" className="size-4" />
-                  </span>
-                  <p className="mt-3 text-sm font-semibold text-[#f8fafc]">Telemetri Langsung &amp; Dispatch</p>
-                  <p className="mt-1 text-xs leading-relaxed text-[#94a3b8]">
-                    Pelacakan GPS real-time dengan penugasan driver otomatis.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-brand-500/15 text-brand-500">
-                    <LoginIcon name="users" className="size-4" />
-                  </span>
-                  <p className="mt-3 text-sm font-semibold text-[#f8fafc]">Integrasi Operasional</p>
-                  <p className="mt-1 text-xs leading-relaxed text-[#94a3b8]">
-                    Booking digital, Nota Dinas, dan akses multi-peran Admin, Driver, Penumpang.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* RIGHT — crisp white Bento login card */}
-          <section className="flex min-w-0 items-center justify-center">
-            <div className="w-full max-w-md">
-              <Suspense fallback={
-                <div role="status" className="flex min-h-96 flex-col items-center justify-center gap-4 rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500">
-                  <Spinner size="lg" className="text-slate-400" />
-                  Menyiapkan halaman masuk…
-                </div>
-              }>
-                <LoginForm />
-              </Suspense>
-              <p className="mt-6 text-center text-xs text-slate-500 lg:hidden">
-                KCIC Fleet &middot; Mobilitas Operasional.
-              </p>
-            </div>
-          </section>
+        {/* top status */}
+        <div className="relative flex shrink-0 items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className="size-2 rounded-full bg-[#C8102E] animate-pulse motion-reduce:animate-none"
+          />
+          <span className="text-xs font-medium tracking-wide text-[#64748B]">Pusat Operasional</span>
         </div>
 
-        <footer className="flex w-full shrink-0 items-center justify-between gap-4 border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-600">
-          <span>KCIC Fleet &middot; Mobilitas Operasional.</span>
-          <span className="hidden sm:block">Untuk tim Anda. Untuk setiap perjalanan.</span>
-        </footer>
-      </div>
+        {/* center typographic focus */}
+        <div className="relative flex flex-1 items-center py-12">
+          <div className="max-w-lg">
+            <p className="text-4xl font-bold leading-[1.15] tracking-tight text-[#F8FAFC] xl:text-[42px]">
+              Pergerakan armada, tanpa celah yang terlewat.
+            </p>
+            <p className="mt-5 text-sm leading-relaxed text-[#94A3B8] xl:text-base">
+              Booking kendaraan, penugasan driver, dan pemantauan rute tetap tersambung dari keberangkatan
+              hingga tiba di tujuan.
+            </p>
+          </div>
+        </div>
+
+        {/* bottom hairline telemetry strip */}
+        <div className="relative flex shrink-0 items-center justify-between gap-6 border-t border-white/10 pt-5 text-xs text-[#64748B]">
+          <span className="min-w-0 leading-relaxed">PT KCIC • Halim – Karawang – Padalarang – Tegalluar</span>
+          <span className="shrink-0 uppercase tracking-[0.14em] tabular-nums text-[#94A3B8]">Fleet Ops</span>
+        </div>
+      </aside>
     </main>
   );
 }

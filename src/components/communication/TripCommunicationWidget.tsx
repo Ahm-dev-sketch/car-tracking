@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
-import { Icon } from '@/components/ui/Icon';
+import { MessageSquare, Phone } from 'lucide-react';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { VoiceCallModal } from '@/components/call/VoiceCallModal';
 import { useWebRTCCall, CallLogEntry } from '@/hooks/useWebRTCCall';
@@ -61,11 +61,11 @@ export function TripCommunicationWidget({
         const mins = Math.floor(entry.durationSeconds / 60);
         const secs = entry.durationSeconds % 60;
         const durStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        text = `📞 Panggilan Suara Berakhir (${durStr})`;
+        text = `Panggilan Suara Berakhir (${durStr})`;
       } else if (entry.type === 'MISSED') {
-        text = '📞 Panggilan suara tak terjawab (30 detik)';
+        text = 'Panggilan suara tak terjawab';
       } else {
-        text = '📞 Panggilan Ditolak';
+        text = 'Panggilan Ditolak';
       }
 
       try {
@@ -85,7 +85,6 @@ export function TripCommunicationWidget({
           throw new Error('Call log API failed');
         }
       } catch {
-        // Fallback: send directly through client realtime chat message hook
         sendMessage(text, partner);
       }
     },
@@ -145,35 +144,31 @@ export function TripCommunicationWidget({
 
   return (
     <>
-      {/* Communication Buttons Presentation */}
+      {/* Buttons */}
       {variant === 'buttons' && (
-        <div className="flex items-center gap-2">
-          {/* Chat Button */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleOpenChat}
-            className="relative flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-3.5 py-2 text-xs font-bold text-zinc-900 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-50 transition cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+            className="button-secondary relative px-3.5 py-2 text-[0.6875rem]"
           >
-            <Icon name="message" className="size-4 text-[#be123c]" />
-            <span>Chat In-App</span>
+            <MessageSquare className="size-3.5 text-[var(--kcic-red)]" strokeWidth={2} aria-hidden="true" />
+            <span>Chat in-app</span>
             {unreadCount > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#be123c] px-1 text-[10px] font-black text-white animate-bounce">
-                {unreadCount}
-              </span>
+              <span className="count-badge ml-0.5">{unreadCount}</span>
             )}
           </button>
 
-          {/* Voice Call Button */}
           {partnerId && (
             <button
               type="button"
               onClick={handleStartCall}
-              className="relative flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-3.5 py-2 text-xs font-black text-black shadow-[2px_2px_0px_0px_#000] hover:bg-emerald-300 transition cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+              className="button-primary relative px-3.5 py-2 text-[0.6875rem]"
             >
-              <Icon name="phone" className="size-4" />
-              <span>Telepon In-App</span>
+              <Phone className="size-3.5" strokeWidth={2} aria-hidden="true" />
+              <span>Telepon</span>
               {missedCallsCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white animate-pulse">
+                <span className="ml-0.5 inline-flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-[var(--status-error-fg)] px-1 text-[0.625rem] font-semibold tabular-nums text-white">
                   {missedCallsCount}
                 </span>
               )}
@@ -182,19 +177,23 @@ export function TripCommunicationWidget({
         </div>
       )}
 
-      {/* Floating Presentation */}
+      {/* Floating — sits above the mobile dock, never over content */}
       {variant === 'floating' && (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-2.5">
+        <div
+          className="fixed right-4 z-40 flex flex-col gap-2"
+          style={{ bottom: 'calc(var(--mobile-nav-space) + 0.75rem)' }}
+        >
           {partnerId && (
             <button
               type="button"
               onClick={handleStartCall}
               title={`Telepon ${partnerName}`}
-              className="relative flex h-12 w-12 items-center justify-center rounded-2xl border-2.5 border-black bg-emerald-400 text-black shadow-[4px_4px_0px_0px_#000] hover:bg-emerald-300 transition cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+              aria-label={`Telepon ${partnerName}`}
+              className="relative grid size-11 cursor-pointer place-items-center rounded-full bg-[var(--slate-navy)] text-white shadow-[var(--shadow-lg)] transition-colors hover:bg-[var(--charcoal)]"
             >
-              <Icon name="phone" className="size-5" />
+              <Phone className="size-5" strokeWidth={1.9} aria-hidden="true" />
               {missedCallsCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black bg-rose-600 text-[10px] font-black text-white animate-pulse">
+                <span className="absolute -right-0.5 -top-0.5 inline-flex size-4.5 animate-pulse items-center justify-center rounded-full bg-[var(--status-error-fg)] px-1 text-[0.625rem] font-semibold tabular-nums text-white">
                   {missedCallsCount}
                 </span>
               )}
@@ -204,11 +203,12 @@ export function TripCommunicationWidget({
             type="button"
             onClick={handleOpenChat}
             title={`Chat dengan ${partnerName}`}
-            className="relative flex h-12 w-12 items-center justify-center rounded-2xl border-2.5 border-black bg-[#be123c] text-white shadow-[4px_4px_0px_0px_#000] hover:bg-[#9f1239] transition cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+            aria-label={`Chat dengan ${partnerName}`}
+            className="relative grid size-11 cursor-pointer place-items-center rounded-full bg-[var(--kcic-red)] text-white shadow-[var(--shadow-lg)] transition-colors hover:bg-[var(--kcic-red-hover)]"
           >
-            <Icon name="message" className="size-5" />
+            <MessageSquare className="size-5" strokeWidth={1.9} aria-hidden="true" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black bg-amber-400 text-[10px] font-black text-black">
+              <span className="absolute -right-0.5 -top-0.5 inline-flex size-4.5 items-center justify-center rounded-full bg-[var(--slate-navy)] px-1 text-[0.625rem] font-semibold tabular-nums text-white">
                 {unreadCount}
               </span>
             )}
@@ -216,41 +216,29 @@ export function TripCommunicationWidget({
         </div>
       )}
 
-      {/* Bar Presentation */}
+      {/* Bar */}
       {variant === 'bar' && (
-        <div className="flex w-full items-center justify-between rounded-xl border-2 border-black bg-white p-3 shadow-[3px_3px_0px_0px_#000]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-rose-100 text-[#be123c] font-black text-xs">
-              <Icon name="message" className="size-4.5" />
-            </div>
-            <div>
-              <p className="text-xs font-black text-zinc-950">Komunikasi Armada</p>
-              <p className="text-[10px] text-zinc-500 font-medium">Terhubung dengan {partnerName}</p>
+        <div className="flex w-full flex-wrap items-center justify-between gap-2.5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="icon-tile-accent">
+              <MessageSquare className="size-4" strokeWidth={1.9} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-slate-900">Komunikasi armada</p>
+              <p className="truncate text-[0.6875rem] text-slate-500">Terhubung dengan {partnerName}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleOpenChat}
-              className="relative flex items-center gap-1.5 rounded-lg border-2 border-black bg-white px-2.5 py-1.5 text-xs font-bold hover:bg-zinc-100"
-            >
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button type="button" onClick={handleOpenChat} className="button-secondary px-3 py-1.5 text-[0.6875rem]">
               <span>Chat</span>
-              {unreadCount > 0 && (
-                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#be123c] px-1 text-[9px] font-black text-white">
-                  {unreadCount}
-                </span>
-              )}
+              {unreadCount > 0 && <span className="count-badge">{unreadCount}</span>}
             </button>
             {partnerId && (
-              <button
-                type="button"
-                onClick={handleStartCall}
-                className="relative flex items-center gap-1.5 rounded-lg border-2 border-black bg-emerald-400 px-2.5 py-1.5 text-xs font-black text-black hover:bg-emerald-300"
-              >
-                <Icon name="phone" className="size-3.5" />
+              <button type="button" onClick={handleStartCall} className="button-primary px-3 py-1.5 text-[0.6875rem]">
+                <Phone className="size-3.5" strokeWidth={2} aria-hidden="true" />
                 <span>Panggil</span>
                 {missedCallsCount > 0 && (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white">
+                  <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--status-error-fg)] px-1 text-[0.625rem] font-semibold tabular-nums text-white">
                     {missedCallsCount}
                   </span>
                 )}
@@ -260,7 +248,7 @@ export function TripCommunicationWidget({
         </div>
       )}
 
-      {/* Real-time Chat Drawer */}
+      {/* Real-time chat */}
       <ChatDrawer
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
@@ -283,7 +271,7 @@ export function TripCommunicationWidget({
         }}
       />
 
-      {/* WebRTC Voice Call Modal Overlay */}
+      {/* WebRTC voice call */}
       <VoiceCallModal
         callStatus={callStatus}
         isMuted={isMuted}

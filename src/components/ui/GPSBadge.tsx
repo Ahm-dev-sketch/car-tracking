@@ -1,4 +1,5 @@
 import React from 'react';
+import { Crosshair, Wifi } from 'lucide-react';
 
 interface GPSBadgeProps {
   accuracyM?: number | null;
@@ -15,55 +16,54 @@ export function GPSBadge({
 }: GPSBadgeProps) {
   let label = 'LOW';
   let subtext = '';
-  let dotColor = 'bg-rose-500';
+  let tone: 'active' | 'warning' | 'error' = 'error';
   let isEstimated = false;
 
   if (accuracyM !== undefined && accuracyM !== null) {
     if (accuracyM < 20) {
       label = 'Akurasi Tinggi';
-      subtext = 'Satelit Lock';
-      dotColor = 'bg-emerald-500';
+      subtext = 'Satelit lock';
+      tone = 'active';
     } else if (accuracyM <= 100) {
-      label = 'Sedang';
-      dotColor = 'bg-amber-400';
+      label = 'Akurasi Sedang';
+      tone = 'warning';
     } else {
       label = 'Akurasi Estimasi';
       subtext = 'Seluler/Wi-Fi';
-      dotColor = 'bg-amber-500';
+      tone = 'warning';
       isEstimated = true;
     }
+  } else {
+    tone = 'warning';
   }
 
-  if (signal) {
-    if (signal === 'green') dotColor = 'bg-emerald-500';
-    else if (signal === 'amber') dotColor = 'bg-amber-400';
-    else dotColor = 'bg-rose-500';
-  }
+  if (signal === 'green') tone = 'active';
+  else if (signal === 'amber') tone = 'warning';
+  else if (signal === 'red') tone = 'error';
 
   const roundedM = accuracyM !== undefined && accuracyM !== null ? Math.round(accuracyM) : null;
+  const Icon = isEstimated ? Wifi : Crosshair;
 
   return (
-    <div
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] ${
-        isEstimated ? 'bg-amber-50 text-amber-950 border-amber-900' : 'bg-white text-black'
-      } ${className}`}
+    <span
+      className={`pill pill-${tone} ${className}`}
       title={
         roundedM !== null
           ? isEstimated
-            ? `Akurasi Estimasi: ±${roundedM} m (Berdasarkan Triangulasi Seluler/Wi-Fi)`
+            ? `Akurasi estimasi: ±${roundedM} m (triangulasi seluler/Wi-Fi)`
             : subtext
-            ? `Akurasi Tinggi: ±${roundedM} m (${subtext})`
-            : `Akurasi: ±${roundedM} m`
+              ? `${label}: ±${roundedM} m (${subtext})`
+              : `Akurasi: ±${roundedM} m`
           : undefined
       }
     >
-      <span className={`w-2.5 h-2.5 shrink-0 rounded-full border border-black ${dotColor}`} aria-hidden="true" />
+      <Icon className="size-3 shrink-0" strokeWidth={2} aria-hidden="true" />
       {showDetails && (
-        <span className="truncate">
-          {label} {roundedM !== null ? `(±${roundedM}m)` : ''}
-          {subtext ? ` · ${subtext}` : ''}
+        <span className="tabular-nums">
+          {label}
+          {roundedM !== null ? ` · ±${roundedM} m` : ''}
         </span>
       )}
-    </div>
+    </span>
   );
 }

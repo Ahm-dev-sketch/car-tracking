@@ -11,7 +11,7 @@ import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Spinner } from '@/components/ui/Spinner';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
-import { Icon } from '@/components/ui/Icon';
+import { MapPin, Route } from 'lucide-react';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
 import { TripCommunicationWidget } from '@/components/communication/TripCommunicationWidget';
 
@@ -211,8 +211,6 @@ function UserTrackingContent() {
   [activeBookings, selectedVehicleId, selectedBookingId]);
 
   const selectedVehicle = mergedVehicles.find((v) => v.vehicleId === selectedVehicleId);
-  const rawPhone = selectedVehicle?.driverPhone ? selectedVehicle.driverPhone.replace(/\D/g, '') : '';
-  const waUrl = rawPhone ? `https://wa.me/${rawPhone}` : null;
 
   const routePoints = useMemo<RoutePoint[]>(() => {
     if (!selectedBooking) return [];
@@ -286,175 +284,194 @@ function UserTrackingContent() {
   }, [selectedVehicle?.lat, selectedVehicle?.lng]);
 
   const bookingSummary = selectedBooking && (
-    <section className="mb-6 space-y-4 rounded-2xl border-2.5 border-black bg-emerald-100 p-5 shadow-[4px_4px_0px_0px_#000]" aria-label="Active booking">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-black uppercase tracking-wider text-emerald-950">Perjalanan Aktif Anda</span>
+    <section className="card overflow-hidden" aria-label="Perjalanan aktif">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+        <span className="eyebrow eyebrow-accent">
+          <Route className="size-3" strokeWidth={2} aria-hidden="true" />
+          Perjalanan aktif
+        </span>
         <StatusBadge status={selectedBooking.status} />
       </div>
 
-      {/* Proximity / Gojek-style Status Headline */}
-      <div className="rounded-xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_0px_#000] flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-3.5 w-3.5 shrink-0">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-              selectedBooking.status === 'ARRIVED' ? 'bg-emerald-400' : 'bg-emerald-600'
-            }`} />
-            <span className={`relative inline-flex rounded-full h-3.5 w-3.5 border border-black ${
-              selectedBooking.status === 'ARRIVED' ? 'bg-emerald-400' : 'bg-emerald-500'
-            }`} />
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-[var(--status-active-bg)] px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="relative flex size-2.5 shrink-0">
+            <span
+              className="live-ping absolute inset-0 rounded-full bg-[var(--status-active-fg)]"
+              aria-hidden="true"
+            />
+            <span className="relative size-2.5 rounded-full bg-[var(--status-active-fg)]" aria-hidden="true" />
           </span>
-          <div>
-            <p className="font-black text-base text-zinc-950">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-[var(--status-active-fg)]">
               {selectedBooking.status === 'ARRIVED'
-                ? 'Driver sudah tiba di titik jemput!'
+                ? 'Driver sudah tiba di titik jemput'
                 : distanceToPickup?.proximity === 'near'
-                ? 'Driver sudah sangat dekat!'
-                : selectedBooking.status === 'IN_PROGRESS'
-                ? 'Perjalanan sedang berlangsung'
-                : 'Driver sedang menuju titik jemput'}
+                  ? 'Driver sudah sangat dekat'
+                  : selectedBooking.status === 'IN_PROGRESS'
+                    ? 'Perjalanan sedang berlangsung'
+                    : 'Driver sedang menuju titik penjemputan'}
             </p>
-            <p className="text-xs font-medium text-zinc-600">
+            <p className="mt-0.5 text-[0.6875rem] text-[var(--status-active-fg)]/80">
               {distanceToPickup
-                ? `Jarak ke penjemputan: ${distanceToPickup.text}`
+                ? `Jarak ke penjemputan ${distanceToPickup.text}`
                 : selectedBooking.etaSeconds
-                ? `Estimasi kedatangan: ${formatEta(selectedBooking.etaSeconds, selectedBooking.etaEstimated)}`
-                : 'Memantau pergerakan armada secara langsung'}
+                  ? `Estimasi kedatangan ${formatEta(selectedBooking.etaSeconds, selectedBooking.etaEstimated)}`
+                  : 'Memantau telemetri GPS secara langsung'}
             </p>
           </div>
         </div>
         {distanceToPickup && (
-          <span className="rounded-md border-2 border-black bg-amber-200 px-3 py-1 font-mono text-xs font-black text-zinc-950 shadow-[2px_2px_0px_0px_#000] shrink-0">
+          <span className="mono-plate shrink-0 rounded-full border border-[var(--status-active-border)] bg-white px-2.5 py-0.5 text-[0.6875rem] font-semibold tabular-nums text-[var(--status-active-fg)]">
             {distanceToPickup.text}
           </span>
         )}
       </div>
 
-      <div className="flex items-start gap-3 rounded-lg border-2 border-black bg-white p-3 text-xs shadow-[2px_2px_0px_0px_#000]">
-        <Icon name="route" className="mt-0.5 shrink-0 text-emerald-800" />
-        <div className="min-w-0 flex-1">
-          <p className="text-zinc-600 truncate"><span className="font-bold text-zinc-900">Jemput:</span> {selectedBooking.pickupLocation}</p>
-          <p className="mt-1 font-bold text-zinc-950 truncate"><span className="font-bold text-zinc-900">Tujuan:</span> {selectedBooking.destination}</p>
+      <div className="px-4 py-3.5">
+        <div className="route-stepper">
+          <div className="route-point" data-kind="pickup">
+            <p className="route-label">Titik jemput</p>
+            <p className="route-value">{selectedBooking.pickupLocation}</p>
+          </div>
+          <div className="route-point" data-kind="destination">
+            <p className="route-label">Tujuan</p>
+            <p className="route-value">{selectedBooking.destination}</p>
+          </div>
         </div>
       </div>
 
-      <DispatchProgress status={selectedBooking.status} etaSeconds={selectedBooking.etaSeconds} etaEstimated={selectedBooking.etaEstimated} compact />
+      <div className="border-t border-[var(--border-subtle)] px-4 py-3">
+        <DispatchProgress
+          status={selectedBooking.status}
+          etaSeconds={selectedBooking.etaSeconds}
+          etaEstimated={selectedBooking.etaEstimated}
+          compact
+        />
+      </div>
     </section>
   );
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="page-intro">
-        <div>
-          <span className="eyebrow mb-3">Closer to your next stop</span>
-          <h1 className="page-heading">Your journey, live.</h1>
-          <p className="text-xs font-semibold text-zinc-600 mt-0.5">
-            Keep your vehicle and driver in view.
+    <div className="w-full min-w-0 space-y-4">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <span className="eyebrow eyebrow-accent">
+            <span className="size-1.5 rounded-full bg-[var(--kcic-red)]" aria-hidden="true" />
+            KCIC fleet telemetry
+          </span>
+          <h1 className="page-heading mt-2">Pantau perjalanan live</h1>
+          <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+            Posisi armada, rute navigasi, dan koordinasi pengemudi secara real-time.
           </p>
         </div>
 
-        {/* Realtime WS status indicator */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="font-bold text-zinc-600">Location feed</span>
+        <span className="pill self-start">
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-bold border-2 border-black shadow-[2px_2px_0px_0px_#000] ${
+            className={`size-1.5 rounded-full ${
               connectionState === 'open'
-                ? 'bg-emerald-200 text-zinc-950'
-                : 'bg-zinc-200 text-zinc-800'
+                ? 'animate-pulse bg-[var(--status-active-fg)]'
+                : 'bg-slate-400'
             }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full border border-black ${
-                connectionState === 'open' ? 'bg-emerald-500' : 'bg-zinc-400'
-              }`}
-            />
-            {connectionState === 'open' ? 'CONNECTED' : 'POLLING'}
-          </span>
-        </div>
-      </div>
-
-
+            aria-hidden="true"
+          />
+          <span>{connectionState === 'open' ? 'Live GPS stream' : 'Polling 20s'}</span>
+        </span>
+      </header>
 
       {(isLoading || mergedVehicles.length === 0) && bookingSummary}
 
       {isLoading ? (
-        <div className="surface py-24 text-center text-zinc-500 text-sm" role="status">
-          <Spinner size="lg" className="mb-2" />
-          <p className="font-bold">Locating active vehicles...</p>
+        <div
+          className="card flex flex-col items-center justify-center gap-2 py-24 text-xs text-slate-500"
+          role="status"
+        >
+          <Spinner size="lg" className="text-[var(--kcic-red)]" />
+          <p>Mencari sinyal GPS armada…</p>
         </div>
       ) : mergedVehicles.length === 0 ? (
-        <div className="surface p-8 sm:p-12 text-center text-zinc-500 text-sm">
-          <span className="mx-auto mb-4 flex size-14 items-center justify-center rounded-xl border-2 border-black bg-amber-200 text-zinc-950 shadow-[3px_3px_0px_0px_#000]"><Icon name="pin" className="size-6" /></span>
-          <p className="font-black text-lg text-zinc-950">No active vehicle trips reporting live GPS</p>
-          <p className="text-xs font-medium text-zinc-600 mt-1">
-            Tracking is displayed once a driver starts a trip or an online driver shares telemetry.
+        <div className="card flex flex-col items-center px-6 py-12 text-center">
+          <span className="mb-3 grid size-12 place-items-center rounded-full border border-[var(--border)] bg-[var(--canvas)] text-slate-400">
+            <MapPin className="size-5" strokeWidth={1.8} aria-hidden="true" />
+          </span>
+          <p className="text-[0.8125rem] font-semibold text-slate-900">
+            Belum ada armada yang menyiarkan GPS aktif
+          </p>
+          <p className="mt-1 max-w-sm text-[0.6875rem] leading-relaxed text-slate-500">
+            Pelacakan posisi akan tampil otomatis setelah pengemudi menyalakan sesi perjalanan atau
+            transmisi telemetri.
           </p>
         </div>
       ) : (
         <div className="tracking-layout">
-          {/* Main Map */}
-          <div className="bezel min-w-0">
+          <div className="min-w-0 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
             <FleetMap
               vehicles={mergedVehicles}
               selectedVehicleId={selectedVehicleId}
               onSelectVehicle={(v) => setSelectedVehicleId(v.vehicleId)}
               routePoints={routePoints}
-              className="tracking-map"
+              className="h-[58dvh] min-h-[22rem] w-full lg:h-[calc(100dvh-15rem)]"
             />
           </div>
 
-          {/* Vehicle & Driver Side Panel */}
-          <div className="surface tracking-panel p-5 sm:p-6 flex flex-col justify-between">
-            <div>
-              {bookingSummary}
-              <div className="border-b-2 border-black/10 pb-3 mb-3">
-                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                  Tracked Vehicles ({mergedVehicles.length})
-                </span>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {mergedVehicles.map((v) => (
-                    <button
-                      key={v.vehicleId}
-                      type="button"
-                      onClick={() => setSelectedVehicleId(v.vehicleId)}
-                      aria-pressed={v.vehicleId === selectedVehicleId}
-                      className={`min-h-11 px-4 py-2 text-xs rounded-xl font-mono font-bold border-2 border-black cursor-pointer transition ${
-                        v.vehicleId === selectedVehicleId
-                          ? 'bg-emerald-400 text-zinc-950 shadow-[3px_3px_0px_0px_#000] translate-x-[-1px] translate-y-[-1px]'
-                          : 'bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#000]'
-                      }`}
-                    >
-                      {v.plateNumber}
-                    </button>
-                  ))}
-                </div>
+          <div className="tracking-panel space-y-3">
+            {bookingSummary}
+
+            <section className="card overflow-hidden" aria-labelledby="tracked-vehicles-heading">
+              <div className="flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
+                <h2 id="tracked-vehicles-heading" className="eyebrow">
+                  Armada terlacak{' '}
+                  <span className="tabular-nums opacity-70">({mergedVehicles.length})</span>
+                </h2>
+                <span className="text-[0.625rem] text-slate-400">Pilih unit</span>
               </div>
 
-              {selectedVehicle ? (
-                <div className="space-y-4 text-sm">
-                  {/* Driver Profile Card */}
+              <div className="flex flex-wrap gap-1.5 p-3">
+                {mergedVehicles.map((v) => (
+                  <button
+                    key={v.vehicleId}
+                    type="button"
+                    onClick={() => setSelectedVehicleId(v.vehicleId)}
+                    aria-pressed={v.vehicleId === selectedVehicleId}
+                    className={`cursor-pointer rounded-full border px-3 py-1 text-[0.6875rem] font-semibold transition-colors ${
+                      v.vehicleId === selectedVehicleId
+                        ? 'border-[var(--kcic-red)] bg-[var(--kcic-red)] text-white'
+                        : 'border-[var(--border)] bg-white text-slate-700 hover:border-[var(--border-strong)]'
+                    }`}
+                  >
+                    <span className="mono-plate">{v.plateNumber}</span>
+                  </button>
+                ))}
+              </div>
+
+              {selectedVehicle && (
+                <div className="space-y-3 border-t border-[var(--border-subtle)] p-3.5">
                   {selectedVehicle.driverName && (
-                    <div className="rounded-xl border-2 border-black bg-emerald-100 p-4 space-y-3 shadow-[3px_3px_0px_0px_#000]">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-emerald-400 text-zinc-950 font-black text-base shadow-[2px_2px_0px_0px_#000]">
+                    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3.5">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--slate-navy)] text-xs font-semibold text-white">
                           {selectedVehicle.driverName.slice(0, 2).toUpperCase()}
-                        </div>
+                        </span>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-black text-zinc-950 truncate">{selectedVehicle.driverName}</span>
-                            <span className="rounded-md border-1.5 border-black bg-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase text-zinc-950 shadow-[1px_1px_0px_0px_#000] shrink-0">
-                              Driver KCIC
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="truncate text-xs font-semibold text-slate-900">
+                              {selectedVehicle.driverName}
+                            </span>
+                            <span className="pill pill-error">
+                              <span>Driver KCIC</span>
                             </span>
                           </div>
-                          <p className="text-[11px] text-zinc-600 font-bold mt-0.5 flex items-center gap-1.5">
-                            <span className="size-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                            <span>Kontak Terproteksi (In-App Saja)</span>
+                          <p className="mt-0.5 flex items-center gap-1 text-[0.625rem] text-slate-500">
+                            <span
+                              className="size-1.5 rounded-full bg-[var(--status-active-fg)]"
+                              aria-hidden="true"
+                            />
+                            Kontak terlindungi (in-app)
                           </p>
                         </div>
                       </div>
 
-                      {/* In-App Real-time Chat & Voice Call (Gojek Style) */}
-                      <div className="pt-2 border-t-2 border-black/10">
+                      <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
                         <TripCommunicationWidget
                           bookingId={selectedBooking?.id}
                           currentUserId={(session?.user as any)?.id || 'passenger-user'}
@@ -469,70 +486,59 @@ function UserTrackingContent() {
                     </div>
                   )}
 
-                  {/* Vehicle Information */}
-                  <div className="rounded-xl border-2 border-black bg-zinc-50 p-4 space-y-3 shadow-[3px_3px_0px_0px_#000]">
-                    <div className="flex items-center justify-between">
-                      <span className="inline-block px-3 py-1 bg-zinc-950 text-white font-mono font-black tracking-wider rounded-md border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000]">
+                  <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="mono-plate rounded-[var(--radius-sm)] bg-[var(--canvas)] px-2 py-0.5 text-[0.8125rem] font-semibold text-slate-900">
                         {selectedVehicle.plateNumber}
                       </span>
                       <StatusBadge status={selectedVehicle.status} />
                     </div>
+
                     {selectedVehicle.brand && (
-                      <p className="text-xs text-zinc-700 font-bold">
+                      <p className="mt-1.5 text-[0.6875rem] font-medium text-slate-600">
                         {selectedVehicle.brand} {selectedVehicle.model}
                       </p>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/10 text-xs">
+                    <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border-subtle)] pt-2.5">
                       <div>
-                        <span className="text-[10px] text-zinc-500 uppercase font-black">
-                          Movement
-                        </span>
-                        <div className="mt-0.5">
+                        <dt className="metric-label">Pergerakan</dt>
+                        <dd className="mt-1">
                           <MovementBadge movement={selectedVehicle.movement} />
-                        </div>
+                        </dd>
                       </div>
                       <div>
-                        <span className="text-[10px] text-zinc-500 uppercase font-black">
-                          Accuracy
-                        </span>
-                        <div className="mt-0.5">
+                        <dt className="metric-label">Akurasi GPS</dt>
+                        <dd className="mt-1">
                           <GPSBadge accuracyM={selectedVehicle.accuracyM} />
-                        </div>
-                        {typeof selectedVehicle.accuracyM === 'number' && selectedVehicle.accuracyM > 100 && (
-                          <div className="mt-1 rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                            ⚠️ Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(selectedVehicle.accuracyM)} m)
-                          </div>
-                        )}
+                        </dd>
                       </div>
-                    </div>
+                    </dl>
 
                     {driverCurrentAddress && (
-                      <div className="pt-2 border-t-2 border-black/10 text-xs">
-                        <span className="text-[10px] text-zinc-500 uppercase font-black">
-                          Posisi Terkini Armada
-                        </span>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-zinc-900 font-bold line-clamp-2">
-                          <Icon name="pin" className="size-3.5 shrink-0 text-emerald-700" />
-                          <span>{driverCurrentAddress}</span>
+                      <div className="mt-2.5 border-t border-[var(--border-subtle)] pt-2.5">
+                        <p className="metric-label">Lokasi terkini</p>
+                        <p className="mt-0.5 flex items-start gap-1.5 text-[0.6875rem] leading-relaxed text-slate-700">
+                          <MapPin
+                            className="mt-0.5 size-3 shrink-0 text-[var(--kcic-red)]"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          />
+                          <span className="line-clamp-2">{driverCurrentAddress}</span>
                         </p>
                       </div>
                     )}
 
-                    <div className="pt-2 border-t-2 border-black/10 flex items-center justify-between text-xs">
-                      <span className="text-[10px] text-zinc-500 uppercase font-black">
-                        Last Update
-                      </span>
-                      <div className="text-zinc-800 font-mono font-bold text-[11px]">
+                    <div className="mt-2.5 flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5">
+                      <span className="metric-label">Update terakhir</span>
+                      <span className="text-[0.6875rem] font-medium tabular-nums text-slate-600">
                         <RelativeTime date={selectedVehicle.recordedAt} />
-                      </div>
+                      </span>
                     </div>
                   </div>
                 </div>
-              ) : (
-                <p className="text-xs text-zinc-400 italic">Pilih kendaraan untuk melihat detail posisi</p>
               )}
-            </div>
+            </section>
           </div>
         </div>
       )}
@@ -544,9 +550,9 @@ export default function UserTrackingPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-20 text-center text-zinc-500 text-sm">
-          <Spinner size="lg" className="mb-2" />
-          <p>Loading tracking map...</p>
+        <div className="flex flex-col items-center justify-center gap-2 py-24 text-xs text-slate-500">
+          <Spinner size="lg" className="text-[var(--kcic-red)]" />
+          <p>Memuat peta pelacakan…</p>
         </div>
       }
     >

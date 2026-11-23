@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { ChevronRight } from "lucide-react";
 
 export interface Column<T> {
   header: string;
@@ -35,6 +36,7 @@ export function DataTable<T extends object>({
       : column.accessorKey
         ? String(row[column.accessorKey] ?? "—")
         : null;
+
   const handleRowClick = (event: React.MouseEvent<HTMLElement>, row: T) => {
     if (
       !onRowClick ||
@@ -49,6 +51,7 @@ export function DataTable<T extends object>({
       ?.focus({ preventScroll: true });
     onRowClick(row);
   };
+
   const viewButton = (row: T, index: number, mobile = false) => (
     <button
       type="button"
@@ -57,42 +60,34 @@ export function DataTable<T extends object>({
         event.currentTarget.focus({ preventScroll: true });
         onRowClick?.(row);
       }}
-      aria-label={`View record ${index + 1}`}
-      className={`inline-flex min-h-9 min-w-9 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-black bg-amber-300 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000] transition-all hover:bg-amber-400 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-2 focus-visible:outline-black ${mobile ? "w-full py-2.5 px-4" : "p-1.5"}`}
+      aria-label={`Lihat data ${index + 1}`}
+      className={
+        mobile
+          ? "inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-1 rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-3.5 text-xs font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
+          : "inline-grid size-8 cursor-pointer place-items-center rounded-full text-slate-400 transition-colors hover:bg-[var(--canvas)] hover:text-slate-700"
+      }
     >
-      {mobile && <span>View record</span>}
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M5 12h14m-5-5 5 5-5 5" />
-      </svg>
+      {mobile && <span>Lihat detail</span>}
+      <ChevronRight className="size-3.5" strokeWidth={2} aria-hidden="true" />
     </button>
   );
 
   if (isLoading || data.length === 0) {
     return (
       <div
-        className="w-full rounded-xl border-[2.5px] border-black bg-white p-8 text-center sm:p-12 shadow-[5px_5px_0px_0px_#000]"
+        className="w-full rounded-[var(--radius-xl)] border border-[var(--border)] bg-white px-6 py-14 text-center"
         role="status"
         aria-live="polite"
         aria-busy={isLoading}
       >
         {isLoading && (
           <span
-            className="mx-auto mb-4 block size-7 animate-spin rounded-full border-3 border-zinc-200 border-t-black motion-reduce:animate-none"
+            className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--kcic-red)] motion-reduce:animate-none"
             aria-hidden="true"
           />
         )}
-        <p className="text-sm font-bold text-zinc-800">
-          {isLoading ? "Loading data..." : emptyMessage}
+        <p className="text-xs font-medium text-slate-500">
+          {isLoading ? "Memuat data…" : emptyMessage}
         </p>
       </div>
     );
@@ -100,44 +95,46 @@ export function DataTable<T extends object>({
 
   return (
     <div className="w-full min-w-0">
-      <div className="hidden rounded-xl border-[2.5px] border-black bg-white shadow-[5px_5px_0px_0px_#000] overflow-hidden md:block">
+      <div className="hidden overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border)] bg-white md:block">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead className="border-b-[2.5px] border-black bg-emerald-100 text-xs font-black uppercase tracking-wider text-black">
-              <tr>
+          <table className="w-full text-left text-[0.8125rem]">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--canvas)]">
                 {columns.map((column, index) => (
                   <th
                     key={index}
                     scope="col"
-                    className={`px-5 py-3.5 ${column.className || ""}`}
+                    className={`whitespace-nowrap px-5 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-slate-500 ${column.className || ""}`}
                   >
                     {column.header}
                   </th>
                 ))}
                 {onRowClick && (
-                  <th scope="col" className="w-16 px-3">
-                    <span className="sr-only">Record details</span>
+                  <th scope="col" className="w-12 px-2">
+                    <span className="sr-only">Detail data</span>
                   </th>
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y-2 divide-black/10">
+            <tbody>
               {data.map((row, rowIndex) => (
                 <tr
                   key={String(row[keyField] ?? rowIndex)}
                   onClick={(event) => handleRowClick(event, row)}
-                  className={`hover:bg-amber-100/50 transition-colors ${onRowClick ? "cursor-pointer" : ""}`}
+                  className={`border-b border-[var(--border-subtle)] transition-colors last:border-b-0 ${
+                    onRowClick ? "cursor-pointer hover:bg-[var(--canvas)]" : ""
+                  }`}
                 >
                   {columns.map((column, index) => (
                     <td
                       key={index}
-                      className={`px-5 py-3.5 text-black font-medium ${column.className || ""}`}
+                      className={`px-5 py-3 text-slate-700 ${column.className || ""}`}
                     >
                       {renderCell(column, row)}
                     </td>
                   ))}
                   {onRowClick && (
-                    <td className="px-3 py-2.5">{viewButton(row, rowIndex)}</td>
+                    <td className="px-2 py-2">{viewButton(row, rowIndex)}</td>
                   )}
                 </tr>
               ))}
@@ -146,29 +143,32 @@ export function DataTable<T extends object>({
         </div>
       </div>
 
-      <ul className="grid min-w-0 gap-4 md:hidden" aria-label="Records">
+      <ul className="grid min-w-0 gap-2.5 md:hidden" aria-label="Records">
         {data.map((row, rowIndex) => (
           <li
             key={String(row[keyField] ?? rowIndex)}
             onClick={(event) => handleRowClick(event, row)}
-            className={`min-w-0 rounded-xl border-[2.5px] border-black bg-white p-4 shadow-[4px_4px_0px_0px_#000] ${onRowClick ? "cursor-pointer" : ""}`}
+            className={`min-w-0 rounded-[var(--radius-xl)] border border-[var(--border)] bg-white p-4 transition-colors ${
+              onRowClick ? "cursor-pointer hover:border-[var(--border-strong)]" : ""
+            }`}
           >
-            <div className="min-w-0">
-              <dl className="min-w-0 divide-y-2 divide-black/10">
-                {columns.map((column, index) => (
-                  <div key={index} className="grid min-w-0 gap-1.5 py-3 first:pt-0 last:pb-0">
-                    <dt className="text-[11px] font-black uppercase tracking-wider text-zinc-600">
-                      {column.header || "Value"}
-                    </dt>
-                    <dd className="min-w-0 text-sm font-semibold text-black wrap-anywhere">
-                      {renderCell(column, row)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+            <dl className="min-w-0 divide-y divide-[var(--border-subtle)]">
+              {columns.map((column, index) => (
+                <div
+                  key={index}
+                  className="grid min-w-0 grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] items-baseline gap-3 py-2 first:pt-0 last:pb-0"
+                >
+                  <dt className="text-[0.6875rem] font-medium text-slate-400">
+                    {column.header || "Value"}
+                  </dt>
+                  <dd className="min-w-0 text-[0.8125rem] font-medium text-slate-800 wrap-anywhere">
+                    {renderCell(column, row)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
             {onRowClick && (
-              <div className="pt-3">
+              <div className="mt-3 border-t border-[var(--border-subtle)] pt-2.5">
                 {viewButton(row, rowIndex, true)}
               </div>
             )}

@@ -22,7 +22,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: 'cover',
-  themeColor: '#f4f7f5',
+  themeColor: '#F8FAFC',
 };
 
 export const metadata: Metadata = {
@@ -73,7 +73,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
       </head>
-      <body className="min-h-dvh flex flex-col text-zinc-900 font-sans">
+      <body className="min-h-dvh flex flex-col text-slate-900 font-sans">
         <LaunchSplash />
         <ServiceWorkerRegister />
         <AuthProvider>

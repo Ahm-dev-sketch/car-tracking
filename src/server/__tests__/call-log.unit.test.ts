@@ -76,7 +76,7 @@ it('logs MISSED call and creates system chat message successfully', async () => 
       sender_name: 'Sistem',
       sender_role: 'SYSTEM',
       receiver_id: 'driver-1',
-      message: '📞 Panggilan suara tak terjawab (30 detik)',
+      message: 'Panggilan suara tak terjawab (30 detik)',
       is_read: false,
       created_at: '2026-11-10T07:30:00Z',
     },
@@ -98,7 +98,7 @@ it('logs MISSED call and creates system chat message successfully', async () => 
   const json = await res.json();
   expect(json.success).toBe(true);
   expect(json.data.status).toBe('MISSED');
-  expect(json.data.message).toBe('📞 Panggilan suara tak terjawab (30 detik)');
+  expect(json.data.message).toBe('Panggilan suara tak terjawab (30 detik)');
   expect(mocks.executeRawUnsafe).toHaveBeenCalledWith(
     expect.stringContaining('INSERT INTO fleet_call_logs'),
     'b-101',
@@ -116,7 +116,7 @@ it('logs MISSED call and creates system chat message successfully', async () => 
     'Sistem',
     'SYSTEM',
     'driver-1',
-    '📞 Panggilan suara tak terjawab (30 detik)'
+    'Panggilan suara tak terjawab (30 detik)'
   );
 });
 
@@ -132,7 +132,7 @@ it('logs COMPLETED call and formats duration in system message', async () => {
       sender_name: 'Sistem',
       sender_role: 'SYSTEM',
       receiver_id: 'user-1',
-      message: '📞 Panggilan Suara Berakhir (02:45)',
+      message: 'Panggilan Suara Berakhir (02:45)',
       is_read: false,
       created_at: '2026-11-10T07:35:00Z',
     },
@@ -155,6 +155,6 @@ it('logs COMPLETED call and formats duration in system message', async () => {
   const json = await res.json();
   expect(json.success).toBe(true);
   expect(json.data.status).toBe('COMPLETED');
-  expect(json.data.message).toBe('📞 Panggilan Suara Berakhir (02:45)');
+  expect(json.data.message).toBe('Panggilan Suara Berakhir (02:45)');
 });
 

@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Plus, Search } from 'lucide-react';
 
 interface OperationalLocation {
   id: string;
@@ -351,34 +352,42 @@ function AdminDriversContent() {
 
   const columns: Column<DriverItem>[] = [
     {
-      header: 'Driver Name',
+      header: 'Pengemudi',
       cell: (d) => (
-        <div>
-          <span className="font-semibold text-zinc-900">{d.user.name}</span>
-          <span className="text-zinc-500 block text-xs">{d.user.email}</span>
+        <div className="min-w-0 max-w-[13rem]">
+          <span className="block truncate text-[0.8125rem] font-semibold text-slate-900">
+            {d.user.name}
+          </span>
+          <span className="block truncate text-xs text-slate-500">{d.user.email}</span>
         </div>
       ),
     },
     {
-      header: 'Phone',
-      cell: (d) => <span className="font-mono text-xs">{d.user.phone}</span>,
+      header: 'Telepon',
+      cell: (d) => (
+        <span className="tabular-nums whitespace-nowrap text-xs text-slate-700">{d.user.phone}</span>
+      ),
     },
     {
-      header: 'License #',
-      cell: (d) => <span className="font-mono text-xs font-semibold">{d.licenseNumber}</span>,
+      header: 'SIM',
+      cell: (d) => (
+        <span className="mono-plate whitespace-nowrap rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--canvas)] px-1.5 py-0.5 text-[0.6875rem] font-semibold text-slate-800">
+          {d.licenseNumber}
+        </span>
+      ),
     },
     {
-      header: 'Vehicle Assigned',
+      header: 'Armada',
       cell: (d) =>
         d.currentVehicle ? (
-          <div>
-            <span className="font-mono text-xs font-semibold text-zinc-900">
+          <div className="min-w-0 space-y-1">
+            <span className="mono-plate block text-[0.6875rem] font-semibold text-slate-900">
               {d.currentVehicle.plateNumber}
             </span>
-            <span className="text-zinc-500 block text-[11px]">
+            <span className="block max-w-[9.5rem] truncate text-[0.6875rem] text-slate-500">
               {d.currentVehicle.brand} {d.currentVehicle.model}
             </span>
-            <div className="flex flex-wrap items-center gap-1 mt-1">
+            <div className="flex flex-wrap items-center gap-1">
               {d.currentVehicle.homeLocation && (
                 <LocationBadge
                   type="home"
@@ -396,7 +405,7 @@ function AdminDriversContent() {
             </div>
           </div>
         ) : (
-          <span className="text-zinc-400 italic text-xs">Unassigned</span>
+          <span className="text-xs text-slate-400">Belum ditugaskan</span>
         ),
     },
     {
@@ -404,24 +413,27 @@ function AdminDriversContent() {
       cell: (d) => <StatusBadge status={d.status} />,
     },
     {
-      header: 'Actions',
+      header: 'Aksi',
       cell: (d) => (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex flex-wrap items-center justify-end gap-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
           {d.currentVehicle ? (
             <button
               type="button"
               onClick={() => setUnassigningDriver(d)}
-              className="px-2 py-1 text-xs font-medium border border-zinc-200 text-zinc-700 rounded hover:bg-zinc-50 cursor-pointer"
+              className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
             >
-              Unassign
+              Lepas mobil
             </button>
           ) : (
             <button
               type="button"
               onClick={() => handleOpenAssign(d)}
-              className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+              className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--slate-navy)] bg-[var(--slate-navy)] px-2.5 py-1 text-[0.6875rem] font-semibold text-white transition-opacity hover:opacity-90"
             >
-              Assign
+              Tugaskan
             </button>
           )}
 
@@ -433,7 +445,7 @@ function AdminDriversContent() {
               setEditStatus(d.status);
               setEditError(null);
             }}
-            className="px-2.5 py-1 text-xs font-black border-2 border-black text-zinc-900 bg-white rounded-lg hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+            className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-medium text-slate-700 transition-colors hover:bg-[var(--canvas)]"
           >
             Edit
           </button>
@@ -442,22 +454,25 @@ function AdminDriversContent() {
             <button
               type="button"
               onClick={() => setDeactivatingDriver(d)}
-              className="px-2.5 py-1 text-xs font-black text-rose-700 bg-rose-50 border-2 border-black rounded-lg hover:bg-rose-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+              className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--status-error-border)] bg-[var(--status-error-bg)] px-2.5 py-1 text-[0.6875rem] font-semibold text-[var(--status-error-fg)] transition-opacity hover:opacity-80"
             >
-              Deactivate
+              Nonaktifkan
             </button>
           )}
         </div>
       ),
     },
   ];
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b-2 border-black/10">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-zinc-950">Drivers Directory</h1>
-          <p className="text-xs font-medium text-zinc-600 mt-0.5">Manage drivers, licenses, and duty assignments</p>
+    <div className="w-full min-w-0 space-y-5">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <span className="eyebrow eyebrow-accent">Personel armada</span>
+          <h1 className="page-heading mt-2">Direktori pengemudi &amp; SIM</h1>
+          <p className="mt-1.5 max-w-lg text-xs leading-relaxed text-slate-500">
+            Kelola data pengemudi dinas KCIC, verifikasi lisensi SIM, dan penugasan armada
+            kendaraan.
+          </p>
         </div>
         <button
           type="button"
@@ -465,38 +480,59 @@ function AdminDriversContent() {
             setIsAddOpen(true);
             setAddError(null);
           }}
-          className="button-primary cursor-pointer inline-flex items-center gap-1.5"
+          className="button-primary self-start sm:self-auto"
         >
-          <span>+ Add Driver</span>
+          <Plus className="size-4" strokeWidth={2.2} aria-hidden="true" />
+          <span>Tambah driver</span>
         </button>
-      </div>
+      </header>
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
-      {/* Filter and Search */}
-      <div className="surface p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <form onSubmit={(e) => { e.preventDefault(); fetchDrivers(1); }} className="w-full sm:w-80 flex gap-2">
-          <input
-            type="text"
-            placeholder="Search driver name, license, email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs font-medium border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
-          />
-          <button type="submit" className="button-primary px-3 py-1.5 text-xs font-black">
-            Search
+      {/* Search & filters */}
+      <div className="card flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            fetchDrivers(1);
+          }}
+          className="flex w-full gap-2 md:w-80"
+        >
+          <div className="relative min-w-0 flex-1">
+            <label className="sr-only" htmlFor="driver-search">
+              Cari pengemudi
+            </label>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+            <input
+              id="driver-search"
+              type="text"
+              placeholder="Cari nama, SIM, email&hellip;"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <button type="submit" className="button-secondary px-3.5 py-2 text-[0.6875rem]">
+            Cari
           </button>
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Hub:</span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <label htmlFor="driver-hub-filter" className="metric-label shrink-0">
+              Hub
+            </label>
             <select
+              id="driver-hub-filter"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
+              className="w-auto min-w-0 rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
             >
-              <option value="">All Hubs</option>
+              <option value="">Semua hub</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -505,16 +541,19 @@ function AdminDriversContent() {
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black uppercase tracking-wider text-zinc-600">Status:</span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <label htmlFor="driver-status-filter" className="metric-label shrink-0">
+              Status
+            </label>
             <select
+              id="driver-status-filter"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 shadow-[2px_2px_0px_0px_#000] focus:outline-none"
+              className="w-auto min-w-0 rounded-full py-1.5 pl-3 pr-8 text-[0.6875rem] font-semibold"
             >
-              <option value="">All Statuses</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="ON_TRIP">On Trip</option>
+              <option value="">Semua status</option>
+              <option value="AVAILABLE">Tersedia</option>
+              <option value="ON_TRIP">On trip</option>
               <option value="OFFLINE">Offline</option>
             </select>
           </div>
@@ -525,7 +564,7 @@ function AdminDriversContent() {
         columns={columns}
         data={drivers}
         isLoading={isLoading}
-        emptyMessage="No drivers found"
+        emptyMessage="Belum ada pengemudi terdaftar"
       />
 
       <Pagination
@@ -535,160 +574,163 @@ function AdminDriversContent() {
         onPageChange={(p) => fetchDrivers(p)}
       />
 
-      {/* Add Driver Modal */}
+      {/* Add driver */}
       <Modal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        title="Add New Driver"
+        title="Tambah driver baru"
+        description="Registrasi akun pengemudi dinas KCIC beserta nomor SIM aktif."
         maxWidth="md"
       >
-        {addError && <ErrorBanner message={addError} className="mb-4" onDismiss={() => setAddError(null)} />}
+        {addError && (
+          <ErrorBanner message={addError} className="mb-4" onDismiss={() => setAddError(null)} />
+        )}
 
         <form onSubmit={handleCreateDriver} className="space-y-4">
-          <FormField label="Full Name" required>
+          <FormField label="Nama lengkap" required>
             <input
               type="text"
               required
-              placeholder="John Doe"
+              placeholder="Contoh: Budi Santoso"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
             />
           </FormField>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Email Address" required>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Alamat email" required>
               <input
                 type="email"
                 required
-                placeholder="driver@company.com"
+                autoComplete="off"
+                placeholder="driver@kcic.co.id"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
 
-            <FormField label="Phone Number" required>
+            <FormField label="Telepon / WhatsApp" required>
               <input
                 type="tel"
                 required
                 placeholder="081234567890"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="tabular-nums"
               />
             </FormField>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField label="Driver License #" required>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Nomor SIM" required>
               <input
                 type="text"
                 required
                 placeholder="SIM-A-123456"
                 value={licenseNumber}
                 onChange={(e) => setLicenseNumber(e.target.value.toUpperCase())}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded font-mono uppercase focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="mono-plate uppercase"
               />
             </FormField>
 
-            <FormField label="Initial Password" required hint="Min 8 characters">
+            <FormField label="Password awal" required hint="Minimal 8 karakter">
               <input
                 type="password"
                 required
                 minLength={8}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
           </div>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
             <button
               type="button"
               disabled={isSubmittingAdd}
               onClick={() => setIsAddOpen(false)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              className="button-secondary"
             >
-              Cancel
+              Batal
             </button>
-            <button
-              type="submit"
-              disabled={isSubmittingAdd}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              {isSubmittingAdd && <Spinner size="sm" className="text-white" />}
-              Create Driver
+            <button type="submit" disabled={isSubmittingAdd} className="button-primary">
+              {isSubmittingAdd && <Spinner size="xs" />}
+              <span>Daftarkan driver</span>
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Edit Driver Modal */}
+      {/* Edit driver */}
       <Modal
         isOpen={Boolean(editingDriver)}
         onClose={() => setEditingDriver(null)}
-        title={editingDriver ? `Edit Driver: ${editingDriver.user.name}` : ''}
+        title={editingDriver ? `Edit driver \u00b7 ${editingDriver.user.name}` : 'Edit driver'}
+        description="Perbarui lisensi mengemudi dan status dinas pengemudi."
         maxWidth="sm"
       >
-        {editError && <ErrorBanner message={editError} className="mb-4" onDismiss={() => setEditError(null)} />}
+        {editError && (
+          <ErrorBanner message={editError} className="mb-4" onDismiss={() => setEditError(null)} />
+        )}
 
         <form onSubmit={handleEditDriver} className="space-y-4">
-          <FormField label="Driver License #" required>
+          <FormField label="Nomor SIM" required>
             <input
               type="text"
               required
               value={editLicense}
               onChange={(e) => setEditLicense(e.target.value.toUpperCase())}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded font-mono uppercase focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              className="mono-plate uppercase"
             />
           </FormField>
 
-          <FormField label="Duty Status" required>
-            <select
-              value={editStatus}
-              onChange={(e) => setEditStatus(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
-            >
-              <option value="OFFLINE">OFFLINE</option>
-              <option value="AVAILABLE">AVAILABLE (Requires assigned vehicle)</option>
+          <FormField label="Status dinas" required>
+            <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+              <option value="OFFLINE">Offline</option>
+              <option value="AVAILABLE">Tersedia &mdash; butuh kendaraan</option>
             </select>
           </FormField>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
             <button
               type="button"
               disabled={isSubmittingEdit}
               onClick={() => setEditingDriver(null)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              className="button-secondary"
             >
-              Cancel
+              Batal
             </button>
-            <button
-              type="submit"
-              disabled={isSubmittingEdit}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              {isSubmittingEdit && <Spinner size="sm" className="text-white" />}
-              Save Changes
+            <button type="submit" disabled={isSubmittingEdit} className="button-primary">
+              {isSubmittingEdit && <Spinner size="xs" />}
+              <span>Simpan perubahan</span>
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Assign Vehicle Modal */}
+      {/* Assign vehicle */}
       <Modal
         isOpen={Boolean(assigningDriver)}
         onClose={() => setAssigningDriver(null)}
-        title="Assign Vehicle to Driver"
-        description={assigningDriver ? `${assigningDriver.user.name} (${assigningDriver.user.phone})` : ''}
+        title="Tugaskan kendaraan"
+        description={
+          assigningDriver
+            ? `${assigningDriver.user.name} \u00b7 ${assigningDriver.user.phone}`
+            : ''
+        }
         maxWidth="md"
       >
-        {assignError && <ErrorBanner message={assignError} className="mb-4" onDismiss={() => setAssignError(null)} />}
+        {assignError && (
+          <ErrorBanner
+            message={assignError}
+            className="mb-4"
+            onDismiss={() => setAssignError(null)}
+          />
+        )}
 
         <form onSubmit={handleAssignVehicle} className="space-y-4">
-          <FormField label="Lokasi / Pool Armada">
+          <FormField label="Lokasi pool armada">
             <select
               value={assignLocationFilter}
               onChange={(e) => {
@@ -697,9 +739,8 @@ function AdminDriversContent() {
                 fetchAvailableVehicles(locId);
                 setSelectedVehicleId('');
               }}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
             >
-              <option value="">-- Semua Lokasi Pool --</option>
+              <option value="">Semua lokasi pool</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -708,29 +749,29 @@ function AdminDriversContent() {
             </select>
           </FormField>
 
-          <FormField label="Available Vehicles" required>
+          <FormField label="Kendaraan tersedia" required>
             {isLoadingVehicles ? (
-              <div className="flex items-center gap-2 py-2 text-xs text-zinc-500">
-                <Spinner size="sm" className="text-zinc-600" />
-                <span>Memuat kendaraan pool...</span>
+              <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+                <Spinner size="xs" />
+                <span>Memuat kendaraan pool&hellip;</span>
               </div>
             ) : availableVehicles.length === 0 ? (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
-                Tidak ada kendaraan AVAILABLE {assignLocationFilter ? 'di lokasi pool ini' : ''}. Silakan pilih lokasi pool lain.
+              <div className="rounded-[var(--radius-md)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] px-3 py-2.5 text-xs leading-relaxed text-[var(--status-warning-fg)]">
+                Tidak ada kendaraan tersedia
+                {assignLocationFilter ? ' di lokasi pool ini' : ''}. Silakan pilih lokasi pool lain.
               </div>
             ) : (
               <select
                 required
                 value={selectedVehicleId}
                 onChange={(e) => setSelectedVehicleId(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-zinc-800"
               >
-                <option value="">-- Pilih Kendaraan ({availableVehicles.length} tersedia) --</option>
+                <option value="">Pilih kendaraan ({availableVehicles.length} tersedia)</option>
                 {availableVehicles.map((v) => {
                   const hub = v.currentOperationalLocation?.name || v.homeLocation?.name;
                   return (
                     <option key={v.id} value={v.id}>
-                      {v.plateNumber} ({v.brand} {v.model}){hub ? ` — ${hub}` : ''}
+                      {v.plateNumber} ({v.brand} {v.model}){hub ? ` \u2014 ${hub}` : ''}
                     </option>
                   );
                 })}
@@ -738,47 +779,45 @@ function AdminDriversContent() {
             )}
           </FormField>
 
-          <div className="pt-3 border-t border-zinc-200 flex items-center justify-end gap-3">
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-4">
             <button
               type="button"
               disabled={isAssigning}
               onClick={() => setAssigningDriver(null)}
-              className="px-3.5 py-1.5 border border-zinc-300 rounded text-xs font-medium text-zinc-700 bg-white hover:bg-zinc-50 cursor-pointer"
+              className="button-secondary"
             >
-              Cancel
+              Batal
             </button>
             <button
               type="submit"
               disabled={isAssigning || !selectedVehicleId}
-              className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
+              className="button-primary"
             >
-              {isAssigning && <Spinner size="sm" className="text-white" />}
-              Assign Vehicle
+              {isAssigning && <Spinner size="xs" />}
+              <span>Tugaskan kendaraan</span>
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Unassign Confirmation */}
       <ConfirmDialog
         isOpen={Boolean(unassigningDriver)}
         onClose={() => setUnassigningDriver(null)}
         onConfirm={handleUnassignVehicle}
-        title="Unassign Vehicle"
-        message={`Are you sure you want to unassign vehicle ${unassigningDriver?.currentVehicle?.plateNumber} from ${unassigningDriver?.user.name}?`}
-        confirmLabel="Unassign"
+        title="Lepas kendaraan"
+        message={`Kendaraan ${unassigningDriver?.currentVehicle?.plateNumber} akan dilepas dari ${unassigningDriver?.user.name}. Lanjutkan?`}
+        confirmLabel="Lepas kendaraan"
         isDestructive={false}
         isLoading={isUnassigning}
       />
 
-      {/* Deactivate Driver Confirmation */}
       <ConfirmDialog
         isOpen={Boolean(deactivatingDriver)}
         onClose={() => setDeactivatingDriver(null)}
         onConfirm={handleDeactivateDriver}
-        title="Deactivate Driver"
-        message={`Are you sure you want to deactivate ${deactivatingDriver?.user.name}? They will no longer be able to log in or operate fleet vehicles.`}
-        confirmLabel="Deactivate"
+        title="Nonaktifkan pengemudi"
+        message={`${deactivatingDriver?.user.name} tidak akan bisa masuk atau mengoperasikan armada lagi. Lanjutkan?`}
+        confirmLabel="Nonaktifkan"
         isDestructive={true}
         isLoading={isDeactivating}
       />
@@ -790,9 +829,9 @@ export default function AdminDriversPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-24 text-center text-zinc-500 text-xs">
-          <Spinner size="md" className="mb-2" />
-          <p>Loading drivers directory...</p>
+        <div className="flex flex-col items-center justify-center gap-2 py-24 text-xs text-slate-500">
+          <Spinner size="md" className="text-[var(--kcic-red)]" />
+          <p>Memuat direktori pengemudi&hellip;</p>
         </div>
       }
     >

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useId, useRef } from 'react';
+import { X } from 'lucide-react';
 import { useDialog } from './Modal';
 
 interface DrawerProps {
@@ -13,6 +14,10 @@ interface DrawerProps {
   width?: 'md' | 'lg' | 'xl';
 }
 
+/**
+ * Side sheet on desktop, bottom sheet on mobile.
+ * Focus trap, scroll lock and focus return all live in useDialog().
+ */
 export function Drawer({
   isOpen,
   onClose,
@@ -48,34 +53,46 @@ export function Drawer({
         if (backdropPress.current && event.target === event.currentTarget) onClose();
         backdropPress.current = false;
       }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-end justify-end overflow-hidden border-0 bg-transparent p-0 pt-[max(1rem,env(safe-area-inset-top))] text-black outline-none open:flex backdrop:bg-black/50 sm:p-0"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-end justify-end overflow-hidden border-0 bg-transparent p-0 text-slate-900 outline-none open:flex backdrop:bg-slate-900/35 backdrop:backdrop-blur-[2px]"
     >
-      <div className={`flex max-h-full min-h-0 w-full flex-col rounded-t-2xl sm:rounded-none border-t-[3px] sm:border-t-0 sm:border-l-[3px] border-black bg-white shadow-[-6px_0px_0px_0px_#000] transition-[transform,opacity] duration-200 ease-out starting:translate-y-6 sm:starting:translate-x-8 sm:starting:translate-y-0 motion-reduce:transition-none sm:h-full ${widthClasses[width]}`}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)] sm:pb-0">
-          <div className="mx-auto mb-1 mt-2 h-1.5 w-12 shrink-0 rounded-full bg-black sm:hidden" aria-hidden="true" />
-          <div className="flex shrink-0 items-center justify-between gap-4 border-b-[2.5px] border-black bg-amber-100/60 px-5 py-4 sm:px-6">
-            <div className="min-w-0">
-              <h2 id={titleId} className="text-xl font-extrabold tracking-tight text-black">{title}</h2>
-              {description && <p id={descriptionId} className="mt-1 text-xs font-semibold text-zinc-700 leading-relaxed">{description}</p>}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border-2 border-black bg-rose-200 text-black shadow-[2px_2px_0px_0px_#000] transition-all hover:bg-rose-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
-              aria-label="Close panel"
+      <div
+        className={`flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-t-[var(--radius-2xl)] border-t border-[var(--border)] bg-white shadow-[var(--shadow-float)] transition-[transform,opacity] duration-200 ease-out starting:translate-y-8 starting:opacity-0 motion-reduce:transition-none sm:h-full sm:rounded-none sm:rounded-l-[var(--radius-2xl)] sm:border-t-0 sm:border-l sm:starting:translate-x-8 sm:starting:translate-y-0 ${widthClasses[width]}`}
+      >
+        <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-[var(--border-strong)] sm:hidden" aria-hidden="true" />
+
+        <div className="flex shrink-0 items-start justify-between gap-4 px-5 pb-3.5 pt-4 sm:px-6">
+          <div className="min-w-0">
+            <h2
+              id={titleId}
+              className="text-[0.9375rem] font-semibold tracking-[-0.015em] text-slate-900"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                <path d="m7 7 10 10M17 7 7 17" />
-              </svg>
-            </button>
+              {title}
+            </h2>
+            {description && (
+              <p id={descriptionId} className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                {description}
+              </p>
+            )}
           </div>
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">{children}</div>
-          {footer && (
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t-[2.5px] border-black bg-zinc-50 px-5 py-4 sm:px-6">
-              {footer}
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="-mr-1 grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-slate-400 transition-colors hover:bg-[var(--canvas-sunken)] hover:text-slate-700"
+            aria-label="Close panel"
+          >
+            <X className="size-4" strokeWidth={2} aria-hidden="true" />
+          </button>
         </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain border-t border-[var(--border-subtle)] px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:bg-[var(--canvas)]/40 sm:px-5 sm:pb-5">
+          {children}
+        </div>
+
+        {footer && (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] bg-white px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-6">
+            {footer}
+          </div>
+        )}
       </div>
     </dialog>
   );

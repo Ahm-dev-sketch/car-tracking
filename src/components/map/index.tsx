@@ -10,9 +10,9 @@ export type { ConditionVisual } from './condition';
 export const FleetMap = dynamic(() => import('./FleetMap'), {
   ssr: false,
   loading: () => (
-    <div className="h-[500px] w-full rounded-lg bg-zinc-100 flex flex-col items-center justify-center border border-zinc-200 text-zinc-500 text-sm">
-      <Spinner size="lg" className="mb-2" />
-      <span>Loading fleet map...</span>
+    <div className="flex h-[500px] w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--canvas)] text-xs text-slate-500">
+      <Spinner size="md" className="text-[var(--kcic-red)]" />
+      <span>Memuat peta armada&hellip;</span>
     </div>
   ),
 });

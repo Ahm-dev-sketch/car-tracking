@@ -26,9 +26,13 @@ export default function ShareTargetPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-2 text-zinc-600">
-      <Spinner size="lg" />
-      <p className="text-sm">Opening…</p>
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-[var(--canvas)] text-slate-500"
+    >
+      <Spinner size="lg" className="text-[#C8102E]" />
+      <p className="text-xs font-medium">Membuka tautan…</p>
     </div>
   );
 }

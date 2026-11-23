@@ -1,35 +1,32 @@
 import React from 'react';
+import { Clock, Navigation, TriangleAlert, WifiOff, type LucideIcon } from 'lucide-react';
 
 type MovementType = 'MOVING' | 'STOPPED' | 'GPS_LOST' | 'OFFLINE' | string;
 
-const movementStyles: Record<string, { bg: string; label: string }> = {
-  MOVING: {
-    bg: 'bg-emerald-300 text-black',
-    label: 'Moving',
-  },
-  STOPPED: {
-    bg: 'bg-zinc-200 text-black',
-    label: 'Stopped',
-  },
-  GPS_LOST: {
-    bg: 'bg-amber-300 text-black',
-    label: 'GPS Lost',
-  },
-  OFFLINE: {
-    bg: 'bg-rose-300 text-black',
-    label: 'Offline',
-  },
+type Tone = 'active' | 'standby' | 'warning' | 'error' | 'neutral';
+
+const movementStyles: Record<string, { tone: Tone; label: string; Icon: LucideIcon }> = {
+  MOVING: { tone: 'active', label: 'Bergerak', Icon: Navigation },
+  STOPPED: { tone: 'neutral', label: 'Berhenti', Icon: Clock },
+  GPS_LOST: { tone: 'warning', label: 'GPS Hilang', Icon: TriangleAlert },
+  OFFLINE: { tone: 'error', label: 'Offline', Icon: WifiOff },
 };
 
-export function MovementBadge({ movement, className = '' }: { movement?: MovementType | null; className?: string }) {
+export function MovementBadge({
+  movement,
+  className = '',
+}: {
+  movement?: MovementType | null;
+  className?: string;
+}) {
   const norm = movement ? movement.toUpperCase() : 'OFFLINE';
   const conf = movementStyles[norm] || movementStyles.OFFLINE;
+  const { Icon } = conf;
 
   return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_0px_#000] ${conf.bg} ${className}`}
-    >
-      {conf.label}
+    <span className={`pill ${conf.tone === 'neutral' ? '' : `pill-${conf.tone}`} ${className}`}>
+      <Icon className="size-3 shrink-0" strokeWidth={2} aria-hidden="true" />
+      <span>{conf.label}</span>
     </span>
   );
 }

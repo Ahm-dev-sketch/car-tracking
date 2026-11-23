@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate resolve --rolled-back 20261112010000_add_location_coordinates || true && prisma migrate deploy && prisma generate && next build",
+    "build": "prisma migrate resolve --rolled-back 20261112010000_add_location_coordinates || node -e \"process.exit(0)\" && prisma migrate deploy && prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -30,6 +30,7 @@
     "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
     "leaflet": "^1.9.4",
+    "lucide-react": "^1.77.0",
     "next": "16.4.3",
     "next-auth": "^5.0.0-beta.32",
     "pg": "^8.23.1",

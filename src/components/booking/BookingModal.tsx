@@ -7,12 +7,24 @@ import { FormField } from '@/components/ui/FormField';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Icon } from '@/components/ui/Icon';
-import { DispatchProgress, formatEta } from './DispatchProgress';
+import { formatEta } from './DispatchProgress';
 import { findNearestHub } from '@/lib/operational-locations';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
 import { enqueueOfflineAction } from '@/lib/offline-sync';
 import { looksLikeGoogleMapsUrl, isShortLink, parseGoogleMapsUrl } from '@/lib/google-maps-url';
+import {
+  ArrowRight,
+  CalendarDays,
+  Car,
+  Check,
+  CircleAlert,
+  Clock,
+  MapPin,
+  MessageSquare,
+  Navigation,
+  Phone,
+  Search,
+} from 'lucide-react';
 
 export interface LocationOption {
   id: string;
@@ -52,11 +64,9 @@ export function BookingModal({
 }: BookingModalProps) {
   const router = useRouter();
 
-  // Locations list
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
 
-  // Form inputs
   const [operationalLocationId, setOperationalLocationId] = useState('');
   const [pickupLocation, setPickupLocation] = useState('');
   const [destination, setDestination] = useState('');
@@ -66,33 +76,34 @@ export function BookingModal({
   const [purpose, setPurpose] = useState('');
   const [notes, setNotes] = useState('');
 
-  // 2 Options: Drop Off vs Standby
   const [serviceType, setServiceType] = useState<'DROP_OFF' | 'STANDBY'>('DROP_OFF');
   const [dropOffDate, setDropOffDate] = useState('');
   const [dropOffTime, setDropOffTime] = useState('');
 
-  // Specific vehicle preference (Option B)
   const [preferredVehicle, setPreferredVehicle] = useState<PreferredVehicle | null>(null);
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState('');
   const [vehicleSearchResults, setVehicleSearchResults] = useState<PreferredVehicle[]>([]);
   const [isSearchingVehicles, setIsSearchingVehicles] = useState(false);
 
-  // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [offlineNotice, setOfflineNotice] = useState<string | null>(null);
 
-  // User GPS Location (Wajib)
   const [geoStatus, setGeoStatus] = useState<'idle' | 'locating' | 'granted' | 'denied' | 'unsupported'>('idle');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; accuracyM: number } | null>(null);
   const [nearestHubName, setNearestHubName] = useState<string | null>(null);
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
 
-  // Destination link resolution (Google Maps share links)
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isResolvingLink, setIsResolvingLink] = useState(false);
   const [destinationLinkError, setDestinationLinkError] = useState<string | null>(null);
+
+  const [submittedBooking, setSubmittedBooking] = useState<any | null>(null);
+  const [noDriverState, setNoDriverState] = useState<{
+    booking: any;
+    alternatives: PreferredVehicle[];
+  } | null>(null);
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationsLoadedRef = useRef(false);
@@ -113,125 +124,56 @@ export function BookingModal({
         setUserCoords({ lat, lng, accuracyM: acc });
         setGeoStatus('granted');
 
-        // Reverse geocode with IndexedDB/LocalStorage client cache
         setIsResolvingAddress(true);
         reverseGeocodeWithCache(lat, lng, nearestHubName || null)
           .then((addr) => {
             setResolvedAddress(addr);
+            if (!pickupLocation) {
+              setPickupLocation(addr);
+            }
           })
-          .catch(() => {
-            setResolvedAddress(nearestHubName || null);
-          })
-          .finally(() => {
-            setIsResolvingAddress(false);
-          });
+          .catch(() => {})
+          .finally(() => setIsResolvingAddress(false));
 
-        // Auto-match nearest Operational Location if not manually overridden by user or props
-        if (locationList && locationList.length > 0 && !initialVehiclePreference && !initialLocationId && !userManuallySelectedRef.current) {
-          const nearest = findNearestHub(lat, lng, locationList);
+        const locs = locationList || locations;
+        if (locs.length > 0 && !userManuallySelectedRef.current) {
+          const nearest = findNearestHub(lat, lng, locs);
           if (nearest) {
-            setOperationalLocationId(nearest.location.id);
-            setNearestHubName(`${nearest.location.name} (${nearest.location.code})`);
+            setNearestHubName(nearest.location.name);
+            const matched = locs.find((l) => l.code === nearest.location.code || l.id === nearest.location.id);
+            if (matched && !operationalLocationId) {
+              setOperationalLocationId(matched.id);
+            }
           }
         }
       },
-      () => {
+      (err) => {
+        console.warn('Geolocation error:', err.message);
         setGeoStatus('denied');
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     );
-  }, [initialVehiclePreference, initialLocationId]);
+  }, [locations, operationalLocationId, pickupLocation, nearestHubName]);
 
-  // Dispatch progress / Result states
-  const [submittedBooking, setSubmittedBooking] = useState<any | null>(null);
-  const [noDriverState, setNoDriverState] = useState<{
-    booking: any;
-    alternatives: Array<{ id: string; plateNumber: string; brand: string; model: string; seatingCapacity?: number }>;
-  } | null>(null);
-
-  // Reset or initialize on open
   useEffect(() => {
-    if (!isOpen) {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      locationsLoadedRef.current = false;
-      userManuallySelectedRef.current = false;
-      initialDestinationHandledRef.current = false;
-      setSubmittedBooking(null);
-      setNoDriverState(null);
-      setFormError(null);
-      setOfflineNotice(null);
-      setDestinationCoords(null);
-      setDestinationLinkError(null);
-      setDestination('');
-      return;
-    }
+    if (!isOpen) return;
 
-    // Default dates: now + 1hr, return now + 4hr
-    const now = new Date();
-    now.setHours(now.getHours() + 1, 0, 0, 0);
-    const returnTime = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const toLocalISO = (d: Date) =>
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-
-    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
-    setDepartureAt(toLocalISO(now));
-    setExpectedReturnAt(toLocalISO(returnTime));
-    setDropOffDate(todayStr);
-    setDropOffTime(timeStr);
-    setServiceType('DROP_OFF');
-    setPassengerCount(1);
-    setPurpose('');
-    setNotes('');
-    setFormError(null);
-    setOfflineNotice(null);
-    setSubmittedBooking(null);
-    setNoDriverState(null);
-    setNearestHubName(null);
-    setResolvedAddress(null);
-
-    // Initial vehicle preference
-    if (initialVehiclePreference) {
-      setPreferredVehicle(initialVehiclePreference);
-      if (initialVehiclePreference.currentLocationId) {
-        setOperationalLocationId(initialVehiclePreference.currentLocationId);
-      } else if (initialVehiclePreference.homeLocationId) {
-        setOperationalLocationId(initialVehiclePreference.homeLocationId);
-      }
-    } else {
-      setPreferredVehicle(null);
-    }
-
-    if (initialLocationId) {
-      setOperationalLocationId(initialLocationId);
-    }
-
-    // Proactively acquire user GPS location
-    requestUserLocation();
-
-    // Resolve an initial destination URL from a share-target flow (once per open).
-    if (initialDestinationUrl && !initialDestinationHandledRef.current) {
-      initialDestinationHandledRef.current = true;
-      void handleDestinationChange(initialDestinationUrl);
-    }
-
-    // Fetch operational locations
-    async function loadLocations() {
-      if (locations.length === 0) setLoadingLocations(true);
+    async function fetchLocations() {
+      setLoadingLocations(true);
       try {
         const res = await fetch('/api/locations');
         if (res.ok) {
           const json = await res.json();
-          const list: LocationOption[] = json.data || [];
-          setLocations(list);
-          if (list.length > 0 && !operationalLocationId && !initialLocationId && !initialVehiclePreference && !userManuallySelectedRef.current) {
-            setOperationalLocationId(list[0].id);
+          const activeLocs = (json.data || []).filter((l: LocationOption) => l.isActive);
+          setLocations(activeLocs);
+          locationsLoadedRef.current = true;
+
+          if (initialLocationId) {
+            setOperationalLocationId(initialLocationId);
+            userManuallySelectedRef.current = true;
+          } else {
+            requestUserLocation(activeLocs);
           }
-          // Re-evaluate nearest hub once location list is loaded
-          requestUserLocation(list);
         }
       } catch {
         // ignore
@@ -240,27 +182,52 @@ export function BookingModal({
       }
     }
 
-    // Fetch operational locations (only once per open)
-    if (!locationsLoadedRef.current) {
-      locationsLoadedRef.current = true;
-      loadLocations();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- requestUserLocation is stable enough; including it causes an infinite fetch loop
-  }, [isOpen, initialVehiclePreference, initialLocationId]);
+    fetchLocations();
 
-  // Search vehicles when typing in vehicle preference search
+    if (initialVehiclePreference) {
+      setPreferredVehicle(initialVehiclePreference);
+      if (initialVehiclePreference.currentLocationId || initialVehiclePreference.homeLocationId) {
+        setOperationalLocationId(
+          initialVehiclePreference.currentLocationId || initialVehiclePreference.homeLocationId || ''
+        );
+        userManuallySelectedRef.current = true;
+      }
+    }
+
+    if (initialDestinationUrl && !initialDestinationHandledRef.current) {
+      initialDestinationHandledRef.current = true;
+      void handleDestinationChange(initialDestinationUrl);
+    }
+
+    const now = new Date();
+    now.setHours(now.getHours() + 1, 0, 0, 0);
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:00`;
+    setDropOffDate(dateStr);
+    setDropOffTime(timeStr);
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const localIso = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    setDepartureAt(localIso);
+
+    const ret = new Date(now);
+    ret.setHours(ret.getHours() + 3);
+    const localRetIso = `${ret.getFullYear()}-${pad(ret.getMonth() + 1)}-${pad(ret.getDate())}T${pad(ret.getHours())}:${pad(ret.getMinutes())}`;
+    setExpectedReturnAt(localRetIso);
+  }, [isOpen, initialVehiclePreference, initialLocationId, initialDestinationUrl, requestUserLocation]);
+
   useEffect(() => {
-    if (!vehicleSearchQuery.trim() || vehicleSearchQuery.trim().length < 2) {
+    if (!vehicleSearchQuery.trim()) {
       setVehicleSearchResults([]);
       return;
     }
-
     const timer = setTimeout(async () => {
       setIsSearchingVehicles(true);
       try {
         const params = new URLSearchParams({
           search: vehicleSearchQuery.trim(),
-          limit: '6',
+          status: 'AVAILABLE',
+          limit: '5',
         });
         if (operationalLocationId) {
           params.set('locationId', operationalLocationId);
@@ -268,20 +235,18 @@ export function BookingModal({
         const res = await fetch(`/api/vehicles?${params.toString()}`);
         if (res.ok) {
           const json = await res.json();
-          const list = json.data || json.vehicles || [];
-          setVehicleSearchResults(list);
+          setVehicleSearchResults(json.data || json.vehicles || []);
         }
       } catch {
         // ignore
       } finally {
         setIsSearchingVehicles(false);
       }
-    }, 250);
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [vehicleSearchQuery, operationalLocationId]);
 
-  // Live polling for dispatch progress when booking submitted
   useEffect(() => {
     if (!submittedBooking || !submittedBooking.id) return;
 
@@ -289,27 +254,24 @@ export function BookingModal({
     const terminalStatuses = ['COMPLETED', 'CANCELLED', 'REJECTED', 'NO_DRIVER_AVAILABLE'];
 
     const poll = async () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         const res = await fetch(`/api/bookings/${bookingId}`);
         if (res.ok) {
           const json = await res.json();
-          const updated = json.data || json.booking || json;
-          setSubmittedBooking((prev: any) => ({
-            ...prev,
-            ...updated,
-          }));
+          const updated = json.data || json;
+          setSubmittedBooking(updated);
 
           if (terminalStatuses.includes(updated.status)) {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           }
         }
       } catch {
-        // ignore polling error
+        // ignore
       }
     };
 
-    pollIntervalRef.current = setInterval(poll, 5000); // 5s interval with visibility protection
+    pollIntervalRef.current = setInterval(poll, 3000);
+
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
@@ -324,191 +286,150 @@ export function BookingModal({
       return;
     }
 
-    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
-
-    // Fast path: full (non-short) Google Maps URLs with coords resolve locally, no server round-trip.
-    if (!isShortLink(value)) {
-      const parsed = parseGoogleMapsUrl(value);
-      if (parsed) {
-        setDestination(parsed.label);
-        setDestinationCoords({ lat: parsed.lat, lng: parsed.lng });
-        setDestinationLinkError(null);
-        return; // no network
-      }
-      // Full URL but no coords (text-only place/search) — fall through to server for Nominatim.
-    }
-
-    if (isOffline) {
-      if (isShortLink(value)) {
-        setDestinationLinkError(
-          'Short Google Maps links need an internet connection. Paste the full link (with @lat,lng) or connect to the internet.'
-        );
-        return;
-      }
-
-      // Text-only full URL while offline: no coords to extract and no server available.
-      setDestinationLinkError('Could not resolve this Google Maps link');
-      return;
-    }
-
     setIsResolvingLink(true);
-    try {
-      const res = await fetch('/api/maps/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: value }),
-      });
+    setDestinationLinkError(null);
 
-      if (res.ok) {
-        const json = await res.json();
-        setDestination(json.data.label);
-        setDestinationCoords({ lat: json.data.lat, lng: json.data.lng });
-        setDestinationLinkError(null);
+    try {
+      if (isShortLink(value)) {
+        const res = await fetch(`/api/maps/resolve?url=${encodeURIComponent(value.trim())}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.resolvedCoords) {
+            setDestinationCoords(data.resolvedCoords);
+            if (data.placeName) {
+              setDestination(data.placeName);
+            }
+          } else {
+            setDestinationLinkError('Tautan Google Maps tidak memuat koordinat tujuan yang valid.');
+          }
+        } else {
+          setDestinationLinkError('Gagal mengurai tautan Google Maps.');
+        }
       } else {
-        const json = await res.json().catch(() => null);
-        setDestinationLinkError(json?.error?.message || 'Could not resolve this Google Maps link');
+        const parsed = parseGoogleMapsUrl(value);
+        if (parsed) {
+          setDestinationCoords({ lat: parsed.lat, lng: parsed.lng });
+          if (parsed.label) {
+            setDestination(parsed.label);
+          }
+        } else {
+          setDestinationLinkError('Tidak dapat mengekstrak koordinat dari tautan tersebut.');
+        }
       }
     } catch {
-      setDestinationLinkError('Could not reach the server to resolve this link.');
+      setDestinationLinkError('Kesalahan jaringan saat memverifikasi tautan tujuan.');
     } finally {
       setIsResolvingLink(false);
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent, overrideVehiclePreferenceId?: string) => {
-    if (e) e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setFormError(null);
-    setIsSubmitting(true);
+    setOfflineNotice(null);
 
     if (!operationalLocationId) {
-      setFormError('Operational location is required');
-      setIsSubmitting(false);
+      setFormError('Harap pilih hub lokasi operasional keberangkatan.');
       return;
     }
-
-    if (!userCoords && geoStatus === 'denied') {
-      setFormError('Akses lokasi (GPS) wajib diaktifkan agar sistem dapat mencocokkan titik jemput dan armada terdekat.');
-      setIsSubmitting(false);
-      return;
-    }
-
     if (!pickupLocation.trim()) {
-      setFormError('Pickup location is required');
-      setIsSubmitting(false);
+      setFormError('Titik penjemputan wajib diisi.');
       return;
     }
-
     if (!destination.trim()) {
-      setFormError('Destination is required');
-      setIsSubmitting(false);
+      setFormError('Destinasi tujuan wajib diisi.');
       return;
     }
 
-    const isDropOff = serviceType === 'DROP_OFF';
-    let depDate: Date;
-    let retDate: Date;
+    let finalDeparture: string;
+    let finalReturn: string;
 
-    if (isDropOff) {
-      if (!dropOffDate) {
-        setFormError('Tanggal jemput wajib diisi untuk layanan Drop Off');
-        setIsSubmitting(false);
+    if (serviceType === 'DROP_OFF') {
+      if (!dropOffDate || !dropOffTime) {
+        setFormError('Tanggal dan jam penjemputan wajib diisi untuk layanan Drop Off.');
         return;
       }
-      if (!dropOffTime) {
-        setFormError('Jam jemput wajib dipilih untuk layanan Drop Off');
-        setIsSubmitting(false);
-        return;
-      }
-      depDate = new Date(`${dropOffDate}T${dropOffTime}:00`);
-      if (isNaN(depDate.getTime())) {
-        setFormError('Format tanggal atau jam jemput tidak valid');
-        setIsSubmitting(false);
-        return;
-      }
-      // Waktu kembali otomatis 3 jam setelah jam jemput
-      retDate = new Date(depDate.getTime() + 3 * 60 * 60 * 1000);
+      finalDeparture = new Date(`${dropOffDate}T${dropOffTime}`).toISOString();
+      const returnTime = new Date(`${dropOffDate}T${dropOffTime}`);
+      returnTime.setHours(returnTime.getHours() + 2);
+      finalReturn = returnTime.toISOString();
     } else {
       if (!departureAt || !expectedReturnAt) {
-        setFormError('Waktu keberangkatan dan waktu kembali wajib diisi');
-        setIsSubmitting(false);
+        setFormError('Waktu mulai dan selesai wajib diisi untuk layanan Standby.');
         return;
       }
-      depDate = new Date(departureAt);
-      retDate = new Date(expectedReturnAt);
-
-      if (isNaN(depDate.getTime()) || isNaN(retDate.getTime())) {
-        setFormError('Format tanggal keberangkatan atau kembali tidak valid');
-        setIsSubmitting(false);
+      finalDeparture = new Date(departureAt).toISOString();
+      finalReturn = new Date(expectedReturnAt).toISOString();
+      if (new Date(finalReturn) <= new Date(finalDeparture)) {
+        setFormError('Waktu selesai harus lebih lambat dari waktu mulai keberangkatan.');
         return;
       }
-
-      if (retDate <= depDate) {
-        setFormError('Waktu kembali harus setelah waktu keberangkatan');
-        setIsSubmitting(false);
-        return;
-      }
-
       if (!purpose.trim()) {
-        setFormError('Keterangan / keperluan wajib diisi untuk layanan Standby');
-        setIsSubmitting(false);
+        setFormError('Keterangan / keperluan wajib diisi untuk pesanan Standby.');
         return;
       }
     }
 
-    const vehiclePrefId =
-      overrideVehiclePreferenceId !== undefined
-        ? overrideVehiclePreferenceId
-        : preferredVehicle?.id || undefined;
+    setIsSubmitting(true);
 
-    const effectivePurpose = purpose.trim() || (isDropOff ? 'Layanan Drop Off' : '');
-    const autoNote = isDropOff
-      ? [notes.trim(), `[Layanan Drop Off - Tanggal: ${dropOffDate}, Jam Jemput: ${dropOffTime}]`].filter(Boolean).join(' ')
-      : notes.trim() || undefined;
-
-    const payload = {
+    const payload: any = {
       operationalLocationId,
       pickupLocation: pickupLocation.trim(),
       destination: destination.trim(),
-      departureAt: depDate.toISOString(),
-      expectedReturnAt: retDate.toISOString(),
-      passengerCount: Number(passengerCount),
-      purpose: effectivePurpose,
-      notes: autoNote || undefined,
+      departureAt: finalDeparture,
+      expectedReturnAt: finalReturn,
+      passengerCount,
+      purpose: purpose.trim() || (serviceType === 'DROP_OFF' ? 'Perjalanan Dinas Drop Off' : 'Standby Operasional'),
+      notes: notes.trim() || null,
       serviceType,
-      vehiclePreferenceId: vehiclePrefId || undefined,
-      pickupLat: userCoords?.lat ?? null,
-      pickupLng: userCoords?.lng ?? null,
-      destinationLat: destinationCoords?.lat ?? null,
-      destinationLng: destinationCoords?.lng ?? null,
     };
 
-    const enqueueAsOffline = () => {
-      enqueueOfflineAction('USER_CREATE_BOOKING', {
-        endpoint: '/api/bookings',
-        method: 'POST',
-        payload,
-      });
+    if (preferredVehicle?.id) {
+      payload.vehicleId = preferredVehicle.id;
+    }
 
-      const optimisticBooking = {
-        ...payload,
-        bookingNumber: `OFFLINE-${Date.now().toString(36).toUpperCase()}`,
-        status: 'OFFLINE_PENDING',
-      };
+    if (userCoords) {
+      payload.userLatitude = userCoords.lat;
+      payload.userLongitude = userCoords.lng;
+      payload.userAccuracyM = userCoords.accuracyM;
+    }
 
-      setOfflineNotice(
-        'Pesanan Anda tersimpan di perangkat ini dan akan dikirim otomatis saat koneksi kembali online.'
-      );
-      onSuccess?.(optimisticBooking);
-      setIsSubmitting(false);
-      setDestinationCoords(null);
-      setDestinationLinkError(null);
-      onClose();
-    };
+    if (destinationCoords) {
+      payload.destinationLatitude = destinationCoords.lat;
+      payload.destinationLongitude = destinationCoords.lng;
+    }
 
-    // Offline before even attempting the fetch
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      enqueueAsOffline();
-      return;
+      try {
+        const queuedAction = enqueueOfflineAction('USER_CREATE_BOOKING', {
+          endpoint: '/api/bookings',
+          method: 'POST',
+          payload,
+        });
+        setIsSubmitting(false);
+        setOfflineNotice(
+          `Mode Offline: Permintaan booking tersimpan secara lokal dan akan disinkronkan saat koneksi internet kembali (ID antrean: ${queuedAction.id.slice(0, 8)}).`
+        );
+        onSuccess?.({
+          id: queuedAction.id,
+          bookingNumber: `OFFLINE-${queuedAction.id.slice(0, 6).toUpperCase()}`,
+          status: 'OFFLINE_PENDING',
+          pickupLocation: payload.pickupLocation,
+          destination: payload.destination,
+          departureAt: payload.departureAt,
+          expectedReturnAt: payload.expectedReturnAt,
+          passengerCount: payload.passengerCount,
+          purpose: payload.purpose,
+          notes: payload.notes,
+          serviceType: payload.serviceType,
+          createdAt: new Date().toISOString(),
+        });
+        return;
+      } catch {
+        setFormError('Gagal menyimpan pesanan secara offline.');
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     try {
@@ -521,62 +442,65 @@ export function BookingModal({
       const json = await res.json();
 
       if (!res.ok) {
-        setFormError(json.error?.message || 'Failed to submit booking');
+        if (res.status === 409 && json.code === 'NO_DRIVER_AVAILABLE') {
+          setNoDriverState({
+            booking: json.booking,
+            alternatives: json.alternatives || [],
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        setFormError(json.error?.message || json.message || 'Gagal membuat reservasi');
+        setIsSubmitting(false);
         return;
       }
 
-      const bookingData = json.data || json;
-      onSuccess?.(bookingData);
-      setDestinationCoords(null);
-      setDestinationLinkError(null);
-
-      // Check dispatchState
-      if (bookingData.dispatchState === 'NO_DRIVER_AVAILABLE') {
-        setNoDriverState({
-          booking: bookingData,
-          alternatives: bookingData.alternatives || [],
-        });
-      } else {
-        setSubmittedBooking(bookingData);
-      }
+      const created = json.data || json;
+      setSubmittedBooking(created);
+      onSuccess?.(created);
     } catch {
-      // Network failure => save on-device and enqueue for later (no red error)
-      enqueueAsOffline();
+      setFormError('Terjadi kesalahan jaringan saat mengirimkan pesanan.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleBookAlternative = (alt: { id: string; plateNumber: string; brand: string; model: string; seatingCapacity?: number }) => {
-    setPreferredVehicle({
-      id: alt.id,
-      plateNumber: alt.plateNumber,
-      brand: alt.brand,
-      model: alt.model,
-      seatingCapacity: alt.seatingCapacity || passengerCount,
-    });
-    setNoDriverState(null);
-    handleSubmit(undefined, alt.id);
+  const handleBookAlternative = async (altVehicle: PreferredVehicle) => {
+    if (!noDriverState?.booking?.id) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/bookings/${noDriverState.booking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicleId: altVehicle.id }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setNoDriverState(null);
+        setSubmittedBooking(json.data || json);
+        onSuccess?.(json.data || json);
+      } else {
+        const err = await res.json();
+        setFormError(err.error?.message || 'Gagal menugaskan kendaraan alternatif.');
+      }
+    } catch {
+      setFormError('Kesalahan jaringan saat memilih kendaraan alternatif.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // If showing dispatch progress view
+  // If booking was submitted, show live dispatch progress or confirmation
   if (submittedBooking) {
-    const isPending = submittedBooking.status === 'PENDING';
-    const isAssigned = [
-      'DRIVER_ASSIGNED',
-      'DRIVER_EN_ROUTE',
-      'ARRIVED',
-      'IN_PROGRESS',
-    ].includes(submittedBooking.status);
+    const isAssigned = ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(
+      submittedBooking.status
+    );
+    const isPending = ['PENDING', 'APPROVED'].includes(submittedBooking.status);
+    const isSearching = ['SEARCHING_DRIVER', 'DRIVER_NOTIFIED'].includes(submittedBooking.status);
 
-    const isSearching = [
-      'SEARCHING_DRIVER',
-      'DRIVER_NOTIFIED',
-    ].includes(submittedBooking.status);
-
-    const driverName = submittedBooking.driver?.user?.name || submittedBooking.driver?.name || 'Driver KCIC';
-    const driverPhone = submittedBooking.driver?.user?.phone;
-    const rawDriverPhone = driverPhone && driverPhone !== 'REDACTED' ? driverPhone.replace(/\D/g, '') : null;
+    const driverName = submittedBooking.driver?.user?.name || 'Driver Operasional';
+    const driverPhone = submittedBooking.driver?.user?.phone || '';
+    const rawDriverPhone = driverPhone.replace(/\D/g, '').replace(/^0/, '62');
     const etaText = formatEta(submittedBooking.etaSeconds, submittedBooking.etaEstimated);
 
     return (
@@ -585,73 +509,70 @@ export function BookingModal({
         onClose={onClose}
         title={
           isAssigned
-            ? 'Pengemudi Dikonfirmasi'
+            ? 'Driver dikonfirmasi'
             : isPending
-            ? 'Permintaan Pemesanan Terkirim'
-            : 'Mencari Armada'
+              ? 'Pengajuan terkirim'
+              : 'Mencari armada'
         }
-        description={`Booking Reference #${submittedBooking.bookingNumber || ''}`}
+        description={`Nomor referensi ${submittedBooking.bookingNumber || '\u2014'}`}
         maxWidth="lg"
       >
-        <div className="space-y-5">
-          {/* PENDING ADMIN REVIEW & DRIVER ASSIGNMENT VIEW */}
+        <div className="space-y-4">
+          {/* Menunggu validasi admin */}
           {isPending && (
-            <div className="py-2 space-y-4">
-              <div className="rounded-xl border-[2.5px] border-black bg-amber-100 p-4 text-black shadow-[4px_4px_0px_0px_#000]">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-amber-400 text-black shadow-[2px_2px_0px_0px_#000]">
-                    <Icon name="calendar" className="size-5" />
+            <div className="space-y-4">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] p-4">
+                <div className="flex items-start gap-3">
+                  <span className="icon-tile bg-[var(--status-warning-border)]/40 text-[var(--status-warning-fg)]">
+                    <CalendarDays className="size-4.5" strokeWidth={1.9} aria-hidden="true" />
                   </span>
-                  <div>
-                    <h4 className="text-sm font-extrabold text-black">Menunggu Verifikasi & Penugasan Driver</h4>
-                    <p className="text-xs text-zinc-700 mt-0.5">
-                      Pemesanan Anda telah masuk ke portal Biro Umum / Admin Operasional KCIC. Admin akan memvalidasi jadwal serta menugaskan driver dan armada kendaraan.
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-[var(--status-warning-fg)]">
+                      Menunggu penugasan driver
+                    </h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[var(--status-warning-fg)]/85">
+                      Pengajuan masuk ke portal Biro Umum / Admin Operasional KCIC. Admin akan
+                      memvalidasi jadwal lalu menugaskan driver dan armada.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Route Summary Preview */}
-              <div className="rounded-xl border-[2.5px] border-black bg-white p-4 text-left text-xs space-y-3 shadow-[4px_4px_0px_0px_#000]">
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-200">
-                  <span className="font-bold text-zinc-600">Tipe Layanan:</span>
-                  <span className="px-2 py-0.5 bg-rose-100 border border-rose-300 text-rose-900 rounded font-black text-[11px]">
-                    {submittedBooking.serviceType === 'STANDBY' ? 'Standby Operasional' : 'Drop Off Sekali Jalan'}
+              <section className="card p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="eyebrow">Rute diajukan</span>
+                  <span
+                    className={`pill ${submittedBooking.serviceType === 'STANDBY' ? 'pill-warning' : ''}`}
+                  >
+                    <span className="pill-dot" aria-hidden="true" />
+                    <span>
+                      {submittedBooking.serviceType === 'STANDBY'
+                        ? 'Standby operasional'
+                        : 'Drop off sekali jalan'}
+                    </span>
                   </span>
                 </div>
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-emerald-400 text-[10px] font-black text-black">
-                    ●
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Titik Jemput</span>
-                    <p className="font-bold text-black truncate">{submittedBooking.pickupLocation}</p>
+
+                <div className="route-stepper mt-3">
+                  <div className="route-point" data-kind="pickup">
+                    <span className="route-label">Penjemputan</span>
+                    <p className="route-value">{submittedBooking.pickupLocation}</p>
+                  </div>
+                  <div className="route-point" data-kind="destination">
+                    <span className="route-label">Tujuan</span>
+                    <p className="route-value">{submittedBooking.destination}</p>
                   </div>
                 </div>
-                <div className="border-t-2 border-dashed border-black/20" />
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-rose-400 text-[10px] font-black text-black">
-                    ■
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Tujuan</span>
-                    <p className="font-bold text-black truncate">{submittedBooking.destination}</p>
-                  </div>
-                </div>
+              </section>
+
+              <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--canvas)] px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+                Status persetujuan dapat dipantau di menu{' '}
+                <span className="font-semibold text-slate-900">Pemesanan saya</span>. Notifikasi
+                dikirim saat driver telah ditugaskan.
               </div>
 
-              <div className="p-3 bg-zinc-50 border-2 border-black rounded-xl text-xs text-zinc-600">
-                <p>
-                  Anda dapat memantau status persetujuan dan penugasan driver melalui menu <strong className="text-black">Pemesanan Saya</strong>. Notifikasi in-app akan dikirim saat driver telah ditugaskan.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 border-2 border-black rounded-lg bg-white text-zinc-800 text-xs font-bold hover:bg-zinc-100 shadow-[2px_2px_0px_0px_#000] cursor-pointer"
-                >
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-3">
+                <button type="button" onClick={onClose} className="button-secondary">
                   Tutup
                 </button>
                 <button
@@ -660,219 +581,186 @@ export function BookingModal({
                     onClose();
                     router.push('/user/bookings');
                   }}
-                  className="px-4 py-2 border-2 border-black rounded-lg bg-[#be123c] text-white text-xs font-black hover:bg-[#9f1239] shadow-[2px_2px_0px_0px_#000] cursor-pointer"
+                  className="button-primary"
                 >
-                  Lihat Pemesanan Saya
+                  <span>Lihat pemesanan saya</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* GOJEK-STYLE RADAR SEARCHING VIEW */}
+          {/* Mencari armada */}
           {isSearching && (
-            <div className="py-4 text-center space-y-5">
-              <div className="relative mx-auto flex h-36 w-36 items-center justify-center">
-                <span className="absolute h-full w-full rounded-full border-2 border-dashed border-black bg-emerald-400/20 animate-ping duration-1000" />
-                <span className="absolute h-28 w-28 rounded-full border-2 border-black bg-emerald-300/30 animate-pulse" />
-                <span className="absolute h-20 w-20 rounded-full border-2 border-black bg-emerald-200/50" />
-                <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-2xl border-[3px] border-black bg-emerald-400 text-black shadow-[4px_4px_0px_0px_#000]">
-                  <Icon name="car" className="size-8 animate-bounce text-black" />
-                </div>
+            <div className="space-y-5 py-4 text-center">
+              <div className="relative mx-auto grid size-24 place-items-center">
+                <span
+                  className="live-ping absolute inset-0 rounded-full bg-[var(--kcic-red-soft)]"
+                  aria-hidden="true"
+                />
+                <span
+                  className="absolute size-16 rounded-full border border-[var(--kcic-red)]/25 bg-[var(--kcic-red-soft)]"
+                  aria-hidden="true"
+                />
+                <span className="relative z-10 grid size-12 place-items-center rounded-full bg-[var(--kcic-red)] text-white shadow-[var(--shadow-md)]">
+                  <Car className="size-6" strokeWidth={1.8} aria-hidden="true" />
+                </span>
               </div>
 
               <div>
-                <h3 className="text-xl font-extrabold tracking-tight text-black">
-                  Mencari Pengemudi Terdekat...
+                <h3 className="text-base font-semibold tracking-[-0.02em] text-slate-900">
+                  Mencari pengemudi terdekat
                 </h3>
-                <p className="mt-1.5 text-xs font-semibold text-zinc-700 max-w-sm mx-auto">
-                  Sistem auto-dispatch sedang memindai armada standby di hub operasional Anda.
+                <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-slate-500">
+                  Sistem auto-dispatch memindai armada standby di hub operasional Anda.
                 </p>
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-lg border-2 border-black bg-amber-300 px-3.5 py-1.5 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000]">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-black" />
+              <div className="inline-flex items-center gap-2 rounded-[var(--radius-full)] border border-[var(--status-standby-border)] bg-[var(--status-standby-bg)] px-3.5 py-1 text-xs font-medium text-[var(--status-standby-fg)]">
+                <span className="relative flex size-1.5" aria-hidden="true">
+                  <span className="live-ping absolute inset-0 rounded-full bg-current" />
+                  <span className="relative size-1.5 rounded-full bg-current" />
                 </span>
                 <span>
                   {submittedBooking.status === 'DRIVER_NOTIFIED'
-                    ? 'Penawaran terkirim ke pengemudi terdekat, menunggu konfirmasi...'
-                    : 'Menghubungkan ke armada terbaik...'}
+                    ? 'Penawaran terkirim ke driver, menunggu konfirmasi\u2026'
+                    : 'Menghubungkan ke armada terbaik\u2026'}
                 </span>
               </div>
 
-              {/* Route Summary Preview */}
-              <div className="rounded-xl border-[2.5px] border-black bg-white p-4 text-left text-xs space-y-2.5 shadow-[4px_4px_0px_0px_#000]">
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-emerald-400 text-[10px] font-black text-black">
-                    ●
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Titik Jemput</span>
-                    <p className="font-bold text-black truncate">{submittedBooking.pickupLocation}</p>
+              <section className="card p-4 text-left">
+                <div className="route-stepper">
+                  <div className="route-point" data-kind="pickup">
+                    <span className="route-label">Penjemputan</span>
+                    <p className="route-value">{submittedBooking.pickupLocation}</p>
+                  </div>
+                  <div className="route-point" data-kind="destination">
+                    <span className="route-label">Tujuan</span>
+                    <p className="route-value">{submittedBooking.destination}</p>
                   </div>
                 </div>
-                <div className="border-t-2 border-dashed border-black/20" />
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-black bg-rose-400 text-[10px] font-black text-black">
-                    ■
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[10px] uppercase font-black tracking-wider text-zinc-500">Tujuan</span>
-                    <p className="font-bold text-black truncate">{submittedBooking.destination}</p>
-                  </div>
-                </div>
-              </div>
+              </section>
             </div>
           )}
 
-          {/* GOJEK-STYLE DRIVER ACCEPTED / ASSIGNED VIEW */}
+          {/* Driver ditugaskan */}
           {isAssigned && (
-            <div className="space-y-4">
-              {/* Banner */}
-              <div className="rounded-xl border-[2.5px] border-black bg-emerald-300 p-4 text-black shadow-[4px_4px_0px_0px_#000]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000]">
-                      <Icon name="check" className="size-5" />
+            <div className="space-y-3.5">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="icon-tile bg-[var(--status-active-fg)] text-white">
+                      <Check className="size-4.5" strokeWidth={2.6} aria-hidden="true" />
                     </span>
-                    <div>
-                      <h4 className="text-base font-extrabold text-black">Driver Ditemukan!</h4>
-                      <p className="text-xs font-semibold text-emerald-950">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-[var(--status-active-fg)]">
+                        Driver ditemukan
+                      </h3>
+                      <p className="mt-0.5 text-xs leading-relaxed text-[var(--status-active-fg)]/85">
                         {submittedBooking.status === 'ARRIVED'
-                          ? 'Driver sudah tiba di titik penjemputan Anda!'
+                          ? 'Driver sudah tiba di titik penjemputan.'
                           : submittedBooking.status === 'IN_PROGRESS'
-                          ? 'Perjalanan sedang berlangsung.'
-                          : 'Driver sedang menuju titik penjemputan Anda.'}
+                            ? 'Perjalanan dinas sedang berlangsung.'
+                            : 'Driver sedang menuju titik penjemputan Anda.'}
                       </p>
                     </div>
                   </div>
                   {etaText && (
-                    <span className="rounded-lg border-2 border-black bg-amber-300 px-3 py-1 font-mono text-xs font-black text-black shadow-[2px_2px_0px_0px_#000]">
-                      ETA {etaText}
+                    <span className="pill pill-active bg-white">
+                      <span className="tabular-nums">ETA {etaText}</span>
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Driver & Vehicle Profile Card */}
-              <div className="rounded-xl border-[2.5px] border-black bg-white p-5 shadow-[4px_4px_0px_0px_#000] space-y-4">
+              <section className="card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-amber-300 text-black font-black text-xl shadow-[2px_2px_0px_0px_#000]">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="grid size-11 shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[var(--canvas-sunken)] text-sm font-semibold text-slate-700">
                       {driverName.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-extrabold text-base text-black">{driverName}</h4>
-                        <span className="rounded-md border-1.5 border-black bg-emerald-200 px-2 py-0.5 text-[10px] font-black uppercase text-black">
-                          Driver KCIC
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h4 className="truncate text-sm font-semibold text-slate-900">
+                          {driverName}
+                        </h4>
+                        <span className="pill">
+                          <span>Driver KCIC</span>
                         </span>
                       </div>
-                      <p className="text-xs text-zinc-600 font-mono font-bold mt-0.5">
-                        {submittedBooking.driver?.licenseNumber ? `SIM: ${submittedBooking.driver.licenseNumber}` : 'Pengemudi Resmi'}
+                      <p className="mono-plate mt-0.5 text-[0.6875rem] text-slate-500">
+                        {submittedBooking.driver?.licenseNumber
+                          ? `SIM ${submittedBooking.driver.licenseNumber}`
+                          : 'Pengemudi resmi'}
                       </p>
                     </div>
                   </div>
 
-                  {/* Indonesian Vehicle License Plate Badge */}
                   {submittedBooking.vehicle && (
                     <div className="text-right">
-                      <div className="inline-block px-3 py-1 bg-black text-white font-mono font-black tracking-wider rounded-lg border-2 border-black text-sm shadow-[2px_2px_0px_0px_#000]">
+                      <span className="mono-plate inline-flex rounded-[var(--radius-xs)] border border-[var(--border)] bg-[var(--canvas)] px-2 py-0.5 text-[0.6875rem] font-semibold text-slate-800">
                         {submittedBooking.vehicle.plateNumber}
-                      </div>
-                      <p className="text-[11px] font-bold text-zinc-700 mt-1">
+                      </span>
+                      <p className="mt-1 max-w-[11rem] truncate text-[0.6875rem] text-slate-500">
                         {submittedBooking.vehicle.brand} {submittedBooking.vehicle.model}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* Direct Contact Buttons (WhatsApp & Call) */}
                 {rawDriverPhone && (
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t-2 border-black/15">
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border-subtle)] pt-3">
                     <a
                       href={`https://wa.me/${rawDriverPhone}?text=${encodeURIComponent(
                         `Halo Pak/Bu ${driverName}, saya penumpang untuk pemesanan #${submittedBooking.bookingNumber}. Saya menunggu di ${submittedBooking.pickupLocation}.`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-3.5 py-2.5 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000] hover:bg-emerald-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition"
+                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[var(--radius-full)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] px-3.5 py-2 text-xs font-semibold text-[var(--status-active-fg)] transition-opacity hover:opacity-80"
                     >
-                      <svg className="size-4 fill-current" viewBox="0 0 24 24">
-                        <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.698.074-2.001-.466-1.503-.623-2.529-2.115-2.607-2.219-.074-.103-.615-.818-.615-1.56 0-.743.391-1.107.531-1.258.14-.15.307-.188.409-.188.103 0 .205.004.296.009.096.005.225-.036.352.27.13.313.444 1.082.483 1.161.039.08.065.173.013.277-.052.103-.079.168-.156.259-.078.09-.163.201-.233.27-.08.077-.163.161-.07.32.093.16.413.682.886 1.103.609.543 1.123.711 1.282.79.16.08.254.07.348-.039.095-.109.406-.473.514-.635.109-.162.217-.135.367-.08.151.054.958.452 1.123.535.165.083.276.124.316.193.04.07.04.405-.104.81z"/>
-                      </svg>
-                      <span>Chat WhatsApp</span>
+                      <MessageSquare className="size-3.5" strokeWidth={2} aria-hidden="true" />
+                      <span>WhatsApp</span>
                     </a>
 
                     <a
                       href={`tel:${driverPhone}`}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-3.5 py-2.5 text-xs font-extrabold text-black shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition"
+                      className="button-secondary min-h-10 py-2"
                     >
-                      <Icon name="phone" className="size-4" />
-                      <span>Telepon Driver</span>
+                      <Phone className="size-3.5" strokeWidth={2} aria-hidden="true" />
+                      <span>Telepon driver</span>
                     </a>
                   </div>
                 )}
-              </div>
+              </section>
 
-              {/* Route Summary */}
-              <div className="rounded-xl border-[2.5px] border-black bg-amber-50/70 p-4 text-xs space-y-2 shadow-[3px_3px_0px_0px_#000]">
-                <div className="flex justify-between items-center text-black">
-                  <span className="font-extrabold text-black">Status Penjemputan:</span>
-                  <StatusBadge status={submittedBooking.status} />
-                </div>
-                <div className="flex justify-between text-black">
-                  <span className="font-extrabold text-black">Titik Jemput:</span>
-                  <span className="text-right text-black font-bold truncate max-w-[220px]">
-                    {submittedBooking.pickupLocation}
-                  </span>
-                </div>
-                <div className="flex justify-between text-black">
-                  <span className="font-extrabold text-black">Tujuan:</span>
-                  <span className="text-right text-black font-bold truncate max-w-[220px]">
-                    {submittedBooking.destination}
-                  </span>
-                </div>
-              </div>
-
-              {/* Big Tracking CTA Button */}
               {submittedBooking.vehicle?.id && (
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      router.push(`/user/tracking?vehicleId=${submittedBooking.vehicle.id}`);
-                    }}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-[2.5px] border-black bg-emerald-400 px-4 py-3.5 text-sm font-black text-black shadow-[4px_4px_0px_0px_#000] hover:bg-emerald-300 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition cursor-pointer"
-                  >
-                    <Icon name="tracking" className="size-5" />
-                    <span>Lacak Posisi Driver di Peta Langsung</span>
-                    <Icon name="arrow" className="size-4" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    router.push(`/user/tracking?vehicleId=${submittedBooking.vehicle.id}`);
+                  }}
+                  className="button-primary w-full"
+                >
+                  <Navigation className="size-4" strokeWidth={2} aria-hidden="true" />
+                  <span>Lacak posisi driver</span>
+                  <ArrowRight className="size-4" strokeWidth={2.2} aria-hidden="true" />
+                </button>
               )}
             </div>
           )}
 
-          {/* Modal Footer Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-2 border-t-2 border-black/15">
+          <div className="flex flex-col items-stretch gap-2 border-t border-[var(--border-subtle)] pt-3 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
               onClick={() => {
                 onClose();
                 router.push('/user/bookings');
               }}
-              className="px-4 py-2.5 bg-black hover:bg-zinc-800 text-white rounded-xl border-2 border-black text-xs font-bold shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+              className="button-primary"
             >
-              Lihat Daftar Pemesanan Saya
+              <span>Lihat daftar pemesanan</span>
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 border-2 border-black bg-white hover:bg-zinc-100 text-black rounded-xl text-xs font-bold shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-            >
+            <button type="button" onClick={onClose} className="button-secondary">
               Tutup
             </button>
           </div>
@@ -881,70 +769,74 @@ export function BookingModal({
     );
   }
 
-  // If showing No Driver Available with alternatives
+  // Driver belum tersedia
   if (noDriverState) {
     return (
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="No Driver Available"
-        description="Auto-dispatch could not find an available online driver"
+        title="Driver belum tersedia"
+        description="Sistem auto-dispatch belum menemukan driver yang sedang standby"
         maxWidth="lg"
       >
         <div className="space-y-4">
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
-            <p className="font-semibold">All eligible drivers are currently busy or offline.</p>
-            <p className="mt-1 text-amber-800">
-              Your request was registered as reference #{noDriverState.booking?.bookingNumber}.
-              You can choose an alternative available vehicle below, or wait for admin manual dispatch.
+          <div className="rounded-[var(--radius-md)] border border-[var(--status-warning-border)] bg-[var(--status-warning-bg)] px-3 py-2.5 text-xs">
+            <p className="font-semibold text-[var(--status-warning-fg)]">
+              Semua driver di hub ini sedang bertugas atau offline.
+            </p>
+            <p className="mt-1 leading-relaxed text-[var(--status-warning-fg)]/85">
+              Permintaan tersimpan dengan referensi {noDriverState.booking?.bookingNumber}. Pilih
+              armada alternatif di bawah atau tunggu penugasan admin.
             </p>
           </div>
 
           {noDriverState.alternatives.length > 0 ? (
             <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-600">
-                Alternative Vehicles at this Location ({noDriverState.alternatives.length})
-              </h4>
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              <div className="flex items-center gap-2">
+                <span className="eyebrow">Armada alternatif</span>
+                <span className="tabular-nums text-[0.6875rem] font-medium text-slate-400">
+                  {noDriverState.alternatives.length}
+                </span>
+              </div>
+              <ul className="max-h-56 space-y-2 overflow-y-auto pr-1">
                 {noDriverState.alternatives.map((alt) => (
-                  <div
+                  <li
                     key={alt.id}
-                    className="p-3 bg-white border border-zinc-200 hover:border-zinc-300 rounded-lg flex items-center justify-between gap-3 text-xs"
+                    className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-white p-3 text-xs"
                   >
-                    <div>
-                      <span className="font-mono font-bold text-zinc-900">{alt.plateNumber}</span>
-                      <p className="text-zinc-600">
+                    <div className="min-w-0">
+                      <span className="mono-plate text-[0.6875rem] font-semibold text-slate-900">
+                        {alt.plateNumber}
+                      </span>
+                      <p className="truncate text-slate-500">
                         {alt.brand} {alt.model}
-                        {alt.seatingCapacity && ` • ${alt.seatingCapacity} seats`}
+                        {alt.seatingCapacity
+                          ? ` \u00b7 ${alt.seatingCapacity} kursi`
+                          : ''}
                       </p>
                     </div>
                     <button
                       type="button"
                       disabled={isSubmitting}
                       onClick={() => handleBookAlternative(alt)}
-                      className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 text-white rounded text-xs font-semibold cursor-pointer shrink-0"
+                      className="button-primary shrink-0 px-3.5 py-1.5 text-[0.6875rem]"
                     >
-                      {isSubmitting ? <Spinner size="sm" /> : 'Book Alternative'}
+                      {isSubmitting && <Spinner size="xs" />}
+                      <span>Pilih unit</span>
                     </button>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ) : (
-            <div className="p-4 bg-zinc-50 border border-dashed border-zinc-300 rounded-lg text-center text-xs text-zinc-500">
-              No immediate alternative vehicles found at this location.
+            <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--canvas)] px-4 py-8 text-center text-xs text-slate-500">
+              Tidak ada armada alternatif di hub ini.
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
-            <button
-              type="button"
-              onClick={() => {
-                setNoDriverState(null);
-              }}
-              className="px-3.5 py-1.5 border border-zinc-300 hover:bg-zinc-50 text-zinc-700 rounded text-xs font-medium cursor-pointer"
-            >
-              Back to Form
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <button type="button" onClick={() => setNoDriverState(null)} className="button-secondary">
+              Kembali ke form
             </button>
             <button
               type="button"
@@ -952,9 +844,9 @@ export function BookingModal({
                 onClose();
                 router.push('/user/bookings');
               }}
-              className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold cursor-pointer"
+              className="button-primary"
             >
-              Go to My Bookings
+              <span>Ke pemesanan saya</span>
             </button>
           </div>
         </div>
@@ -966,88 +858,92 @@ export function BookingModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Reserve a Vehicle"
-      description="Select operational location and trip details for auto-dispatch"
+      title="Pesan kendaraan dinas"
+      description="Pilih hub operasional dan rincian perjalanan dinas Whoosh"
       maxWidth="lg"
     >
       <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
         {formError && <ErrorBanner message={formError} onDismiss={() => setFormError(null)} />}
         {offlineNotice && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+          <div
+            role="status"
+            className="rounded-[var(--radius-md)] border border-[var(--status-active-border)] bg-[var(--status-active-bg)] px-3 py-2.5 text-xs leading-relaxed text-[var(--status-active-fg)]"
+          >
             {offlineNotice}
           </div>
         )}
 
-        {/* GPS Location Banner (Wajib Bagi User) */}
-        <div className={`rounded-xl border-[2.5px] border-black p-3.5 text-xs shadow-[3px_3px_0px_0px_#000] transition-colors duration-200 ${
-          geoStatus === 'granted' && userCoords
-            ? 'bg-emerald-200 text-black'
-            : geoStatus === 'denied'
-              ? 'bg-rose-200 text-black'
-              : 'bg-amber-100 text-black'
-        }`}>
+        {/* GPS */}
+        <div
+          className={`rounded-[var(--radius-md)] border px-3 py-2.5 text-xs transition-colors ${
+            geoStatus === 'granted' && userCoords
+              ? 'border-[var(--status-active-border)] bg-[var(--status-active-bg)] text-[var(--status-active-fg)]'
+              : geoStatus === 'denied'
+                ? 'border-[var(--status-error-border)] bg-[var(--status-error-bg)] text-[var(--status-error-fg)]'
+                : 'border-[var(--border)] bg-[var(--canvas)] text-slate-700'
+          }`}
+        >
           {geoStatus === 'locating' ? (
-            <div className="flex items-center gap-2.5 text-black font-bold">
-              <Spinner size="sm" />
-              <span>Memeriksa dan mendeteksi titik GPS perangkat Anda...</span>
+            <div className="flex items-center gap-2 font-medium">
+              <Spinner size="xs" />
+              <span>Mendeteksi koordinat GPS perangkat&hellip;</span>
             </div>
           ) : geoStatus === 'granted' && userCoords ? (
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-extrabold text-black flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full border border-black bg-emerald-600 animate-pulse" />
-                  Lokasi GPS Terdeteksi (Wajib Aktif)
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <span className="pill-dot" aria-hidden="true" />
+                  <span>GPS terdeteksi</span>
                 </span>
-                <span className="text-[11px] font-mono font-black text-black bg-white px-2 py-0.5 rounded-md border-1.5 border-black shadow-[1.5px_1.5px_0px_0px_#000]">
-                  ±{userCoords.accuracyM}m akurasi
+                <span className="tabular-nums rounded-[var(--radius-full)] border border-[var(--status-active-border)] bg-white px-2 py-0.5 text-[0.625rem] font-medium">
+                  &plusmn;{userCoords.accuracyM} m akurasi
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-zinc-800">
-                Koordinat: {userCoords.lat.toFixed(5)}, {userCoords.lng.toFixed(5)}
-                {nearestHubName ? ` · Hub terdekat: ${nearestHubName}` : ''}
+              <p className="tabular-nums text-[0.6875rem] opacity-85">
+                {userCoords.lat.toFixed(5)}, {userCoords.lng.toFixed(5)}
+                {nearestHubName ? ` \u00b7 Terdekat: ${nearestHubName}` : ''}
               </p>
             </div>
           ) : geoStatus === 'denied' ? (
-            <div className="space-y-2 text-black">
-              <div className="flex items-center justify-between">
-                <span className="font-extrabold flex items-center gap-1.5 text-black">
-                  <Icon name="alert" className="size-4 text-rose-600" />
-                  <span>Izin Lokasi (GPS) Wajib Diaktifkan</span>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <CircleAlert className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+                  <span>Izin akses GPS diperlukan</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => requestUserLocation()}
-                  className="px-3 py-1 text-[11px] font-extrabold bg-black hover:bg-zinc-800 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                  className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--status-error-border)] bg-white px-2.5 py-1 text-[0.6875rem] font-semibold text-[var(--status-error-fg)]"
                 >
-                  Izinkan Lokasi
+                  Izinkan lokasi
                 </button>
               </div>
-              <p className="text-[11px] font-bold leading-relaxed text-rose-950">
-                Lokasi GPS Anda wajib diaktifkan agar sistem auto-dispatch dapat menentukan titik penjemputan dan armada driver terdekat. Silakan izinkan akses lokasi di browser Anda.
+              <p className="text-[0.6875rem] leading-relaxed opacity-85">
+                Akses lokasi dipakai untuk menentukan titik penjemputan dan armada terdekat.
               </p>
             </div>
           ) : (
-            <div className="flex items-center justify-between">
-              <span className="text-black font-extrabold flex items-center gap-1.5">
-                <Icon name="pin" className="size-4 text-emerald-700" />
-                <span>Lokasi (GPS) Wajib untuk Penjemputan</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5 font-medium">
+                <MapPin className="size-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
+                <span>Deteksi otomatis titik penjemputan</span>
               </span>
               <button
                 type="button"
                 onClick={() => requestUserLocation()}
-                className="px-3 py-1 text-[11px] font-extrabold bg-black hover:bg-zinc-800 text-white rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                className="cursor-pointer rounded-[var(--radius-full)] border border-[var(--border)] bg-white px-2.5 py-1 text-[0.6875rem] font-semibold text-slate-700"
               >
-                Deteksi GPS
+                Aktifkan GPS
               </button>
             </div>
           )}
         </div>
 
-        {/* Operational Location (Required) */}
-        <FormField label="Operational Location" name="operationalLocation" required>
+        <FormField label="Hub operasional keberangkatan" name="operationalLocation" required>
           {loadingLocations ? (
-            <div className="flex items-center gap-2 py-2 text-xs text-zinc-500">
-              <Spinner size="sm" /> Loading operational locations...
+            <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+              <Spinner size="xs" /> Memuat daftar hub&hellip;
             </div>
           ) : (
             <select
@@ -1056,7 +952,6 @@ export function BookingModal({
               onChange={(e) => {
                 userManuallySelectedRef.current = true;
                 setOperationalLocationId(e.target.value);
-                // Clear preferred vehicle if it doesn't belong to newly selected location
                 if (
                   preferredVehicle &&
                   preferredVehicle.currentLocationId &&
@@ -1067,10 +962,9 @@ export function BookingModal({
                 }
               }}
               required
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-800"
             >
               <option value="" disabled>
-                Select operational hub / base...
+                Pilih hub operasional stasiun / depo&hellip;
               </option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
@@ -1081,48 +975,40 @@ export function BookingModal({
           )}
         </FormField>
 
-        {/* Pilihan Layanan: Drop Off vs Standby */}
-        <div className="space-y-1.5">
-          <label className="block text-xs font-black uppercase tracking-wider text-black">
-            Pilihan Layanan Pemesanan
-          </label>
-          <div className="grid grid-cols-2 gap-2 p-1.5 bg-zinc-100 border-2 border-black rounded-xl">
+        {/* Jenis layanan */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-slate-600">Jenis layanan</span>
+          <div className="segmented grid w-full grid-cols-2">
             <button
               type="button"
               onClick={() => setServiceType('DROP_OFF')}
-              className={`py-2 px-3 text-xs font-bold rounded-lg border-2 transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                serviceType === 'DROP_OFF'
-                  ? 'bg-[#be123c] border-black text-white shadow-[2px_2px_0px_0px_#000]'
-                  : 'border-transparent text-zinc-700 hover:text-black hover:bg-zinc-200'
-              }`}
+              aria-pressed={serviceType === 'DROP_OFF'}
+              className="justify-start py-2"
             >
-              <Icon name="car" className="size-4 shrink-0" />
-              <div className="text-left">
-                <div className="font-extrabold leading-tight">1. Drop Off</div>
-                <div className="text-[10px] opacity-85 leading-tight">Sekali Jalan (Jam Jemput Saja)</div>
-              </div>
+              <Car className="size-4 shrink-0" strokeWidth={1.9} aria-hidden="true" />
+              <span className="flex min-w-0 flex-col items-start leading-tight">
+                <span className="font-semibold">Drop off</span>
+                <span className="text-[0.625rem] font-normal text-slate-400">Sekali jalan</span>
+              </span>
             </button>
             <button
               type="button"
               onClick={() => setServiceType('STANDBY')}
-              className={`py-2 px-3 text-xs font-bold rounded-lg border-2 transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                serviceType === 'STANDBY'
-                  ? 'bg-[#be123c] border-black text-white shadow-[2px_2px_0px_0px_#000]'
-                  : 'border-transparent text-zinc-700 hover:text-black hover:bg-zinc-200'
-              }`}
+              aria-pressed={serviceType === 'STANDBY'}
+              className="justify-start py-2"
             >
-              <Icon name="clock" className="size-4 shrink-0" />
-              <div className="text-left">
-                <div className="font-extrabold leading-tight">2. Standby</div>
-                <div className="text-[10px] opacity-85 leading-tight">Operasional Seharian</div>
-              </div>
+              <Clock className="size-4 shrink-0" strokeWidth={1.9} aria-hidden="true" />
+              <span className="flex min-w-0 flex-col items-start leading-tight">
+                <span className="font-semibold">Standby</span>
+                <span className="text-[0.625rem] font-normal text-slate-400">Seharian</span>
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Pickup & Destination */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField label="Pickup Location" name="pickupLocation" required>
+        {/* Rute */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormField label="Titik penjemputan" name="pickupLocation" required>
             <div className="space-y-1">
               <input
                 id="pickupLocation"
@@ -1130,11 +1016,10 @@ export function BookingModal({
                 required
                 value={pickupLocation}
                 onChange={(e) => setPickupLocation(e.target.value)}
-                placeholder="e.g. Halim Gate 2"
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                placeholder="Contoh: Lobi Stasiun Halim Pintu 2"
               />
               {userCoords && (
-                <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] pt-0.5">
+                <div className="flex flex-wrap items-center justify-between gap-1 pt-0.5">
                   <button
                     type="button"
                     onClick={() => {
@@ -1144,19 +1029,22 @@ export function BookingModal({
                         `Titik GPS (${userCoords.lat.toFixed(5)}, ${userCoords.lng.toFixed(5)})`;
                       setPickupLocation(locationText);
                     }}
-                    className="text-emerald-700 hover:text-emerald-900 font-medium underline inline-flex items-center gap-1 cursor-pointer"
+                    className="inline-flex cursor-pointer items-center gap-1 text-[0.6875rem] font-medium text-[var(--kcic-red)] hover:underline"
                   >
-                    <Icon name="pin" className="size-3 text-emerald-700" />
-                    <span>Gunakan alamat lokasi saya</span>
+                    <MapPin className="size-3 shrink-0" strokeWidth={2} aria-hidden="true" />
+                    <span>Gunakan posisi saya</span>
                   </button>
                   {isResolvingAddress ? (
-                    <span className="text-zinc-400 italic text-[10px]">Mencari alamat...</span>
+                    <span className="text-[0.625rem] text-slate-400">Mencari alamat&hellip;</span>
                   ) : resolvedAddress ? (
-                    <span className="text-zinc-600 font-medium text-[10px] max-w-[280px] truncate" title={resolvedAddress}>
+                    <span
+                      className="max-w-[14rem] truncate text-[0.625rem] text-slate-500"
+                      title={resolvedAddress}
+                    >
                       {resolvedAddress}
                     </span>
                   ) : (
-                    <span className="text-zinc-400 font-mono text-[10px]">
+                    <span className="tabular-nums text-[0.625rem] text-slate-400">
                       {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
                     </span>
                   )}
@@ -1165,7 +1053,7 @@ export function BookingModal({
             </div>
           </FormField>
 
-          <FormField label="Destination" name="destination" required>
+          <FormField label="Destinasi tujuan" name="destination" required>
             <div className="relative">
               <input
                 id="destination"
@@ -1173,46 +1061,51 @@ export function BookingModal({
                 required
                 value={destination}
                 onChange={(e) => handleDestinationChange(e.target.value)}
-                placeholder="e.g. Tegalluar Depo Office"
+                placeholder="Contoh: Depo Tegalluar / tautan Maps"
                 aria-invalid={destinationLinkError ? true : undefined}
-                className="w-full min-h-12 rounded-xl border-[2.5px] border-black bg-white px-4 py-3 pr-10 text-base font-medium text-black shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#059669] focus:outline-none sm:text-sm"
+                className="pr-9"
               />
               {isResolvingLink && (
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                  <Spinner size="sm" />
+                  <Spinner size="xs" />
                 </span>
               )}
             </div>
             {destinationCoords && (
-              <p className="flex items-center gap-1 text-[11px] text-zinc-600">
-                <Icon name="pin" className="size-3 text-rose-600" />
-                <span>{destinationCoords.lat.toFixed(5)}, {destinationCoords.lng.toFixed(5)}</span>
+              <p className="tabular-nums flex items-center gap-1 pt-0.5 text-[0.6875rem] text-slate-500">
+                <MapPin className="size-3 shrink-0 text-[var(--kcic-red)]" strokeWidth={2} aria-hidden="true" />
+                <span>
+                  {destinationCoords.lat.toFixed(5)}, {destinationCoords.lng.toFixed(5)}
+                </span>
               </p>
             )}
             {destinationLinkError && (
-              <p role="alert" className="text-xs font-bold text-rose-600">
+              <p role="alert" className="pt-0.5 text-[0.6875rem] font-medium text-[var(--status-error-fg)]">
                 {destinationLinkError}
               </p>
             )}
           </FormField>
         </div>
 
-        {/* Departure & Return */}
+        {/* Jadwal */}
         {serviceType === 'DROP_OFF' ? (
-          <div className="p-3 bg-rose-50/70 border-2 border-black rounded-xl space-y-2 shadow-[2px_2px_0px_0px_#000]">
-            <div className="flex items-center justify-between text-xs font-black text-zinc-900 border-b border-black/10 pb-1.5">
-              <span className="flex items-center gap-1.5">
-                <Icon name="clock" className="size-3.5 text-[#be123c]" />
-                <span>Jadwal Penjemputan Drop Off</span>
+          <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                <Clock className="size-3.5 text-[var(--kcic-red)]" strokeWidth={2} aria-hidden="true" />
+                <span>Jadwal penjemputan</span>
               </span>
-              <span className="text-[10px] bg-rose-100 text-[#be123c] px-2 py-0.5 rounded font-bold border border-rose-300">
-                Sekali Jalan
+              <span className="pill">
+                <span>Sekali jalan</span>
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label htmlFor="dropOffDate" className="block text-[11px] font-bold text-zinc-900 mb-1">
-                  Tanggal Jemput <span className="text-[#be123c]">*</span>
+                <label
+                  htmlFor="dropOffDate"
+                  className="mb-1 block text-xs font-medium text-slate-600"
+                >
+                  Tanggal jemput <span className="text-[var(--kcic-red)]">*</span>
                 </label>
                 <input
                   id="dropOffDate"
@@ -1220,12 +1113,15 @@ export function BookingModal({
                   required
                   value={dropOffDate}
                   onChange={(e) => setDropOffDate(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+                  className="tabular-nums"
                 />
               </div>
               <div>
-                <label htmlFor="dropOffTime" className="block text-[11px] font-bold text-zinc-900 mb-1">
-                  Jam Jemput <span className="text-[#be123c]">*</span>
+                <label
+                  htmlFor="dropOffTime"
+                  className="mb-1 block text-xs font-medium text-slate-600"
+                >
+                  Jam jemput <span className="text-[var(--kcic-red)]">*</span>
                 </label>
                 <input
                   id="dropOffTime"
@@ -1233,43 +1129,40 @@ export function BookingModal({
                   required
                   value={dropOffTime}
                   onChange={(e) => setDropOffTime(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white text-zinc-900 focus:outline-none focus:ring-1 focus:ring-black"
+                  className="tabular-nums"
                 />
               </div>
             </div>
-            <p className="text-[10px] text-zinc-500 italic pt-0.5">
-              * Khusus Drop Off, tanggal & jam selesai tidak perlu diisi (hanya jadwal penjemputan).
-            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Waktu Mulai Standby" name="departureAt" required>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField label="Waktu mulai standby" name="departureAt" required>
               <input
                 id="departureAt"
                 type="datetime-local"
                 required
                 value={departureAt}
                 onChange={(e) => setDepartureAt(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="tabular-nums"
               />
             </FormField>
 
-            <FormField label="Waktu Selesai Standby" name="expectedReturnAt" required>
+            <FormField label="Waktu selesai standby" name="expectedReturnAt" required>
               <input
                 id="expectedReturnAt"
                 type="datetime-local"
                 required
                 value={expectedReturnAt}
                 onChange={(e) => setExpectedReturnAt(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+                className="tabular-nums"
               />
             </FormField>
           </div>
         )}
 
-        {/* Passenger count & Purpose */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <FormField label="Passengers" name="passengerCount" required>
+        {/* Penumpang & keperluan */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <FormField label="Jumlah penumpang" name="passengerCount" required>
             <input
               id="passengerCount"
               type="number"
@@ -1278,13 +1171,13 @@ export function BookingModal({
               required
               value={passengerCount}
               onChange={(e) => setPassengerCount(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
+              className="tabular-nums"
             />
           </FormField>
 
           <div className="sm:col-span-2">
             <FormField
-              label={serviceType === 'STANDBY' ? 'Keperluan / Keterangan (Wajib)' : 'Keperluan / Keterangan (Opsional)'}
+              label={serviceType === 'STANDBY' ? 'Keperluan (wajib)' : 'Keperluan (opsional)'}
               name="purpose"
               required={serviceType === 'STANDBY'}
             >
@@ -1296,123 +1189,125 @@ export function BookingModal({
                 onChange={(e) => setPurpose(e.target.value)}
                 placeholder={
                   serviceType === 'STANDBY'
-                    ? 'Wajib diisi, misal: Standby pimpinan / inspeksi rel'
-                    : 'Opsional, misal: Antar staf ke Stasiun Halim'
+                    ? 'Wajib, misal: standby pimpinan / inspeksi rel'
+                    : 'Opsional, misal: antar staf ke Stasiun Halim'
                 }
-                className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-zinc-800"
               />
             </FormField>
           </div>
         </div>
 
-        {/* Specific Vehicle Preference (Option B - Optional) */}
-        <div className="p-3.5 bg-amber-50/70 border-[2.5px] border-black rounded-xl space-y-2 shadow-[3px_3px_0px_0px_#000]">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-black">
-              Specific Vehicle Preference (Optional)
-            </span>
+        {/* Armada khusus */}
+        <div className="space-y-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--canvas)] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-medium text-slate-700">Pilihan armada khusus</span>
             {preferredVehicle && (
               <button
                 type="button"
                 onClick={() => setPreferredVehicle(null)}
-                className="text-xs text-rose-700 hover:text-rose-900 font-extrabold cursor-pointer underline"
+                className="cursor-pointer text-[0.6875rem] font-medium text-[var(--kcic-red)] hover:underline"
               >
-                Clear Preference
+                Hapus pilihan
               </button>
             )}
           </div>
 
           {preferredVehicle ? (
-            <div className="p-3 bg-white border-2 border-black rounded-lg flex items-center justify-between text-xs shadow-[2px_2px_0px_0px_#000]">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-black text-black">
+            <div className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--border)] bg-white p-3 text-xs">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mono-plate font-semibold text-slate-900">
                     {preferredVehicle.plateNumber}
                   </span>
                   {preferredVehicle.status && <StatusBadge status={preferredVehicle.status} />}
                 </div>
-                <div className="text-zinc-700 font-semibold mt-0.5">
-                  {preferredVehicle.brand} {preferredVehicle.model} • {preferredVehicle.seatingCapacity} seats
-                  {preferredVehicle.vehicleType && ` • ${preferredVehicle.vehicleType}`}
+                <div className="mt-0.5 truncate text-slate-500">
+                  {preferredVehicle.brand} {preferredVehicle.model}
+                  <span className="tabular-nums"> &middot; {preferredVehicle.seatingCapacity} kursi</span>
+                  {preferredVehicle.vehicleType && ` \u00b7 ${preferredVehicle.vehicleType}`}
                 </div>
               </div>
-              <span className="px-2 py-0.5 bg-amber-300 border-1.5 border-black text-black text-[10px] font-black rounded-md uppercase shadow-[1.5px_1.5px_0px_0px_#000]">
-                Selected
+              <span className="pill pill-standby shrink-0">
+                <span>Terpilih</span>
               </span>
             </div>
           ) : (
             <div className="space-y-1.5">
-              <input
-                type="text"
-                placeholder="Search by license plate to request specific vehicle..."
-                value={vehicleSearchQuery}
-                onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                className="w-full px-3 py-2 text-xs border-2 border-black rounded-lg bg-white text-black font-semibold shadow-[2px_2px_0px_0px_#000] focus:shadow-[3px_3px_0px_0px_#059669] focus:outline-none"
-              />
+              <div className="relative">
+                <label className="sr-only" htmlFor="vehicle-search">
+                  Cari armada
+                </label>
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+                <input
+                  id="vehicle-search"
+                  type="text"
+                  placeholder="Ketik plat nomor atau tipe mobil&hellip;"
+                  value={vehicleSearchQuery}
+                  onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
               {isSearchingVehicles && (
-                <div className="text-xs text-black font-bold flex items-center gap-1.5 py-1">
-                  <Spinner size="sm" /> Searching vehicles...
+                <div className="flex items-center gap-1.5 py-1 text-xs text-slate-500">
+                  <Spinner size="xs" /> Mencari armada&hellip;
                 </div>
               )}
               {vehicleSearchResults.length > 0 && (
-                <div className="bg-white border-2 border-black rounded-lg divide-y-2 divide-black/10 max-h-40 overflow-y-auto shadow-[3px_3px_0px_0px_#000]">
+                <ul className="max-h-40 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-white">
                   {vehicleSearchResults.map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => {
-                        setPreferredVehicle(v);
-                        setVehicleSearchQuery('');
-                        setVehicleSearchResults([]);
-                      }}
-                      className="w-full p-2.5 text-left hover:bg-amber-100/60 flex items-center justify-between text-xs cursor-pointer font-bold transition-colors"
-                    >
-                      <div>
-                        <span className="font-mono font-black text-black">{v.plateNumber}</span>
-                        <span className="text-zinc-700 ml-2">
-                          {v.brand} {v.model} ({v.seatingCapacity} seats)
+                    <li key={v.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreferredVehicle(v);
+                          setVehicleSearchQuery('');
+                          setVehicleSearchResults([]);
+                        }}
+                        className="flex w-full cursor-pointer items-center justify-between gap-2 border-b border-[var(--border-subtle)] px-2.5 py-2 text-left text-xs transition-colors last:border-b-0 hover:bg-[var(--canvas)]"
+                      >
+                        <span className="min-w-0">
+                          <span className="mono-plate font-semibold text-slate-900">
+                            {v.plateNumber}
+                          </span>
+                          <span className="ml-2 text-slate-500">
+                            {v.brand} {v.model}
+                            <span className="tabular-nums"> ({v.seatingCapacity} kursi)</span>
+                          </span>
                         </span>
-                      </div>
-                      <StatusBadge status={v.status || 'AVAILABLE'} />
-                    </button>
+                        <StatusBadge status={v.status || 'AVAILABLE'} />
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-              <p className="text-[11px] font-medium text-zinc-600">
-                Leaving this empty allows auto-dispatch to assign the fastest eligible driver & vehicle.
+              <p className="text-[0.6875rem] leading-relaxed text-slate-500">
+                Jika dikosongkan, auto-dispatch akan menugaskan armada dan driver terdekat.
               </p>
             </div>
           )}
         </div>
 
-        {/* Notes */}
-        <FormField label="Notes (Optional)" name="notes">
+        <FormField label="Catatan tambahan" name="notes">
           <textarea
             id="notes"
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Special equipment, contact details, or operational instructions"
-            className="w-full px-3 py-2 text-xs border-2 border-black rounded-lg bg-white text-black font-medium shadow-[2px_2px_0px_0px_#000] focus:shadow-[3px_3px_0px_0px_#059669] focus:outline-none"
+            placeholder="Kebutuhan khusus, kontak PIC lapangan, atau rincian perjalanan dinas"
           />
         </FormField>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t-2 border-black/15">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border-2 border-black bg-white hover:bg-zinc-100 text-black rounded-xl text-xs font-bold shadow-[2px_2px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-          >
-            Cancel
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--border-subtle)] pt-3">
+          <button type="button" onClick={onClose} className="button-secondary">
+            Batal
           </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-5 py-2.5 bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 text-black border-2 border-black rounded-xl text-xs font-black shadow-[3px_3px_0px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer inline-flex items-center gap-1.5"
-          >
-            {isSubmitting && <Spinner size="sm" className="text-black" />}
-            <span>Submit Reservation</span>
+          <button type="submit" disabled={isSubmitting} className="button-primary">
+            {isSubmitting && <Spinner size="xs" />}
+            <span>Kirim pengajuan</span>
           </button>
         </div>
       </form>

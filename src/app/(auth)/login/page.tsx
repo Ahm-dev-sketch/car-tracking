@@ -1,13 +1,28 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import {
+  ArrowRight,
+  Car,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Spinner } from '@/components/ui/Spinner';
-import { Icon as LoginIcon } from '@/components/ui/Icon';
-import { VehicleTracking3D } from '@/components/ui/VehicleTracking3D';
 import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
+
+const demoAccounts = [
+  { label: 'User', caption: 'Penumpang', email: 'user@demo.test' },
+  { label: 'Driver', caption: 'Budi · Halim', email: 'driver1@demo.test' },
+  { label: 'Admin', caption: 'Operasional', email: 'admin@demo.test' },
+] as const;
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -16,32 +31,33 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    errorParam === 'MissingCSRF' || errorParam === 'CSRFError'
+      ? 'Sesi autentikasi telah disegarkan. Silakan coba masuk kembali.'
+      : null
+  );
 
-  // Clean up any stale ?error=... query param from browser bar on load
+  // Strip the stale ?error=... query param from the address bar. No state is
+  // written here: the message above is seeded on the first render instead.
   React.useEffect(() => {
-    if (errorParam) {
-      if (errorParam === 'MissingCSRF' || errorParam === 'CSRFError') {
-        setError('Sesi autentikasi telah disegarkan. Silakan coba masuk kembali.');
-      }
-      try {
-        const cleanUrl = callbackUrl ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}` : '/login';
-        window.history.replaceState({}, '', cleanUrl);
-      } catch {
-        // ignore
-      }
+    if (!errorParam) return;
+    try {
+      const cleanUrl = callbackUrl ? `/login?callbackUrl=${encodeURIComponent(callbackUrl)}` : '/login';
+      window.history.replaceState({}, '', cleanUrl);
+    } catch {
+      // ignore
     }
   }, [errorParam, callbackUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[login] submit start', { email, callbackUrl });
     setError(null);
     setIsLoading(true);
 
     try {
-      // Timeout guard: a hung signIn() must not leave the button frozen forever
       const res = await Promise.race([
         signIn('credentials', {
           redirect: false,
@@ -50,28 +66,25 @@ function LoginForm() {
         }),
         new Promise<never>((_, reject) =>
           setTimeout(
-            () => reject(new Error('Login request timed out. Check your connection and try again.')),
+            () => reject(new Error('Permintaan masuk melebihi batas waktu (timeout). Periksa koneksi Anda.')),
             20000
           )
         ),
       ]);
-      console.log('[login] auth response received', res);
 
       if (!res || res.error) {
         if (res?.error === 'MissingCSRF' || res?.error === 'CSRFError') {
           setError('Sesi autentikasi telah diperbarui. Silakan coba masuk kembali.');
         } else if (res?.error === 'CredentialsSignin') {
-          setError('Email atau password salah. Jika ingin mencoba, Anda dapat mengklik tombol Akun Demo di atas.');
+          setError('Email atau kata sandi tidak valid. Gunakan tombol Akun Demo di bawah untuk mencoba.');
         } else {
           setError(res?.error ? `Gagal masuk: ${res.error}` : 'Email atau password salah');
         }
         return;
       }
 
-      // Reset install dismissal state so the prompt is ready to offer on new session
       resetInstallDismissal();
 
-      // Resolve target by role
       let target = '/user';
       try {
         const meRes = await fetch('/api/me');
@@ -84,106 +97,88 @@ function LoginForm() {
         console.error('[login] /api/me failed, using default target', meErr);
       }
 
-      // searchParams.get() already decodes; only accept same-origin paths (no open redirect)
       const safeCallback =
         callbackUrl && callbackUrl.startsWith('/') && !callbackUrl.startsWith('//') && !callbackUrl.startsWith('/login')
           ? callbackUrl
           : null;
 
       const destination = safeCallback || target;
-      console.log('[login] redirecting to', destination);
-      // Hard redirect: guarantees the fresh auth cookie is sent on the next request,
-      // so middleware cannot miss the session (router.push could race it)
       window.location.href = destination;
     } catch (err: unknown) {
       console.error('Login Error:', err);
-      const msg = err instanceof Error && err.message ? err.message : 'Authentication failed. Please try again.';
-      // next-auth beta throws "Failed to construct 'URL'" when the server answers 429 (rate limit)
+      const msg = err instanceof Error && err.message ? err.message : 'Autentikasi gagal. Silakan coba lagi.';
       setError(
         msg.includes('Failed to construct')
-          ? 'Too many attempts. Please wait a few minutes and try again.'
+          ? 'Terlalu banyak percobaan. Harap tunggu beberapa menit sebelum mencoba kembali.'
           : msg
       );
     } finally {
-      // Never leave the form stuck in "Signing in..."
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="w-full rounded-2xl border-[3px] border-black bg-white p-6 sm:p-9 shadow-[8px_8px_0px_0px_#000]">
-      <div className="mb-7">
-        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-rose-200 text-black shadow-[3px_3px_0px_0px_#000]">
-          <LoginIcon name="route" className="h-6 w-6 text-rose-900" />
-        </div>
-        <span className="eyebrow">Your workday, connected</span>
-        <h1 className="mt-3 text-3xl font-black tracking-tight text-black sm:text-4xl">Welcome back.</h1>
-        <p className="mt-2 text-sm font-semibold leading-relaxed text-zinc-600">Sign in to book your next ride and keep every journey in view.</p>
+    <div className="w-full rounded-[var(--radius-2xl)] bg-white p-6 shadow-[var(--shadow-md)] sm:p-8">
+      <div className="mb-6 text-center">
+        <span className="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-[var(--kcic-red-soft)] text-[#C8102E]">
+          <Car className="size-5" strokeWidth={1.9} aria-hidden="true" />
+        </span>
+        <h1 className="text-[1.5rem] font-bold tracking-[-0.035em] text-slate-900">Masuk ke akun</h1>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+          Sistem pelacakan armada dan operasional KCIC Whoosh
+        </p>
       </div>
 
-      {error && (
-        <ErrorBanner
-          message={error}
-          className="mb-6"
-          onDismiss={() => setError(null)}
-        />
-      )}
+      {error && <ErrorBanner message={error} className="mb-4" onDismiss={() => setError(null)} />}
 
-      {/* Quick Demo Fill Buttons */}
-      <div className="mb-6 rounded-xl border-2 border-black bg-amber-50 p-3.5 shadow-[2px_2px_0px_0px_#000]">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">
-            Akun Demo Siap Pakai:
+      <div className="mb-5">
+        <div className="mb-1.5 flex items-center justify-between px-0.5">
+          <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold text-slate-600">
+            <Sparkles className="size-3" strokeWidth={2} aria-hidden="true" />
+            Akun demo
           </span>
-          <span className="text-[10px] font-bold text-zinc-500">
-            Password: Demo1234
-          </span>
+          <span className="font-mono text-[0.6875rem] text-slate-400">Demo1234</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('user@demo.test');
-              setPassword('Demo1234');
-              setError(null);
-            }}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-amber-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
-          >
-            <span className="text-xs font-black text-black">User</span>
-            <span className="text-[10px] font-bold text-zinc-500">Penumpang</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('driver1@demo.test');
-              setPassword('Demo1234');
-              setError(null);
-            }}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-rose-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
-          >
-            <span className="text-xs font-black text-black">Driver</span>
-            <span className="text-[10px] font-bold text-zinc-500">Budi (Halim)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEmail('admin@demo.test');
-              setPassword('Demo1234');
-              setError(null);
-            }}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-amber-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
-          >
-            <span className="text-xs font-black text-black">Admin</span>
-            <span className="text-[10px] font-bold text-zinc-500">Operasional</span>
-          </button>
+        <div className="grid grid-cols-3 gap-1 rounded-[var(--radius-lg)] bg-[var(--canvas)] p-1">
+          {demoAccounts.map((account) => {
+            const isPicked = email === account.email;
+            return (
+              <button
+                key={account.email}
+                type="button"
+                aria-pressed={isPicked}
+                onClick={() => {
+                  setEmail(account.email);
+                  setPassword('Demo1234');
+                  setError(null);
+                }}
+                className={`flex cursor-pointer flex-col items-center rounded-[var(--radius-md)] px-1 py-1.5 text-center transition-all ${
+                  isPicked
+                    ? 'bg-white text-slate-900 shadow-[var(--shadow-xs)]'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span className="text-xs font-semibold">{account.label}</span>
+                <span className={`mt-0.5 truncate text-[0.625rem] ${isPicked ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {account.caption}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4" aria-busy={isLoading}>
+      <form onSubmit={handleSubmit} className="space-y-3.5" aria-busy={isLoading}>
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-xs font-black uppercase tracking-wider text-black">Work email</label>
+          <label htmlFor="email" className="mb-1.5 block text-xs font-medium text-slate-600">
+            Email kerja
+          </label>
           <div className="relative">
-            <LoginIcon name="mail" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black" />
+            <Mail
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+              strokeWidth={1.9}
+              aria-hidden="true"
+            />
             <input
               id="email"
               type="email"
@@ -193,43 +188,75 @@ function LoginForm() {
               spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@demo.test"
-              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#be123c] transition-all"
+              placeholder="nama@kcic.co.id"
+              className="pl-9"
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-xs font-black uppercase tracking-wider text-black">Password</label>
+          <label htmlFor="password" className="mb-1.5 block text-xs font-medium text-slate-600">
+            Kata sandi
+          </label>
           <div className="relative">
-            <LoginIcon name="lock" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black" />
+            <Lock
+              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
+              strokeWidth={1.9}
+              aria-hidden="true"
+            />
             <input
               id="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Demo1234"
-              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#be123c] transition-all"
+              placeholder="••••••••"
+              className="pl-9 pr-10"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-slate-400 transition-colors hover:bg-[var(--canvas)] hover:text-slate-600"
+              aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+            >
+              {showPassword ? (
+                <EyeOff className="size-4" strokeWidth={1.9} aria-hidden="true" />
+              ) : (
+                <Eye className="size-4" strokeWidth={1.9} aria-hidden="true" />
+              )}
+            </button>
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="group mt-3 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-[2.5px] border-black bg-[#be123c] px-6 py-3.5 text-base font-black text-white shadow-[4px_4px_0px_0px_#000] hover:bg-[#e11d48] hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isLoading && <Spinner size="sm" className="text-white" />}
-          {isLoading ? 'Signing in...' : 'Sign in'}
-          {!isLoading && <LoginIcon name="arrow" className="h-4 w-4 text-white" />}
+        <div className="flex items-center justify-between pt-0.5">
+          <label className="flex cursor-pointer select-none items-center gap-2">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="size-4 rounded-[4px] border-[var(--border-strong)] accent-[#C8102E]"
+            />
+            <span className="text-xs text-slate-600">Ingat saya</span>
+          </label>
+          <span className="cursor-pointer text-xs font-medium text-[#C8102E] hover:underline">
+            Bantuan akses
+          </span>
+        </div>
+
+        <button type="submit" disabled={isLoading} className="button-primary mt-1 w-full">
+          {isLoading && <Spinner size="sm" />}
+          <span>{isLoading ? 'Memverifikasi…' : 'Masuk'}</span>
+          {!isLoading && <ArrowRight className="size-4" strokeWidth={2} aria-hidden="true" />}
         </button>
       </form>
 
-      <div className="mt-7 flex items-start gap-2.5 border-t-2 border-black/15 pt-5">
-        <LoginIcon name="lock" className="mt-0.5 h-4 w-4 shrink-0 text-black" />
-        <p className="text-xs font-medium leading-relaxed text-zinc-600">Your workplace account is managed by fleet administration. Contact your administrator if you need access.</p>
+      <div className="mt-5 flex items-start gap-2 border-t border-[var(--border-subtle)] pt-4">
+        <ShieldCheck className="mt-px size-3.5 shrink-0 text-[#059669]" strokeWidth={2} aria-hidden="true" />
+        <p className="text-[0.6875rem] leading-relaxed text-slate-500">
+          Akses operasional resmi KCIC Whoosh. Terenkripsi SSL 256-bit dan diawasi Divisi Fleet
+          &amp; Angkutan Dinas.
+        </p>
       </div>
     </div>
   );
@@ -237,48 +264,46 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-dvh flex-col bg-[#faf9f5] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-black sm:px-10 lg:px-14">
-      <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black bg-rose-200 text-black shadow-[2px_2px_0px_0px_#000]">
-            <LoginIcon name="route" className="h-6 w-6 text-rose-900" />
+    <main className="relative min-h-dvh bg-[var(--canvas)] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-slate-900 sm:px-8">
+      <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] w-full max-w-[26rem] flex-col">
+        <header className="flex items-center justify-center gap-4 py-2">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="brand-mark">
+              <Car className="size-4" strokeWidth={2.1} aria-hidden="true" />
+            </span>
+            <span className="brand-word">
+              KCIC <span>Fleet</span>
+            </span>
+          </Link>
+        </header>
+
+        <div className="flex flex-1 flex-col items-center justify-center py-8">
+          <div className="w-full min-w-0 max-w-[26rem]">
+            <React.Suspense
+              fallback={
+                <div
+                  role="status"
+                  className="flex min-h-[26rem] flex-col items-center justify-center gap-3 rounded-[var(--radius-2xl)] bg-white text-xs text-slate-500 shadow-[var(--shadow-md)]"
+                >
+                  <Spinner size="md" className="text-[#C8102E]" />
+                  <span>Memuat formulir…</span>
+                </div>
+              }
+            >
+              <LoginForm />
+            </React.Suspense>
+
+            <p className="mt-4 text-center text-[0.6875rem] text-slate-400">
+              KCIC Fleet · Operasional Whoosh 2026
+            </p>
           </div>
-          <span className="text-xl font-black tracking-tight text-black">KCIC Fleet<span className="text-rose-700">.</span></span>
         </div>
-        <span className="hidden text-[11px] font-black uppercase tracking-wider text-black bg-amber-300 border-1.5 border-black px-2.5 py-0.5 rounded-md shadow-[1.5px_1.5px_0px_0px_#000] sm:block">Workplace mobility</span>
-      </header>
 
-      <div className="mx-auto grid w-full max-w-7xl flex-1 items-center gap-12 py-10 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:gap-16 xl:gap-24">
-        <aside className="hidden min-w-0 flex-col lg:flex">
-          <div><span className="eyebrow">A little less logistics</span></div>
-          <h2 className="mt-5 max-w-xl text-[clamp(2.5rem,4.2vw,4.25rem)] font-black leading-[1.08] tracking-tight text-black">A smoother route<br />through your workday.</h2>
-          <p className="mt-5 max-w-sm text-base font-semibold leading-relaxed text-zinc-600">From the first booking to the last mile. Your vehicles, trips, and team, moving together.</p>
-          <figure className="mt-8">
-            <VehicleTracking3D />
-            <figcaption className="mt-4 flex items-center justify-between gap-4 px-1 text-xs font-bold text-black">
-              <span>KCIC Fleet. Every journey.</span>
-              <span className="flex items-center gap-2 text-black"><span className="h-2 w-2 rounded-full border border-black bg-emerald-500" />Connected mobility</span>
-            </figcaption>
-          </figure>
-        </aside>
-
-        <div className="mx-auto w-full min-w-0 max-w-md lg:max-w-[28rem]">
-          <Suspense fallback={
-            <div role="status" className="flex min-h-96 flex-col items-center justify-center gap-4 rounded-2xl border-[3px] border-black bg-white p-8 text-sm font-bold text-black shadow-[6px_6px_0px_0px_#000]">
-              <Spinner size="lg" className="text-black" />
-              Preparing your sign-in...
-            </div>
-          }>
-            <LoginForm />
-          </Suspense>
-          <p className="mt-6 text-center text-xs font-bold text-black lg:hidden">KCIC Fleet. Every journey.</p>
-        </div>
+        <footer className="flex flex-col items-center gap-1 border-t border-[var(--border)] py-4 text-center text-[0.6875rem] text-slate-400">
+          <span>PT Kereta Cepat Indonesia China · © 2026</span>
+          <span className="hidden sm:inline">Keamanan ISO 27001 · Telemetri RTK GPS</span>
+        </footer>
       </div>
-
-      <footer className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 text-xs font-semibold leading-relaxed text-zinc-600">
-        <span>KCIC Fleet &middot; Operational Mobility.</span>
-        <span className="hidden sm:block">For your team. For the road ahead.</span>
-      </footer>
     </main>
   );
 }

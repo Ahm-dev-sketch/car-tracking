@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -62,7 +62,6 @@ function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }
     const lngDiff = Math.abs(currentCenter.lng - lng);
     const zoomChanged = currentZoom !== zoom;
 
-    // Only update Leaflet view when coordinates or zoom actually change
     if (latDiff > 0.0002 || lngDiff > 0.0002 || zoomChanged) {
       map.setView([lat, lng], zoom, { animate: true });
     }
@@ -93,11 +92,11 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
     : '';
 
   const selectedBorder = isSelected
-    ? 'border-2 border-black ring-2 ring-white scale-110 shadow-lg'
+    ? 'scale-110 shadow-lg border-2 border-white ring-2 ring-[#0f172a]/25'
     : 'border-2 border-white shadow-md';
 
   const badgeHtml = isEstimated
-    ? `<span class="absolute -top-2 -right-3.5 px-1 py-0.2 bg-amber-300 text-amber-950 border border-black rounded text-[9px] font-black shadow-[1px_1px_0px_0px_#000] z-20 pointer-events-none whitespace-nowrap" title="Akurasi Estimasi: ±${Math.round(accuracyM)}m">±${Math.round(accuracyM)}m</span>`
+    ? `<span class="absolute -top-2 -right-3 rounded-full border border-[#fde68a] bg-[#fffbeb] px-1 py-0.5 text-[10px] font-semibold text-[#b45309] tabular-nums whitespace-nowrap">±${Math.round(accuracyM)}m</span>`
     : '';
 
   return L.divIcon({
@@ -119,14 +118,14 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
 
 function createPointIcon(type: 'pickup' | 'destination', label: string) {
   const isPickup = type === 'pickup';
-  const bg = isPickup ? '#047857' : '#e11d48';
+  const bg = isPickup ? '#059669' : '#C8102E';
   return L.divIcon({
     className: 'route-point-div-icon',
     html: `
       <div class="relative flex items-center justify-center -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-white text-[11px] font-bold shadow-lg border-2 border-white" style="background-color: ${bg};">
-          <span>${isPickup ? '●' : '■'}</span>
-          <span class="max-w-[120px] truncate">${label}</span>
+        <div class="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-[11px] font-semibold shadow-md border-2 border-white" style="background-color: ${bg};">
+          <span class="size-2 rounded-full bg-white inline-block"></span>
+          <span class="max-w-[130px] truncate">${label}</span>
         </div>
       </div>
     `,
@@ -135,16 +134,16 @@ function createPointIcon(type: 'pickup' | 'destination', label: string) {
   });
 }
 
+
 export default function FleetMap({
   vehicles,
   selectedVehicleId,
   onSelectVehicle,
-  center = [-6.2088, 106.8456], // Default Jakarta / Ops center
+  center = [-6.2088, 106.8456],
   zoom = 13,
   className = 'h-[500px] w-full',
   routePoints,
 }: FleetMapProps) {
-  // Center on selected vehicle if explicitly chosen, otherwise use center prop (e.g. selected Hub)
   const targetVehicle = selectedVehicleId
     ? vehicles.find((v) => v.vehicleId === selectedVehicleId)
     : null;
@@ -161,17 +160,15 @@ export default function FleetMap({
     [routePoints]
   );
 
-  // Fit bounds to the full route whenever both pickup and destination are present.
-  // The vehicle marker still renders inside the fitted view (it lies on the route).
   const shouldFitBounds = fitPoints.length >= 2;
 
   return (
-    <div className={`relative rounded-[1.625rem] overflow-hidden isolate ${className}`}>
+    <div className={`relative isolate overflow-hidden rounded-[var(--radius-xl)] ${className}`}>
       <MapContainer
         center={mapCenter}
         zoom={zoom}
         scrollWheelZoom={true}
-        className="h-full w-full z-0"
+        className="z-0 h-full w-full"
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -188,61 +185,49 @@ export default function FleetMap({
           const icon = createVehicleIcon(v.status, v.movement, isSelected, v.accuracyM);
           const rawPhone = v.driverPhone ? v.driverPhone.replace(/\D/g, '') : '';
           const waUrl = rawPhone ? `https://wa.me/${rawPhone}` : null;
-          const isMoving = v.movement === 'MOVING';
 
           return (
             <React.Fragment key={v.vehicleId}>
-              {/* GPS Accuracy Radius Circle */}
               {typeof v.accuracyM === 'number' && v.accuracyM > 0 && (
                 <Circle
                   center={[v.lat, v.lng]}
                   radius={Math.max(v.accuracyM, 5)}
                   pathOptions={{
-                    color: '#2563eb',
-                    fillColor: '#3b82f6',
-                    fillOpacity: isSelected ? 0.22 : 0.16,
+                    color: '#0284C7',
+                    fillColor: '#38BDF8',
+                    fillOpacity: isSelected ? 0.2 : 0.12,
                     weight: isSelected ? 1.5 : 1,
                     opacity: 0.7,
                   }}
                 >
                   <Tooltip direction="center" permanent={false} opacity={0.92}>
-                    <span className="font-sans text-xs font-bold text-zinc-900">
+                    <span className="font-sans text-[0.6875rem] font-medium tabular-nums text-slate-700">
                       {v.accuracyM > 100
-                        ? `⚠️ Akurasi Estimasi: ±${Math.round(v.accuracyM)} m (Wi-Fi/Seluler)`
-                        : v.accuracyM < 20
-                        ? `✓ Akurasi Tinggi: ±${Math.round(v.accuracyM)} m (Satelit Lock)`
-                        : `Akurasi: ±${Math.round(v.accuracyM)} m`}
+                        ? `Akurasi estimasi ±${Math.round(v.accuracyM)} m`
+                        : `Akurasi ±${Math.round(v.accuracyM)} m`}
                     </span>
                   </Tooltip>
                 </Circle>
               )}
 
-              {/* Vehicle Marker */}
               <Marker
                 title={`${v.plateNumber} (${visual.badgeText})`}
-                alt={`Vehicle ${v.plateNumber}`}
+                alt={`Kendaraan ${v.plateNumber}`}
                 position={[v.lat, v.lng]}
                 icon={icon}
                 eventHandlers={{
                   click: () => onSelectVehicle?.(v),
                 }}
               >
-                {v.accuracyM > 100 && (
-                  <Tooltip direction="top" offset={[0, -20]} permanent opacity={0.95}>
-                    <span className="font-sans text-[10px] font-black text-amber-950 bg-amber-100 border border-amber-600 px-1.5 py-0.5 rounded shadow-xs">
-                      ⚠️ Akurasi Estimasi: ±{Math.round(v.accuracyM)} m
-                    </span>
-                  </Tooltip>
-                )}
                 <Popup className="custom-leaflet-popup">
-                  <div className="p-1 min-w-[210px] text-zinc-900 font-sans">
-                    <div className="flex items-center justify-between gap-2 border-b border-zinc-200 pb-2 mb-2">
-                      <span className="font-bold text-sm tracking-tight">{v.plateNumber}</span>
+                  <div className="min-w-[200px] font-sans text-slate-900">
+                    <div className="mb-2 flex items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2">
+                      <span className="mono-plate text-[0.8125rem] font-semibold">{v.plateNumber}</span>
                       <StatusBadge status={v.status} />
                     </div>
 
                     {(v.homeLocation || v.currentOperationalLocation) && (
-                      <div className="flex flex-wrap items-center gap-1 pb-2 mb-2 border-b border-zinc-100">
+                      <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] pb-2">
                         {v.homeLocation && (
                           <LocationBadge
                             type="home"
@@ -260,52 +245,42 @@ export default function FleetMap({
                       </div>
                     )}
 
-                    <div className="space-y-1.5 text-xs">
+                    <div className="space-y-1.5 text-[0.6875rem]">
                       {v.brand && (
-                        <div className="text-zinc-600 font-semibold">
+                        <p className="font-medium text-slate-600">
                           {v.brand} {v.model}
-                        </div>
+                        </p>
                       )}
 
-                      <div className="flex items-center justify-between gap-1 pt-1 border-t border-zinc-100">
-                        <span className="text-zinc-500 font-medium">Condition:</span>
+                      <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-1.5">
+                        <span className="text-slate-400">Kondisi</span>
                         <span
-                          className="font-bold text-[10px] px-2 py-0.5 rounded text-white tracking-wide"
+                          className="rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold text-white"
                           style={{ backgroundColor: visual.color }}
                         >
                           {visual.badgeText}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-zinc-500">Movement:</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-400">Pergerakan</span>
                         <MovementBadge movement={v.movement} />
                       </div>
 
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-zinc-500">Accuracy:</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-400">Akurasi</span>
                         <GPSBadge accuracyM={v.accuracyM} showDetails={true} />
                       </div>
-                      {typeof v.accuracyM === 'number' && v.accuracyM > 100 && (
-                        <div className="rounded border border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
-                          ⚠️ Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(v.accuracyM)} m)
-                        </div>
-                      )}
-                      {typeof v.accuracyM === 'number' && v.accuracyM < 20 && (
-                        <div className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-900">
-                          ✓ Akurasi tinggi (satelit GPS terkunci)
-                        </div>
-                      )}
 
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-zinc-500">Updated:</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-slate-400">Update</span>
                         <RelativeTime date={v.recordedAt} />
                       </div>
 
                       {v.driverName ? (
-                        <div className="pt-2 border-t border-zinc-100">
-                          <div className="text-zinc-500 text-[11px]">Assigned Driver:</div>
-                          <div className="font-semibold text-zinc-800">{v.driverName}</div>
+                        <div className="border-t border-[var(--border-subtle)] pt-2">
+                          <p className="metric-label">Driver</p>
+                          <p className="font-semibold text-slate-800">{v.driverName}</p>
                           {v.driverPhone && v.driverPhone !== 'REDACTED' && (
                             <div className="mt-1">
                               {waUrl ? (
@@ -313,30 +288,30 @@ export default function FleetMap({
                                   href={waUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-emerald-700 font-medium hover:underline text-xs"
+                                  className="inline-flex items-center gap-1 font-semibold text-[var(--status-active-fg)] hover:underline"
                                 >
-                                  <span>WhatsApp: {v.driverPhone}</span>
+                                  <span className="mono-plate">WhatsApp {v.driverPhone}</span>
                                 </a>
                               ) : (
-                                <span className="text-zinc-600">{v.driverPhone}</span>
+                                <span className="mono-plate text-slate-600">{v.driverPhone}</span>
                               )}
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className="pt-2 border-t border-zinc-100 text-[11px] text-zinc-400 italic">
+                        <p className="border-t border-[var(--border-subtle)] pt-2 text-[0.625rem] text-slate-400">
                           {v.status === 'MAINTENANCE'
-                            ? 'Unit under workshop maintenance'
+                            ? 'Unit dalam perawatan bengkel'
                             : v.status === 'INACTIVE'
-                            ? 'Unit non-operational'
-                            : 'Standby in operational pool'}
-                        </div>
+                              ? 'Unit non-operasional'
+                              : 'Standby di pool stasiun'}
+                        </p>
                       )}
 
                       {(v.tripOrigin || v.tripDestination) && (
-                        <div className="pt-1.5 border-t border-zinc-100 text-[11px] text-zinc-600">
-                          {v.tripOrigin && <div>From: {v.tripOrigin}</div>}
-                          {v.tripDestination && <div>To: {v.tripDestination}</div>}
+                        <div className="space-y-0.5 border-t border-[var(--border-subtle)] pt-1.5 text-[0.625rem] text-slate-600">
+                          {v.tripOrigin && <p>Dari: {v.tripOrigin}</p>}
+                          {v.tripDestination && <p>Tujuan: {v.tripDestination}</p>}
                         </div>
                       )}
                     </div>
@@ -347,7 +322,6 @@ export default function FleetMap({
           );
         })}
 
-        {/* Route Points (Pickup & Destination) */}
         {routePoints?.map((pt, idx) => {
           if (isNaN(pt.lat) || isNaN(pt.lng)) return null;
           return (

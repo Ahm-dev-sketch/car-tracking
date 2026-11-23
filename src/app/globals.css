@@ -1,6 +1,8 @@
 ﻿@import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -19,6 +21,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.5;
+}
+
+/* Non-inline so these stay runtime-overridable under .dark (inline blocks bake hex). */
+@theme {
   /* ---- KCIC semantic token layer (real palette) ---- */
   /* Brand: KCIC crimson, brand-500 is the identity colour */
   --color-brand-50: #fef2f3;
@@ -36,6 +44,8 @@
   --color-success-50: #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-200: #bbf7d0;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
   --color-success-600: #16a34a;
   --color-success-700: #15803d;
 
@@ -43,6 +53,8 @@
   --color-warning-50: #fffbeb;
   --color-warning-100: #fef3c7;
   --color-warning-200: #fde68a;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
   --color-warning-600: #d97706;
   --color-warning-700: #b45309;
 
@@ -50,6 +62,8 @@
   --color-danger-50: #fef2f2;
   --color-danger-100: #fee2e2;
   --color-danger-200: #fecaca;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
   --color-danger-600: #dc2626;
   --color-danger-700: #b91c1c;
 
@@ -57,16 +71,167 @@
   --color-info-50: #f8fafc;
   --color-info-100: #f1f5f9;
   --color-info-200: #e2e8f0;
+  --color-info-400: #94a3b8;
+  --color-info-500: #64748b;
   --color-info-600: #475569;
   --color-info-700: #334155;
 
   /* Hairline + surface helpers */
   --color-hairline: #e2e8f0;
   --color-canvas: #f8fafc;
-
-  --text-xs: 0.8125rem;
-  --text-xs--line-height: 1.5;
 }
+
+/* ---- Control-Room dark mode -------------------------------------------
+   Unlayered so it wins over @theme defaults without touching light mode. */
+.dark {
+  color-scheme: dark;
+
+  --background: #090d16;
+  --foreground: #f8fafc;
+  --accent: #e11d48;
+  --accent-soft: #2a0a14;
+
+  /* Default Tailwind palette inversion */
+  --color-white: #0f172a;
+  --color-slate-50: #0f172a;
+  --color-slate-100: #1e293b;
+  --color-slate-200: #1e293b;
+  --color-slate-300: #334155;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #f1f5f9;
+  --color-slate-900: #f8fafc;
+
+  /* KCIC semantic tokens — dark tints */
+  --color-brand-500: #e11d48;
+  --color-brand-600: #dc2626;
+  --color-brand-700: #b91c1c;
+  --color-brand-50: #2a0a14;
+  --color-brand-100: #3b0f1c;
+  --color-brand-200: #5f1a2a;
+
+  --color-success-600: #22c55e;
+  --color-success-700: #4ade80;
+  --color-success-50: #052e16;
+  --color-success-100: #14532d;
+  --color-success-200: #166534;
+
+  --color-warning-600: #f59e0b;
+  --color-warning-700: #fbbf24;
+  --color-warning-50: #451a03;
+  --color-warning-100: #78350f;
+  --color-warning-200: #92400e;
+
+  --color-danger-600: #ef4444;
+  --color-danger-700: #f87171;
+  --color-danger-50: #450a0a;
+  --color-danger-100: #7f1d1d;
+  --color-danger-200: #991b1b;
+
+  --color-info-600: #94a3b8;
+  --color-info-700: #cbd5e1;
+  --color-info-50: #0f172a;
+  --color-info-100: #1e293b;
+  --color-info-200: #334155;
+
+  --color-canvas: #090d16;
+  --color-hairline: #1e293b;
+}
+
+/* Light-mode normalizer happens to hardcode white — needs !important to lose. */
+.dark .app-main :where(.bg-white.border.rounded-lg, .bg-white.border.rounded-md) {
+  background: #0f172a !important;
+  border-color: #1e293b !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Custom classes that carry hardcoded light hex. */
+.dark .app-main h1,
+.dark .app-main h2,
+.dark .app-main h3,
+.dark .page-heading,
+.dark .section-title { color: #f8fafc; }
+
+.dark .surface,
+.dark .header-island,
+.dark .mobile-dock,
+.dark .install-toast,
+.dark .driver-live-banner,
+.dark .tracking-map {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+
+.dark .button-primary { background: #e11d48; }
+.dark .button-primary:hover:not(:disabled) { background: #dc2626; }
+.dark .button-primary:active:not(:disabled) { background: #b91c1c; }
+.dark .button-secondary,
+.dark .icon-button {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #1e293b;
+}
+.dark .button-secondary:hover:not(:disabled) { background: #1e293b; border-color: #334155; color: #f8fafc; }
+.dark .button-icon { background: #1e293b; color: #f8fafc; }
+.dark .button-secondary .button-icon { background: #334155; }
+.dark a:hover .button-icon,
+.dark button:hover .button-icon { background: #334155; }
+
+/* text-white follows the inverted --color-white token, which is right on slate
+   chips (dark bg -> light chip) but leaves dark text on crimson CTAs. Restore
+   label contrast on solid brand/semantic fills only; slate chips keep inverting.
+   Base classes only, so hover:/focus: variants are untouched. */
+.dark :where(
+  .bg-brand-500, .bg-brand-600, .bg-brand-700, .bg-brand-800,
+  .bg-danger-600, .bg-danger-700,
+  .bg-success-600, .bg-success-700,
+  .bg-warning-600, .bg-warning-700
+) { color: #f8fafc; }
+
+.dark .desktop-link { color: #94a3b8; }
+.dark .desktop-link:hover { background: #1e293b; color: #f8fafc; }
+
+.dark .dock-tab-icon,
+.dark .dock-tab-label { color: #94a3b8; }
+.dark .dock-tab[aria-current="page"] { background: #2a0a14; color: #e11d48; }
+.dark .dock-tab[aria-current="page"] .dock-tab-icon,
+.dark .dock-tab[aria-current="page"] .dock-tab-label { color: #e11d48; }
+
+.dark .eyebrow { color: #94a3b8; border-left-color: #e11d48; }
+
+.dark .skeleton { background: #1e293b; border-color: #334155; }
+
+.dark .skip-link { background: #f8fafc; color: #0f172a; }
+
+.dark .brand-mark { border-color: #7f1d1d; }
+
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: #0f172a;
+  border-color: #1e293b;
+  color: #f8fafc;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: #94a3b8; }
+.dark input:disabled,
+.dark select:disabled,
+.dark textarea:disabled { background-color: #1e293b; color: #94a3b8; }
+
+.dark ::selection { background: #7f1d1d; color: #f8fafc; }
+
+.dark :focus-visible { outline-color: #f8fafc; }
+
+.dark .leaflet-popup-content-wrapper,
+.dark .leaflet-bar { border-color: #1e293b; }
+.dark .leaflet-bar a { color: #f8fafc; }
+.dark .leaflet-control-attribution { background: rgba(15, 23, 42, 0.82); color: #94a3b8; }
+
+/* Map tiles only — markers and popups keep their own colours. */
+.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+
 
 @layer base {
 * { box-sizing: border-box; }

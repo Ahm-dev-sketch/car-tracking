@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -21,6 +21,17 @@ interface NotificationItem {
   createdAt: string;
 }
 
+const THEME_EVENT = 'kcic-theme-change';
+
+function subscribeTheme(onChange: () => void) {
+  window.addEventListener(THEME_EVENT, onChange);
+  return () => window.removeEventListener(THEME_EVENT, onChange);
+}
+
+function getDarkSnapshot() {
+  return document.documentElement.classList.contains('dark');
+}
+
 export function NavBar() {
   const pathname = usePathname();
   const { data: session } = useSession();
@@ -36,6 +47,17 @@ export function NavBar() {
   const initials = name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase();
   const moreActive = role === 'ADMIN' && links.slice(3).some((link) => isNavigationActive(pathname, link.href));
   const hasMoreButton = role === 'ADMIN' || role === 'DRIVER';
+
+  // The pre-hydration head script owns the initial class, so treat the root
+  // classList as an external store; the server snapshot stays 'light'.
+  const isDark = useSyncExternalStore(subscribeTheme, getDarkSnapshot, () => false);
+
+  const toggleTheme = () => {
+    const next = !isDark;
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+    window.dispatchEvent(new Event(THEME_EVENT));
+  };
 
   useEffect(() => {
     if (!session?.user) return;
@@ -140,6 +162,9 @@ export function NavBar() {
           </nav>
           <div className="flex shrink-0 items-center gap-1.5">
             <GreetingClock variant="navbar" />
+            <button type="button" onClick={toggleTheme} className="inline-flex size-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900" aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} aria-pressed={isDark}>
+              <Icon name={isDark ? 'sun' : 'moon'} className="size-5" />
+            </button>
             <button type="button" onClick={() => setNotificationsOpen(true)} className="relative inline-flex size-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-haspopup="dialog">
               <Icon name="bell" className="size-5" />
               {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 inline-flex size-3.5 items-center justify-center rounded-full bg-brand-500 text-[9px] font-semibold leading-none text-white ring-2 ring-white">{unreadCount}</span>}

@@ -2,6 +2,7 @@
 
 import React, { useId, useRef } from 'react';
 import { useDialog } from './Modal';
+import { Icon } from './Icon';
 
 interface DrawerProps {
   isOpen: boolean;
@@ -48,30 +49,29 @@ export function Drawer({
         if (backdropPress.current && event.target === event.currentTarget) onClose();
         backdropPress.current = false;
       }}
-      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-end justify-end overflow-hidden border-0 bg-transparent p-0 pt-[max(1rem,env(safe-area-inset-top))] text-black outline-none open:flex backdrop:bg-black/50 sm:p-0"
+      className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none flex-col items-end justify-end overflow-hidden border-0 bg-transparent p-0 pt-[max(1rem,env(safe-area-inset-top))] text-slate-900 outline-none open:flex backdrop:bg-slate-900/40 backdrop:backdrop-blur-[2px] sm:p-0"
     >
-      <div className={`flex max-h-full min-h-0 w-full flex-col rounded-t-2xl sm:rounded-none border-t-[3px] sm:border-t-0 sm:border-l-[3px] border-black bg-white shadow-[-6px_0px_0px_0px_#000] transition-[transform,opacity] duration-200 ease-out starting:translate-y-6 sm:starting:translate-x-8 sm:starting:translate-y-0 motion-reduce:transition-none sm:h-full ${widthClasses[width]}`}>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)] sm:pb-0">
-          <div className="mx-auto mb-1 mt-2 h-1.5 w-12 shrink-0 rounded-full bg-black sm:hidden" aria-hidden="true" />
-          <div className="flex shrink-0 items-center justify-between gap-4 border-b-[2.5px] border-black bg-amber-100/60 px-5 py-4 sm:px-6">
+      <div className={`flex max-h-full min-h-0 w-full flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-[-12px_0_40px_rgba(15,23,42,0.12)] transition-[transform,opacity] duration-200 ease-out starting:translate-y-6 sm:starting:translate-x-8 sm:starting:translate-y-0 motion-reduce:transition-none sm:h-full sm:rounded-none ${widthClasses[width]}`}>
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)] sm:pb-0">
+          <div className="h-0.5 w-full shrink-0 bg-brand-500" aria-hidden="true" />
+          <div className="mx-auto mb-1 mt-2 h-1 w-10 shrink-0 rounded-full bg-slate-300 sm:hidden" aria-hidden="true" />
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
             <div className="min-w-0">
-              <h2 id={titleId} className="text-xl font-extrabold tracking-tight text-black">{title}</h2>
-              {description && <p id={descriptionId} className="mt-1 text-xs font-semibold text-zinc-700 leading-relaxed">{description}</p>}
+              <h2 id={titleId} className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
+              {description && <p id={descriptionId} className="mt-1 text-xs leading-relaxed text-slate-500">{description}</p>}
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border-2 border-black bg-rose-200 text-black shadow-[2px_2px_0px_0px_#000] transition-all hover:bg-rose-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+              className="-mr-1 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
               aria-label="Close panel"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-                <path d="m7 7 10 10M17 7 7 17" />
-              </svg>
+              <Icon name="close" className="size-4" />
             </button>
           </div>
           <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">{children}</div>
           {footer && (
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t-[2.5px] border-black bg-zinc-50 px-5 py-4 sm:px-6">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5 border-t border-slate-200 bg-slate-50/60 px-5 py-4 sm:px-6">
               {footer}
             </div>
           )}

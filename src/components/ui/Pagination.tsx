@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './Icon';
 
 interface PaginationProps {
   page: number;
@@ -17,36 +18,39 @@ export function Pagination({
 }: PaginationProps) {
   if (totalPages <= 1 && !totalRecords) return null;
 
+  const navButton =
+    'inline-flex min-h-9 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white sm:flex-none';
+
   return (
-    <nav aria-label="Pagination" className={`flex flex-col gap-4 px-1 py-5 text-sm font-semibold text-black sm:flex-row sm:items-center sm:justify-between ${className}`}>
+    <nav aria-label="Pagination" className={`flex flex-col gap-3 px-1 py-5 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between ${className}`}>
       <p>
         {totalRecords !== undefined ? (
-          <>Total: <strong className="font-extrabold tabular-nums text-black">{totalRecords}</strong> records</>
+          <>Total: <strong className="font-semibold tabular-nums text-slate-900">{totalRecords}</strong> records</>
         ) : (
-          <>Page <strong className="font-extrabold tabular-nums text-black">{page}</strong> of <strong className="font-extrabold tabular-nums text-black">{Math.max(1, totalPages)}</strong></>
+          <>Page <strong className="font-semibold tabular-nums text-slate-900">{page}</strong> of <strong className="font-semibold tabular-nums text-slate-900">{Math.max(1, totalPages)}</strong></>
         )}
       </p>
-      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:gap-3">
+      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:gap-2.5">
         <button
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
-          className="inline-flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-amber-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-5"
+          className={navButton}
         >
-          <svg className="hidden size-4 shrink-0 min-[360px]:block" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m11.5 5-5 5 5 5" /></svg>
+          <Icon name="chevronLeft" className="hidden size-4 shrink-0 min-[360px]:block" />
           Previous
         </button>
-        <span className="shrink-0 rounded-lg border-2 border-black bg-amber-300 px-3 py-1 font-mono text-xs font-bold text-black shadow-[2px_2px_0px_0px_#000]" aria-live="polite" aria-atomic="true" aria-label={`Page ${page} of ${Math.max(1, totalPages)}`}>
-          {page} <span className="mx-1 text-black" aria-hidden="true">/</span> {Math.max(1, totalPages)}
+        <span className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-xs font-medium tabular-nums text-slate-700" aria-live="polite" aria-atomic="true" aria-label={`Page ${page} of ${Math.max(1, totalPages)}`}>
+          {page} <span className="mx-0.5 text-slate-400" aria-hidden="true">/</span> {Math.max(1, totalPages)}
         </span>
         <button
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="inline-flex min-h-10 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black bg-emerald-400 px-4 py-2 text-sm font-extrabold text-black shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-emerald-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none sm:px-5"
+          className={navButton}
         >
           Next
-          <svg className="hidden size-4 shrink-0 min-[360px]:block" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m8.5 5 5 5-5 5" /></svg>
+          <Icon name="chevronRight" className="hidden size-4 shrink-0 min-[360px]:block" />
         </button>
       </div>
     </nav>

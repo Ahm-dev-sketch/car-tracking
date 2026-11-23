@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './Icon';
 
 interface EmptyStateProps {
   title: string;
@@ -19,23 +20,18 @@ export function EmptyState({
   className = '',
 }: EmptyStateProps) {
   return (
-    <div className={`rounded-xl border-[2.5px] border-black bg-white p-2 shadow-[5px_5px_0px_0px_#000] ${className}`}>
-      <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-black bg-amber-50/40 px-6 py-12 text-center sm:py-16">
-        <div className="mb-5 flex size-14 items-center justify-center rounded-xl border-2 border-black bg-emerald-300 text-black shadow-[3px_3px_0px_0px_#000]" aria-hidden="true">
-          {icon || (
-            <svg className="size-7" fill="none" viewBox="0 0 32 32" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 9.5h16a2.5 2.5 0 0 1 2.5 2.5v12a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 24V12A2.5 2.5 0 0 1 8 9.5Z" />
-              <path d="M11 9.5V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2.5M5.5 17.5h7l1.5 3h4l1.5-3h7" />
-            </svg>
-          )}
+    <div className={`rounded-xl border border-slate-200 bg-white p-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${className}`}>
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-6 py-12 text-center sm:py-16">
+        <div className="mb-5 flex size-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400" aria-hidden="true">
+          {icon || <Icon name="inbox" className="size-5" />}
         </div>
-        <h4 className="text-lg font-extrabold tracking-tight text-black">{title}</h4>
-        {description && <p className="mt-2 max-w-sm text-sm font-medium leading-relaxed text-zinc-700">{description}</p>}
+        <h4 className="text-base font-semibold tracking-tight text-slate-900">{title}</h4>
+        {description && <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-slate-500">{description}</p>}
         {action && (
           <button
             type="button"
             onClick={action.onClick}
-            className="mt-6 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border-2 border-black bg-emerald-400 px-6 py-2.5 text-sm font-extrabold text-black shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-emerald-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+            className="mt-6 inline-flex min-h-10 cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
             {action.label}
           </button>

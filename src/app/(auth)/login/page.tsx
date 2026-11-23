@@ -110,15 +110,18 @@ function LoginForm() {
     }
   };
 
+  const fieldClass =
+    'min-h-12 w-full rounded-lg border border-slate-200 bg-white py-3 pl-11 pr-4 text-[15px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15';
+
   return (
-    <div className="w-full rounded-2xl border-[3px] border-black bg-white p-6 sm:p-9 shadow-[8px_8px_0px_0px_#000]">
+    <div className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-8">
       <div className="mb-7">
-        <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-black bg-rose-200 text-black shadow-[3px_3px_0px_0px_#000]">
-          <LoginIcon name="route" className="h-6 w-6 text-rose-900" />
-        </div>
-        <span className="eyebrow">Your workday, connected</span>
-        <h1 className="mt-3 text-3xl font-black tracking-tight text-black sm:text-4xl">Welcome back.</h1>
-        <p className="mt-2 text-sm font-semibold leading-relaxed text-zinc-600">Sign in to book your next ride and keep every journey in view.</p>
+        <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <span className="h-3 w-0.5 rounded-full bg-brand-500" aria-hidden="true" />
+          Workplace mobility
+        </span>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Welcome back.</h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-500">Sign in to book your next ride and keep every journey in view.</p>
       </div>
 
       {error && (
@@ -130,16 +133,16 @@ function LoginForm() {
       )}
 
       {/* Quick Demo Fill Buttons */}
-      <div className="mb-6 rounded-xl border-2 border-black bg-amber-50 p-3.5 shadow-[2px_2px_0px_0px_#000]">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-700">
-            Akun Demo Siap Pakai:
+      <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Akun Demo Siap Pakai
           </span>
-          <span className="text-[10px] font-bold text-zinc-500">
-            Password: Demo1234
+          <span className="font-mono text-[10px] font-medium text-slate-400">
+            Demo1234
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           <button
             type="button"
             onClick={() => {
@@ -147,10 +150,10 @@ function LoginForm() {
               setPassword('Demo1234');
               setError(null);
             }}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-amber-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+            className="flex cursor-pointer flex-col items-start justify-center rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition-colors hover:border-slate-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            <span className="text-xs font-black text-black">User</span>
-            <span className="text-[10px] font-bold text-zinc-500">Penumpang</span>
+            <span className="text-xs font-semibold text-slate-900">User</span>
+            <span className="text-[10px] text-slate-400">Penumpang</span>
           </button>
           <button
             type="button"
@@ -159,10 +162,10 @@ function LoginForm() {
               setPassword('Demo1234');
               setError(null);
             }}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-rose-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+            className="flex cursor-pointer flex-col items-start justify-center rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition-colors hover:border-slate-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            <span className="text-xs font-black text-black">Driver</span>
-            <span className="text-[10px] font-bold text-zinc-500">Budi (Halim)</span>
+            <span className="text-xs font-semibold text-slate-900">Driver</span>
+            <span className="text-[10px] text-slate-400">Budi (Halim)</span>
           </button>
           <button
             type="button"
@@ -171,19 +174,19 @@ function LoginForm() {
               setPassword('Demo1234');
               setError(null);
             }}
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-black bg-white py-1.5 px-1 text-center shadow-[1.5px_1.5px_0px_0px_#000] hover:bg-amber-300 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+            className="flex cursor-pointer flex-col items-start justify-center rounded-md border border-slate-200 bg-white px-2.5 py-2 text-left transition-colors hover:border-slate-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            <span className="text-xs font-black text-black">Admin</span>
-            <span className="text-[10px] font-bold text-zinc-500">Operasional</span>
+            <span className="text-xs font-semibold text-slate-900">Admin</span>
+            <span className="text-[10px] text-slate-400">Operasional</span>
           </button>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4" aria-busy={isLoading}>
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-xs font-black uppercase tracking-wider text-black">Work email</label>
+          <label htmlFor="email" className="mb-1.5 block text-xs font-semibold text-slate-700">Work email</label>
           <div className="relative">
-            <LoginIcon name="mail" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black" />
+            <LoginIcon name="mail" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               id="email"
               type="email"
@@ -194,15 +197,15 @@ function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@demo.test"
-              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#be123c] transition-all"
+              className={fieldClass}
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1.5 block text-xs font-black uppercase tracking-wider text-black">Password</label>
+          <label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-slate-700">Password</label>
           <div className="relative">
-            <LoginIcon name="lock" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black" />
+            <LoginIcon name="lock" className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
             <input
               id="password"
               type="password"
@@ -211,7 +214,7 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Demo1234"
-              className="min-h-12 w-full rounded-xl border-2 border-black bg-white py-3 pl-12 pr-4 text-base font-semibold text-black outline-none placeholder:text-zinc-500 shadow-[3px_3px_0px_0px_#000] focus:shadow-[4px_4px_0px_0px_#be123c] transition-all"
+              className={fieldClass}
             />
           </div>
         </div>
@@ -219,17 +222,17 @@ function LoginForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="group mt-3 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-[2.5px] border-black bg-[#be123c] px-6 py-3.5 text-base font-black text-white shadow-[4px_4px_0px_0px_#000] hover:bg-[#e11d48] hover:shadow-[5px_5px_0px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_0px_#000] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          className="group mt-2 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600 active:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
         >
           {isLoading && <Spinner size="sm" className="text-white" />}
           {isLoading ? 'Signing in...' : 'Sign in'}
-          {!isLoading && <LoginIcon name="arrow" className="h-4 w-4 text-white" />}
+          {!isLoading && <LoginIcon name="arrow" className="size-4 transition-transform group-hover:translate-x-0.5" />}
         </button>
       </form>
 
-      <div className="mt-7 flex items-start gap-2.5 border-t-2 border-black/15 pt-5">
-        <LoginIcon name="lock" className="mt-0.5 h-4 w-4 shrink-0 text-black" />
-        <p className="text-xs font-medium leading-relaxed text-zinc-600">Your workplace account is managed by fleet administration. Contact your administrator if you need access.</p>
+      <div className="mt-7 flex items-start gap-2.5 border-t border-slate-200 pt-5">
+        <LoginIcon name="shield" className="mt-0.5 size-4 shrink-0 text-slate-400" />
+        <p className="text-xs leading-relaxed text-slate-500">Your workplace account is managed by fleet administration. Contact your administrator if you need access.</p>
       </div>
     </div>
   );
@@ -237,45 +240,65 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-dvh flex-col bg-[#faf9f5] px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-black sm:px-10 lg:px-14">
+    <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-slate-50 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-slate-900 sm:px-10 lg:px-14">
+      {/* Geometric grid backdrop — quiet, no glows */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.55] [background-image:linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_at_top,#000_35%,transparent_78%)]"
+      />
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black bg-rose-200 text-black shadow-[2px_2px_0px_0px_#000]">
-            <LoginIcon name="route" className="h-6 w-6 text-rose-900" />
+        <div className="flex items-center gap-2.5">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-brand-500 text-white">
+            <LoginIcon name="route" className="size-5" />
           </div>
-          <span className="text-xl font-black tracking-tight text-black">KCIC Fleet<span className="text-rose-700">.</span></span>
+          <span className="text-base font-semibold tracking-tight text-slate-900">KCIC <span className="font-bold text-brand-500">Fleet</span></span>
         </div>
-        <span className="hidden text-[11px] font-black uppercase tracking-wider text-black bg-amber-300 border-1.5 border-black px-2.5 py-0.5 rounded-md shadow-[1.5px_1.5px_0px_0px_#000] sm:block">Workplace mobility</span>
+        <span className="hidden items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400 sm:flex">
+          <span className="size-1.5 rounded-full bg-brand-500" aria-hidden="true" />
+          Workplace mobility
+        </span>
       </header>
 
       <div className="mx-auto grid w-full max-w-7xl flex-1 items-center gap-12 py-10 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:gap-16 xl:gap-24">
         <aside className="hidden min-w-0 flex-col lg:flex">
-          <div><span className="eyebrow">A little less logistics</span></div>
-          <h2 className="mt-5 max-w-xl text-[clamp(2.5rem,4.2vw,4.25rem)] font-black leading-[1.08] tracking-tight text-black">A smoother route<br />through your workday.</h2>
-          <p className="mt-5 max-w-sm text-base font-semibold leading-relaxed text-zinc-600">From the first booking to the last mile. Your vehicles, trips, and team, moving together.</p>
+          <span className="inline-flex items-center gap-2 self-start text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="h-3 w-0.5 rounded-full bg-brand-500" aria-hidden="true" />
+            KCIC Fleet Operations
+          </span>
+          <h2 className="mt-5 max-w-xl text-[clamp(2.25rem,3.8vw,3.5rem)] font-semibold leading-[1.08] tracking-tight text-slate-900">
+            A smoother route
+            <br />
+            through your workday.
+          </h2>
+          <p className="mt-5 max-w-sm text-base leading-relaxed text-slate-500">From the first booking to the last mile. Your vehicles, trips, and team, moving together.</p>
           <figure className="mt-8">
-            <VehicleTracking3D />
-            <figcaption className="mt-4 flex items-center justify-between gap-4 px-1 text-xs font-bold text-black">
-              <span>KCIC Fleet. Every journey.</span>
-              <span className="flex items-center gap-2 text-black"><span className="h-2 w-2 rounded-full border border-black bg-emerald-500" />Connected mobility</span>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <VehicleTracking3D />
+            </div>
+            <figcaption className="mt-4 flex items-center justify-between gap-4 px-1 text-xs text-slate-500">
+              <span className="font-medium">KCIC Fleet. Every journey.</span>
+              <span className="flex items-center gap-2 text-slate-600">
+                <span className="relative size-2 rounded-full bg-success-600 status-ping" aria-hidden="true" />
+                Connected mobility
+              </span>
             </figcaption>
           </figure>
         </aside>
 
-        <div className="mx-auto w-full min-w-0 max-w-md lg:max-w-[28rem]">
+        <div className="mx-auto w-full min-w-0 max-w-md lg:max-w-[26rem]">
           <Suspense fallback={
-            <div role="status" className="flex min-h-96 flex-col items-center justify-center gap-4 rounded-2xl border-[3px] border-black bg-white p-8 text-sm font-bold text-black shadow-[6px_6px_0px_0px_#000]">
-              <Spinner size="lg" className="text-black" />
+            <div role="status" className="flex min-h-96 flex-col items-center justify-center gap-4 rounded-xl border border-slate-200 bg-white p-8 text-sm text-slate-500">
+              <Spinner size="lg" className="text-slate-400" />
               Preparing your sign-in...
             </div>
           }>
             <LoginForm />
           </Suspense>
-          <p className="mt-6 text-center text-xs font-bold text-black lg:hidden">KCIC Fleet. Every journey.</p>
+          <p className="mt-6 text-center text-xs text-slate-400 lg:hidden">KCIC Fleet. Every journey.</p>
         </div>
       </div>
 
-      <footer className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 text-xs font-semibold leading-relaxed text-zinc-600">
+      <footer className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-400">
         <span>KCIC Fleet &middot; Operational Mobility.</span>
         <span className="hidden sm:block">For your team. For the road ahead.</span>
       </footer>

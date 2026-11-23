@@ -34,7 +34,7 @@ export function RelativeTime({ date, className = '' }: { date: Date | string | n
     <time
       dateTime={new Date(date).toISOString()}
       title={new Date(date).toLocaleString()}
-      className={`text-xs text-zinc-500 ${className}`}
+      className={`text-xs tabular-nums text-slate-500 ${className}`}
     >
       {formatRelative(date)}
     </time>

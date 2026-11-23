@@ -3,6 +3,7 @@
 import React from 'react';
 import { Modal } from './Modal';
 import { Spinner } from './Spinner';
+import { Icon } from './Icon';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="button-secondary inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-xl border-2 border-black bg-white px-5 py-2.5 text-sm font-bold text-black shadow-[3px_3px_0px_0px_#000] transition-all hover:bg-amber-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+            className="button-secondary inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
           >
             {cancelLabel}
           </button>
@@ -49,22 +50,27 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={isLoading}
             aria-busy={isLoading}
-            className={`inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-black px-5 py-2.5 text-sm font-extrabold text-black shadow-[3px_3px_0px_0px_#000] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none ${
+            className={`inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 sm:flex-none ${
               isDestructive
-                ? 'bg-rose-400 hover:bg-rose-500 text-black'
-                : 'bg-emerald-400 hover:bg-emerald-500 text-black'
+                ? 'border-danger-600 bg-danger-600 hover:bg-danger-700 focus-visible:outline-danger-700'
+                : 'border-slate-900 bg-slate-900 hover:bg-slate-800 focus-visible:outline-slate-900'
             }`}
           >
-            {isLoading && <Spinner size="sm" className="text-black" />}
+            {isLoading && <Spinner size="sm" className="text-white" />}
             {confirmLabel}
           </button>
         </>
       }
     >
-      <div className={`flex size-12 items-center justify-center rounded-xl border-2 border-black shadow-[3px_3px_0px_0px_#000] ${isDestructive ? 'bg-rose-300 text-black' : 'bg-emerald-300 text-black'}`} aria-hidden="true">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {isDestructive ? <><path d="M12 8v5m0 3h.01" /><circle cx="12" cy="12" r="9" /></> : <><path d="m8 12 2.5 2.5L16 9" /><circle cx="12" cy="12" r="9" /></>}
-        </svg>
+      <div
+        className={`flex size-11 items-center justify-center rounded-full border ${
+          isDestructive
+            ? 'border-danger-200 bg-danger-50 text-danger-600'
+            : 'border-warning-200 bg-warning-50 text-warning-600'
+        }`}
+        aria-hidden="true"
+      >
+        <Icon name={isDestructive ? 'alert' : 'check'} className="size-5" />
       </div>
     </Modal>
   );

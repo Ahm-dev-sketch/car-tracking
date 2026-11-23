@@ -38,12 +38,12 @@ export function FormField({
 
   return (
     <div
-      className={`flex min-w-0 flex-col gap-2 [&>:is(input,select,textarea)]:min-h-12 [&>:is(input,select,textarea)]:w-full [&>:is(input,select,textarea)]:rounded-xl [&>:is(input,select,textarea)]:border-[2.5px] [&>:is(input,select,textarea)]:border-black [&>:is(input,select,textarea)]:bg-white [&>:is(input,select,textarea)]:px-4 [&>:is(input,select,textarea)]:py-3 [&>:is(input,select,textarea)]:text-base [&>:is(input,select,textarea)]:font-medium [&>:is(input,select,textarea)]:text-black [&>:is(input,select,textarea)]:shadow-[3px_3px_0px_0px_#000] [&>:is(input,select,textarea)]:focus:shadow-[4px_4px_0px_0px_#059669] [&>:is(input,select,textarea)]:focus:outline-none sm:[&>:is(input,select,textarea)]:text-sm ${className}`}
+      className={`flex min-w-0 flex-col gap-1.5 [&>:is(input,select,textarea)]:min-h-12 [&>:is(input,select,textarea)]:w-full [&>:is(input,select,textarea)]:rounded-lg [&>:is(input,select,textarea)]:border [&>:is(input,select,textarea)]:border-slate-200 [&>:is(input,select,textarea)]:bg-white [&>:is(input,select,textarea)]:px-3.5 [&>:is(input,select,textarea)]:py-3 [&>:is(input,select,textarea)]:text-base [&>:is(input,select,textarea)]:text-slate-900 [&>:is(input,select,textarea)]:transition-colors [&>:is(input,select,textarea)]:focus:border-brand-500 [&>:is(input,select,textarea)]:focus:outline-none [&>:is(input,select,textarea)]:focus:ring-3 [&>:is(input,select,textarea)]:focus:ring-brand-500/15 sm:[&>:is(input,select,textarea)]:text-sm ${className}`}
     >
-      <label htmlFor={fieldId} className="text-xs font-extrabold uppercase tracking-wider text-black">
+      <label htmlFor={fieldId} className="text-xs font-semibold text-slate-700">
         {label}
         {required && (
-          <span className="ml-1 text-rose-600 font-black" aria-hidden="true">
+          <span className="ml-0.5 text-brand-500" aria-hidden="true">
             *
           </span>
         )}
@@ -64,14 +64,14 @@ export function FormField({
         });
       })}
       {hint && !error && (
-        <p id={messageId} className="text-xs font-medium text-zinc-600">
+        <p id={messageId} className="text-xs text-slate-500">
           {hint}
         </p>
       )}
       {error && (
         <p
           id={messageId}
-          className="text-xs font-bold text-rose-950 bg-rose-200 border-2 border-black rounded-lg px-3 py-1.5 shadow-[2px_2px_0px_0px_#000]"
+          className="text-xs font-medium text-danger-700"
           role="alert"
         >
           {error}

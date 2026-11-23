@@ -40,13 +40,24 @@ const paths = {
   speaker: 'M11 5 6 9H2v6h4l5 4V5ZM15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14',
   speakerOff: 'M11 5 6 9H2v6h4l5 4V5ZM23 9l-6 6M17 9l6 6',
   send: 'm22 2-7 20-4-9-9-4Z M22 2 11 13',
+  chevronLeft: 'm15 18-6-6 6-6',
+  chevronRight: 'm9 18 6-6-6-6',
+  chevronsLeft: 'm11 17-5-5 5-5m7 10-5-5 5-5',
+  chevronsRight: 'm13 17 5-5-5-5M6 17l5-5-5-5',
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2m4.45-7.16L4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7l-2.45-7.16A2 2 0 0 0 15.65 3h-7.3a2 2 0 0 0-1.9 1.84Z',
+  info: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 16v-4m0-4h.01',
+  search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm10 2-4.35-4.35',
+  eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Zm13-3a3 3 0 1 1-6 6 3 3 0 0 1 6-6Z',
+  eyeOff: 'M10.73 5.08A10.43 10.43 0 0 1 12 5c6.4 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.5 13.5 0 0 0 2 12s3.6 7 10 7a9.74 9.74 0 0 0 5.39-1.61M2 2l20 20M9.88 9.88a3 3 0 1 0 4.24 4.24',
+  gauge: 'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm0-4 4-4M3.5 18a10 10 0 1 1 17 0',
+  map: 'm3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15',
 } satisfies Record<string, string>;
 
 export type IconName = keyof typeof paths;
 
 export function Icon({ name, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={name === 'more' ? 3 : 1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
       <path d={paths[name]} />
     </svg>
   );

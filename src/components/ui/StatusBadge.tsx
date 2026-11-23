@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './Icon';
 
 type StatusType =
   // Booking
@@ -32,42 +33,70 @@ type StatusType =
   | 'ABORTED'
   | string;
 
+const success = 'bg-success-50 text-success-700 border-success-200';
+const info = 'bg-info-50 text-info-700 border-info-200';
+const warning = 'bg-warning-50 text-warning-700 border-warning-200';
+const danger = 'bg-danger-50 text-danger-700 border-danger-200';
+
 const statusStyles: Record<string, string> = {
-  // Booking
-  PENDING: 'bg-amber-300 text-black',
-  SEARCHING_DRIVER: 'bg-amber-400 text-black animate-pulse',
-  DRIVER_NOTIFIED: 'bg-sky-300 text-black',
-  DRIVER_ASSIGNED: 'bg-violet-300 text-black',
-  DRIVER_EN_ROUTE: 'bg-indigo-300 text-black',
-  ARRIVED: 'bg-teal-300 text-black',
-  IN_PROGRESS: 'bg-emerald-300 text-black',
-  PENDING_COMPLETION: 'bg-amber-300 text-black animate-pulse',
-  COMPLETED: 'bg-emerald-400 text-black',
-  NO_DRIVER_AVAILABLE: 'bg-zinc-200 text-black',
-  ADMIN_INTERVENTION: 'bg-orange-300 text-black',
-  APPROVED: 'bg-sky-300 text-black',
-  REJECTED: 'bg-rose-300 text-black',
-  CANCELLED: 'bg-rose-300 text-black',
+  // Booking — positive / live
+  ARRIVED: success,
+  IN_PROGRESS: success,
+  COMPLETED: success,
+  APPROVED: success,
+  // Booking — standby / neutral
+  DRIVER_NOTIFIED: info,
+  DRIVER_ASSIGNED: info,
+  DRIVER_EN_ROUTE: success,
+  NO_DRIVER_AVAILABLE: info,
+  CANCELLED: info,
+  // Booking — pending / needs attention
+  PENDING: warning,
+  SEARCHING_DRIVER: warning,
+  PENDING_COMPLETION: warning,
+  ADMIN_INTERVENTION: warning,
+  // Booking — rejected
+  REJECTED: danger,
 
   // Vehicle
-  AVAILABLE: 'bg-emerald-300 text-black',
-  RESERVED: 'bg-amber-300 text-black',
-  IN_USE: 'bg-sky-300 text-black',
-  MAINTENANCE: 'bg-zinc-200 text-black',
-  INACTIVE: 'bg-rose-300 text-black',
+  AVAILABLE: info,
+  RESERVED: info,
+  IN_USE: info,
+  MAINTENANCE: warning,
+  INACTIVE: info,
 
   // Driver / Trip
-  OFFLINE: 'bg-zinc-200 text-black',
-  ONLINE: 'bg-emerald-300 text-black',
-  BUSY: 'bg-sky-300 text-black',
-  ON_TRIP: 'bg-sky-300 text-black',
-  ACTIVE: 'bg-emerald-300 text-black',
-  ABORTED: 'bg-rose-300 text-black',
+  OFFLINE: info,
+  ONLINE: success,
+  BUSY: info,
+  ON_TRIP: success,
+  ACTIVE: success,
+  ABORTED: danger,
+};
+
+/** States that represent a live, moving signal and earn the telemetry dot. */
+const liveStates = new Set([
+  'ACTIVE',
+  'ON_TRIP',
+  'IN_PROGRESS',
+  'DRIVER_EN_ROUTE',
+  'ONLINE',
+]);
+
+const dangerStates = new Set(['REJECTED', 'ABORTED']);
+
+const dotStyles: Record<string, string> = {
+  [success]: 'bg-success-600',
+  [info]: 'bg-slate-400',
+  [warning]: 'bg-warning-600',
+  [danger]: 'bg-danger-600',
 };
 
 export function StatusBadge({ status, className = '' }: { status: StatusType; className?: string }) {
   const normalized = status ? status.toUpperCase() : 'UNKNOWN';
-  const style = statusStyles[normalized] || 'bg-zinc-200 text-black';
+  const style = statusStyles[normalized] || info;
+  const isLive = liveStates.has(normalized);
+  const isDanger = dangerStates.has(normalized);
   const label =
     normalized === 'PENDING_COMPLETION'
       ? 'Menunggu Approval Nota'
@@ -77,8 +106,16 @@ export function StatusBadge({ status, className = '' }: { status: StatusType; cl
 
   return (
     <span
-      className={`inline-flex max-w-full items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wider uppercase border-2 border-black shadow-[2px_2px_0px_0px_#000] ${style} ${className}`}
+      className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tracking-wide ${style} ${className}`}
     >
+      {isDanger ? (
+        <Icon name="alert" className="size-3 shrink-0" />
+      ) : (
+        <span
+          aria-hidden="true"
+          className={`relative inline-flex size-1.5 shrink-0 rounded-full ${dotStyles[style] ?? 'bg-slate-400'} ${isLive ? 'status-ping' : ''}`}
+        />
+      )}
       {label}
     </span>
   );

@@ -17,30 +17,17 @@ export function ErrorBanner({
   return (
     <div
       role="alert"
-      className={`flex items-start justify-between gap-3 p-4 bg-rose-200 text-black border-[2.5px] border-black rounded-xl text-sm font-semibold shadow-[4px_4px_0px_0px_#000] ${className}`}
+      className={`flex items-start justify-between gap-3 rounded-lg border border-danger-200 bg-danger-50 p-3.5 text-sm text-danger-700 ${className}`}
     >
-      <div className="flex items-center gap-2.5">
-        <svg
-          className="w-5 h-5 shrink-0 text-black"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-          />
-        </svg>
+      <div className="flex items-start gap-2.5">
+        <Icon name="alert" className="mt-0.5 size-4 shrink-0" />
         <span className="leading-snug">{message}</span>
       </div>
       {onDismiss && (
         <button
           type="button"
           onClick={onDismiss}
-          className="flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-lg border-2 border-black bg-white text-black shadow-[2px_2px_0px_0px_#000] hover:bg-zinc-100 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+          className="-mr-1 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-danger-700/70 transition-colors hover:bg-danger-100 hover:text-danger-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
           aria-label="Dismiss error"
         >
           <Icon name="close" className="size-4" />

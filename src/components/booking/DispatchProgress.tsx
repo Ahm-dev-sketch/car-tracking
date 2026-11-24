@@ -10,6 +10,8 @@ export interface DispatchProgressProps {
   etaEstimated?: boolean;
   className?: string;
   compact?: boolean;
+  /** PENDING_COMPLETION only: forwarded to StatusBadge to distinguish upload states. */
+  hasNotaDinas?: boolean;
 }
 
 export function formatEta(
@@ -38,6 +40,7 @@ export function DispatchProgress({
   etaEstimated,
   className = '',
   compact = false,
+  hasNotaDinas,
 }: DispatchProgressProps) {
   const normStatus = status?.toUpperCase() || '';
   const etaText = formatEta(etaSeconds, etaEstimated);
@@ -163,7 +166,7 @@ export function DispatchProgress({
               ETA {etaText}
             </span>
           )}
-          <StatusBadge status={status} />
+          <StatusBadge status={status} hasNotaDinas={hasNotaDinas} />
         </div>
       </div>
 
@@ -216,10 +219,23 @@ export function DispatchProgress({
       </ol>
 
       {normStatus === 'PENDING_COMPLETION' && (
-        <div className="flex items-start gap-2 border-t border-warning-200 bg-warning-50 px-4 py-3 text-xs font-medium leading-relaxed text-warning-700">
-          <Icon name="clock" className="mt-px size-4 shrink-0 text-warning-600" />
+        <div
+          className={`flex items-start gap-2 border-t px-4 py-3 text-xs font-medium leading-relaxed ${
+            hasNotaDinas
+              ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-400'
+              : 'border-warning-200 bg-warning-50 text-warning-700'
+          }`}
+        >
+          <Icon
+            name="clock"
+            className={`mt-px size-4 shrink-0 ${
+              hasNotaDinas ? 'text-sky-600 dark:text-sky-400' : 'text-warning-600'
+            }`}
+          />
           <span>
-            Perjalanan telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi &amp; persetujuan admin.
+            {hasNotaDinas
+              ? 'Nota Dinas sudah diunggah dan sedang menunggu verifikasi admin.'
+              : 'Perjalanan telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi & persetujuan admin.'}
           </span>
         </div>
       )}

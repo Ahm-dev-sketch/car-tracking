@@ -427,7 +427,7 @@ function UserBookingsContent() {
               MENUNGGU SYNC (OFFLINE)
             </span>
           ) : (
-            <StatusBadge status={b.status} />
+            <StatusBadge status={b.status} hasNotaDinas={Boolean(b.notaDinasUrl)} />
           )}
           {b.etaSeconds !== undefined && b.etaSeconds !== null && (
             <div className="text-[10px] tabular-nums text-slate-500">
@@ -468,6 +468,8 @@ function UserBookingsContent() {
                 className={`inline-flex min-h-11 cursor-pointer items-center rounded-lg px-3.5 text-xs font-semibold transition-colors ${
                   b.rejectedReason
                     ? 'bg-danger-600 text-white hover:bg-danger-700'
+                    : b.notaDinasUrl
+                    ? 'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                     : 'bg-brand-600 text-white hover:bg-brand-700'
                 }`}
               >
@@ -688,6 +690,7 @@ function UserBookingsContent() {
               status={selectedBooking.status}
               etaSeconds={selectedBooking.etaSeconds}
               etaEstimated={selectedBooking.etaEstimated}
+              hasNotaDinas={Boolean(selectedBooking.notaDinasUrl)}
             />
 
             {/* Service Type & Operational Hub */}
@@ -728,14 +731,18 @@ function UserBookingsContent() {
                     selectedBooking.rejectedReason
                       ? 'border-danger-200 bg-danger-50 text-danger-700'
                       : selectedBooking.notaDinasUrl
-                      ? 'border-success-200 bg-success-50 text-success-700'
+                      ? selectedBooking.status === 'PENDING_COMPLETION'
+                        ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-400'
+                        : 'border-success-200 bg-success-50 text-success-700'
                       : 'border-warning-200 bg-warning-50 text-warning-700'
                   }`}
                 >
                   {selectedBooking.rejectedReason
                     ? 'Ditolak (Perlu Revisi)'
                     : selectedBooking.notaDinasUrl
-                    ? 'Terlampir'
+                    ? selectedBooking.status === 'PENDING_COMPLETION'
+                      ? 'Terunggah, Menunggu Verifikasi'
+                      : 'Terlampir'
                     : 'Belum Dilampirkan'}
                 </span>
               </div>
@@ -760,6 +767,12 @@ function UserBookingsContent() {
                   <p className="truncate text-[11px] text-slate-600">
                     File: <span className="font-semibold text-slate-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
                   </p>
+                  {selectedBooking.status === 'PENDING_COMPLETION' && !selectedBooking.rejectedReason && (
+                    <p className="flex items-start gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-[11px] font-medium leading-relaxed text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-400">
+                      <Icon name="clock" className="mt-px size-3.5 shrink-0" />
+                      <span>Nota Dinas sudah diunggah. Menunggu verifikasi admin KCIC.</span>
+                    </p>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <a
                       href={selectedBooking.notaDinasUrl}

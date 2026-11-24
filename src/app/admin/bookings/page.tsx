@@ -680,7 +680,7 @@ function AdminBookingsContent() {
       header: 'Status',
       cell: (b) => (
         <div className="space-y-1">
-          <StatusBadge status={b.status} />
+          <StatusBadge status={b.status} hasNotaDinas={Boolean(b.notaDinasUrl)} />
           {b.status === 'PENDING_COMPLETION' && b.rejectedReason && (
             <div className="inline-flex items-center gap-1 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-danger-700">
               Nota Ditolak
@@ -1122,6 +1122,7 @@ function AdminBookingsContent() {
               status={selectedBooking.status}
               etaSeconds={selectedBooking.etaSeconds}
               etaEstimated={selectedBooking.etaEstimated}
+              hasNotaDinas={Boolean(selectedBooking.notaDinasUrl)}
             />
 
             {/* Service Type & Operational Hub */}
@@ -1164,14 +1165,18 @@ function AdminBookingsContent() {
                     selectedBooking.rejectedReason
                       ? 'border-danger-200 bg-danger-50 text-danger-700'
                       : selectedBooking.notaDinasUrl
-                      ? 'border-success-200 bg-success-50 text-success-700'
+                      ? selectedBooking.status === 'PENDING_COMPLETION'
+                        ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-400'
+                        : 'border-success-200 bg-success-50 text-success-700'
                       : 'border-warning-200 bg-warning-50 text-warning-700'
                   }`}
                 >
                   {selectedBooking.rejectedReason
                     ? 'Ditolak (Perlu Revisi)'
                     : selectedBooking.notaDinasUrl
-                    ? 'Terlampir'
+                    ? selectedBooking.status === 'PENDING_COMPLETION'
+                      ? 'Terunggah, Menunggu Verifikasi'
+                      : 'Terlampir'
                     : 'Belum Dilampirkan'}
                 </span>
               </div>

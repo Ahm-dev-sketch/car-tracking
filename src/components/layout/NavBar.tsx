@@ -134,7 +134,8 @@ export function NavBar() {
       <header className="app-header">
         <div className="header-island">
           <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="KCIC Fleet home">
-            <span className="brand-mark"><Icon name="route" className="size-5 text-white" /></span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/icon-192.png" alt="" width={36} height={36} className="size-9 shrink-0 rounded-lg shadow-xs" />
             <span className="text-lg font-semibold tracking-tight text-slate-900">KCIC <span className="font-bold text-brand-500">Fleet</span></span>
           </Link>
           <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Main navigation">

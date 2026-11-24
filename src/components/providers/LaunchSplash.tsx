@@ -46,10 +46,10 @@ export function LaunchSplash() {
         {/* eslint-disable-next-line @next/next/no-img-element -- static icon, no optimizer needed */}
         <img
           src="/icons/icon.svg"
-          alt=""
+          alt="KCIC Fleet"
           width={64}
           height={64}
-          className="size-16 rounded-xl border border-slate-200"
+          className="size-16 rounded-2xl drop-shadow-md"
         />
         <div className="flex flex-col items-center gap-2">
           <div className="h-0.5 w-9 rounded-full bg-brand-600" />

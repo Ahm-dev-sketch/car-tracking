@@ -129,9 +129,14 @@ function LoginForm() {
     <div className="w-full">
       {/* Brand lockup */}
       <div className="mb-10 flex items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#C8102E] text-[#FFFFFF]">
-          <LoginIcon name="route" className="size-5" />
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/icon-192.png"
+          alt="KCIC Fleet"
+          width={40}
+          height={40}
+          className="size-10 shrink-0 rounded-xl shadow-xs"
+        />
         <span className="flex min-w-0 flex-col">
           <span className="text-base font-bold tracking-tight text-slate-900">KCIC Fleet</span>
           <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-400">

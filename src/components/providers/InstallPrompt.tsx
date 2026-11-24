@@ -228,9 +228,14 @@ export function InstallPrompt() {
       <div className="flex flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700">
-              <Icon name="download" className="size-5" />
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/icon-192.png"
+              alt="KCIC Fleet"
+              width={40}
+              height={40}
+              className="size-10 shrink-0 rounded-xl shadow-xs"
+            />
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                 Aplikasi PWA
@@ -305,9 +310,14 @@ export function IosInstallHint() {
       aria-label="Add KCIC Fleet to your home screen"
     >
       <div className="flex items-start gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700">
-          <Icon name="share" className="size-4" />
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/apple-touch-icon.png"
+          alt="KCIC Fleet"
+          width={36}
+          height={36}
+          className="size-9 shrink-0 rounded-lg shadow-xs"
+        />
         <div className="leading-relaxed">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Tip instalasi iOS</p>
           <p className="mt-1 text-sm font-semibold tracking-tight text-slate-900">Pasang di Layar Utama iPhone/iPad</p>

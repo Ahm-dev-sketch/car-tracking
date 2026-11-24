@@ -1,47 +1,112 @@
 
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bgGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1a0208" />
-      <stop offset="50%" stop-color="#4c0519" />
-      <stop offset="100%" stop-color="#881337" />
+    <linearGradient id="kf-bg-m" x1="12%" y1="0%" x2="88%" y2="100%">
+      <stop offset="0%" stop-color="#e11d48" />
+      <stop offset="30%" stop-color="#c8102e" />
+      <stop offset="70%" stop-color="#990b22" />
+      <stop offset="100%" stop-color="#520512" />
     </linearGradient>
-    <linearGradient id="accentGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fb7185" />
-      <stop offset="100%" stop-color="#e11d48" />
+
+    <linearGradient id="kf-dial-m" x1="15%" y1="15%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#1e2638" />
+      <stop offset="45%" stop-color="#0e1422" />
+      <stop offset="100%" stop-color="#04060c" />
     </linearGradient>
-    <linearGradient id="goldGradMask" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fde047" />
-      <stop offset="100%" stop-color="#f59e0b" />
+
+    <linearGradient id="kf-bezel-m" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45" />
+      <stop offset="50%" stop-color="#64748b" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.85" />
     </linearGradient>
+
+    <linearGradient id="kf-wing-red-m" x1="55%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff4d6d" />
+      <stop offset="40%" stop-color="#e11d48" />
+      <stop offset="80%" stop-color="#be123c" />
+      <stop offset="100%" stop-color="#7a0718" />
+    </linearGradient>
+
+    <linearGradient id="kf-wing-silver-m" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="40%" stop-color="#f8fafc" />
+      <stop offset="80%" stop-color="#cbd5e1" />
+      <stop offset="100%" stop-color="#94a3b8" />
+    </linearGradient>
+
+    <linearGradient id="kf-windshield-m" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.9" />
+      <stop offset="30%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <radialGradient id="kf-beacon-glow-m" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="30%" stop-color="#fef08a" />
+      <stop offset="70%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" stop-opacity="0.1" />
+    </radialGradient>
+
+    <filter id="kf-dial-shadow-m" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#2a0209" flood-opacity="0.95" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+
+    <filter id="kf-craft-shadow-m" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="15" flood-color="#000000" flood-opacity="0.8" />
+    </filter>
   </defs>
 
-  <!-- Full Bleed Background for Maskable Icon -->
-  <rect width="512" height="512" fill="url(#bgGradMask)" />
+  <!-- Full Bleed Square Background (no rounded corners for maskable) -->
+  <rect width="512" height="512" fill="url(#kf-bg-m)" />
 
-  <!-- Safe Zone Elements centered in ~75% radius -->
-  <!-- Outer Precision Telemetry Ring -->
-  <circle cx="256" cy="256" r="160" fill="none" stroke="#e11d48" stroke-width="5" opacity="0.3" stroke-dasharray="12 8" />
-
-  <!-- Inner Dark Core -->
-  <circle cx="256" cy="256" r="124" fill="#180206" stroke="#fb7185" stroke-width="4" opacity="0.85" />
-
-  <!-- Nav Arrow Symbol (Scaled for Safe Zone) -->
-  <g transform="translate(256, 252) scale(0.85)">
-    <!-- Left Wing -->
-    <polygon points="0,-104 -78,64 0,28" fill="url(#accentGradMask)" />
-    <!-- Right Wing -->
-    <polygon points="0,-104 78,64 0,28" fill="#fecdd3" />
-    
-    <!-- Central Core Radar Ping Dot -->
-    <circle cx="0" cy="28" r="14" fill="url(#goldGradMask)" />
-    <!-- Pulse Ring -->
-    <circle cx="0" cy="28" r="32" fill="none" stroke="#fef08a" stroke-width="4" opacity="0.75" stroke-dasharray="6 4" />
+  <!-- Aerodynamic Streamlines across Crimson background -->
+  <g opacity="0.15" stroke="#ffffff" stroke-linecap="round">
+    <path d="M -40 180 C 140 180, 260 270, 552 270" stroke-width="2.5" fill="none" />
+    <path d="M -20 220 C 160 220, 280 320, 552 320" stroke-width="3" fill="none" />
+    <path d="M -60 260 C 120 260, 240 370, 552 370" stroke-width="2" fill="none" />
   </g>
 
-  <!-- Text Monogram Badge -->
-  <rect x="194" y="362" width="124" height="28" rx="14" fill="#4c0519" stroke="#fb7185" stroke-width="2.5" />
-  <text x="256" y="381" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="900" fill="#ffffff" letter-spacing="3">
-    KCIC
-  </text>
+  <!-- Content scaled inside 80% safe zone (center = 256, 256, scale = 0.94) -->
+  <g transform="translate(256, 256) scale(0.94) translate(-256, -256)">
+    <!-- Center Obsidian Cockpit/Telemetry Dial -->
+    <circle cx="256" cy="256" r="168" fill="url(#kf-dial-m)" filter="url(#kf-dial-shadow-m)" />
+    <circle cx="256" cy="256" r="168" fill="none" stroke="url(#kf-bezel-m)" stroke-width="2.5" />
+
+    <!-- Inner Telemetry Orbit Tracks -->
+    <circle cx="256" cy="256" r="142" fill="none" stroke="#e11d48" stroke-width="1.8" stroke-dasharray="6 8" opacity="0.4" />
+    <circle cx="256" cy="256" r="118" fill="none" stroke="#f43f5e" stroke-width="1.2" opacity="0.2" />
+
+    <!-- The 4 KCIC Hub Station Waypoint Nodes -->
+    <circle cx="156" cy="176" r="4.5" fill="#ffffff" opacity="0.95" />
+    <circle cx="156" cy="176" r="8" fill="none" stroke="#fb7185" stroke-width="1.2" opacity="0.65" />
+
+    <circle cx="220" cy="120" r="4.5" fill="#ffffff" opacity="0.95" />
+    <circle cx="220" cy="120" r="8" fill="none" stroke="#fb7185" stroke-width="1.2" opacity="0.65" />
+
+    <circle cx="360" cy="216" r="4.5" fill="#ffffff" opacity="0.95" />
+    <circle cx="360" cy="216" r="8" fill="none" stroke="#fb7185" stroke-width="1.2" opacity="0.65" />
+
+    <circle cx="336" cy="342" r="5" fill="#f59e0b" opacity="0.95" />
+    <circle cx="336" cy="342" r="9" fill="none" stroke="#fde047" stroke-width="1.4" opacity="0.8" />
+
+    <!-- Cardinal GPS Radar Ticks -->
+    <line x1="256" y1="92" x2="256" y2="102" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.75" />
+    <line x1="420" y1="256" x2="410" y2="256" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.75" />
+    <line x1="256" y1="420" x2="256" y2="410" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.5" />
+    <line x1="92" y1="256" x2="102" y2="256" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.5" />
+
+    <!-- HERO EMBLEM -->
+    <g transform="translate(256, 256) rotate(30) scale(1.1)" filter="url(#kf-craft-shadow-m)">
+      <path d="M 0 -108 L -74 62 C -68 68, -48 56, 0 24 Z" fill="url(#kf-wing-red-m)" />
+      <path d="M 0 -108 L 74 62 C 68 68, 48 56, 0 24 Z" fill="url(#kf-wing-silver-m)" />
+      <path d="M 0 -92 L -20 10 L 0 22 L 20 10 Z" fill="#0c121e" opacity="0.88" />
+      <path d="M 0 -76 L -14 -16 L 0 -10 L 14 -16 Z" fill="url(#kf-windshield-m)" />
+      <polygon points="-6,-64 -2,-64 8,-22 4,-22" fill="#ffffff" opacity="0.7" />
+      <line x1="0" y1="-108" x2="0" y2="24" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.85" />
+      <circle cx="0" cy="24" r="28" fill="none" stroke="#fde047" stroke-width="2.2" opacity="0.5" stroke-dasharray="5 5" />
+      <circle cx="0" cy="24" r="13" fill="url(#kf-beacon-glow-m)" />
+      <circle cx="0" cy="24" r="5.5" fill="#ffffff" />
+    </g>
+  </g>
 </svg>

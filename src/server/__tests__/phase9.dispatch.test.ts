@@ -192,6 +192,7 @@ describe('Phase 9 PostgreSQL Integration Tests: Auto-Dispatch and Locations', ()
 
     // End session
     const ended = await endDriverSession(driver1Id);
+    if ('alreadyEnded' in ended) throw new Error('expected an active session to end');
     expect(ended.status).toBe(DriverSessionStatus.ENDED);
     expect(ended.endedAt).not.toBeNull();
   });

@@ -18,6 +18,7 @@ import {
   TripStatus,
   MovementStatus,
 } from '@prisma/client';
+import type { DriverSession } from '@prisma/client';
 
 const publicUserSelect = { id: true, name: true, email: true, phone: true } satisfies Prisma.UserSelect;
 
@@ -1475,8 +1476,8 @@ export async function startDriverSession(
 export async function endDriverSession(
   driverId: string,
   ctx?: DispatchMutationContext
-) {
-  const { session, ended, offers } = await prisma.$transaction(
+): Promise<DriverSession | { status: 'OFFLINE'; alreadyEnded: true }> {
+  const result = await prisma.$transaction(
     async (tx) => {
       // Driver-only lock: never acquire booking or vehicle locks in this transaction.
       await tx.$queryRawUnsafe('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', driverId);
@@ -1489,7 +1490,19 @@ export async function endDriverSession(
         include: { driver: true },
       });
       if (!session) {
-        throw new ApiError(404, 'NO_ACTIVE_SESSION', 'No active session found for driver');
+        // Idempotent offline: no active session to end. Reconcile any stale driver
+        // state to OFFLINE, then short-circuit with a clean 200-shaped result instead
+        // of a 404 NO_ACTIVE_SESSION.
+        await tx.driver.update({
+          where: { id: driverId },
+          data: { status: DriverStatus.OFFLINE, currentVehicleId: null },
+        });
+        return {
+          alreadyEnded: true as const,
+          session: null,
+          ended: null,
+          offers: [] as { id: string; bookingId: string }[],
+        };
       }
       const ended = await tx.driverSession.update({
         where: { id: session.id },
@@ -1522,10 +1535,15 @@ export async function endDriverSession(
         where: { driverId, status: OfferStatus.SENT },
         select: { id: true, bookingId: true },
       });
-      return { session, ended, offers };
+      return { alreadyEnded: false as const, session, ended, offers };
     },
     { maxWait: 15000, timeout: 20000 }
   );
+
+  if (result.alreadyEnded) {
+    return { status: 'OFFLINE', alreadyEnded: true };
+  }
+  const { session, ended, offers } = result;
 
   // Release the driver lock before touching bookings; include expired SENT offers too.
   for (const offer of offers) {

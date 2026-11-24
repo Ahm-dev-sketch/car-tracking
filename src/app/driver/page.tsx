@@ -204,6 +204,7 @@ export default function DriverDashboardPage() {
   const [startError, setStartError] = useState<string | null>(null);
   const [isAdvancingTrip, setIsAdvancingTrip] = useState(false);
   const actionInFlight = useRef(false);
+  const sessionEndingRef = useRef(false);
   const dashboardRequest = useRef(0);
   const vehicleSearchRequest = useRef(0);
   const isStartingTrip = startPhase !== null;
@@ -253,6 +254,9 @@ export default function DriverDashboardPage() {
         setTelemetryWarning(result?.data?.rejected && result.data.rejected.length > 0 ? result.data.rejected[0].reason : null);
       }
     } catch (error) {
+      // Session is ending: an already in-flight location POST may 403 after the
+      // server ends the session. Swallow it — no backoff, no warning, no rethrow.
+      if (sessionEndingRef.current) return;
       // Offline: buffer points into the persisted queue (module caps at 200 points)
       if (isOfflineError(error)) {
         enqueueOfflineAction('DRIVER_LOCATION_PING', {
@@ -608,13 +612,20 @@ export default function DriverDashboardPage() {
     setIsTogglingOnline(true);
     try {
       if (isOnline) {
-        stopTracking(false);
-        await flushBuffer();
-        await fetchJson('/api/driver/sessions/current/end', { method: 'PATCH' });
-        stopTracking();
-        setActiveSession(null);
-        setOffers([]);
-        setActionError(null);
+        // Stop the geolocation watcher and cancel any queued flush BEFORE ending the
+        // session, so no in-flight location POST races the server-side end (403).
+        sessionEndingRef.current = true;
+        stopTracking(); // discard=true: cancels flush interval + clears buffer + watch
+        try {
+          await fetchJson('/api/driver/sessions/current/end', { method: 'PATCH' });
+          // UI already transitions to Offline here whether or not the server reports
+          // alreadyEnded; a 200 response means we are cleanly offline.
+          setActiveSession(null);
+          setOffers([]);
+          setActionError(null);
+        } finally {
+          sessionEndingRef.current = false;
+        }
       } else {
         let coords: { lat?: number; lng?: number } | null = null;
         if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {

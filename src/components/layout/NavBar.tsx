@@ -264,6 +264,12 @@ export function NavBar() {
             type="button"
             onClick={() => {
               resetInstallDismissal();
+              if (role === 'DRIVER') {
+                void fetch('/api/driver/sessions/current/end', {
+                  method: 'PATCH',
+                  keepalive: true,
+                }).catch(() => {});
+              }
               onExplicitLogout();
               signOut({ callbackUrl: '/login' });
             }}

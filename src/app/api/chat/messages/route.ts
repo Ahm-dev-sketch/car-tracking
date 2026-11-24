@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser } from '@/lib/auth-guard';
 import { prisma } from '@/lib/prisma';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
+
+// Single, indistinguishable 403 message so a non-participant cannot tell
+// "doesn't exist" apart from "exists but excluded".
+const FORBIDDEN_MESSAGE = 'Anda tidak memiliki akses ke percakapan ini.';
 
 const sendMessageSchema = z.object({
   bookingId: z.string().trim().optional().nullable(),
@@ -13,8 +17,75 @@ const sendMessageSchema = z.object({
   receiverId: z.string().trim().optional().nullable(),
   message: z.string().trim().min(1, 'Pesan tidak boleh kosong').max(1000),
   senderName: z.string().trim().optional(),
-  senderRole: z.enum(['USER', 'DRIVER', 'ADMIN', 'SYSTEM']).optional().default('USER'),
 });
+
+interface ResolvedBooking {
+  id: string;
+  userId: string;
+  driver: { userId: string } | null;
+}
+
+/**
+ * Canonicalizes the chat context to a SINGLE booking and asserts the caller is
+ * a participant (booking user, assigned driver, or admin). The trip (when
+ * supplied) is always resolved and cross-checked against the booking so a
+ * caller can never smuggle a foreign trip into the read/write path. Returns the
+ * single canonical bookingId and the validated tripId so callers never
+ * reconstruct a union of raw inputs.
+ */
+async function authorizeChat(
+  user: { id: string; role: string },
+  bookingId?: string | null,
+  tripId?: string | null
+): Promise<{ bookingId: string; tripId: string | null; booking: ResolvedBooking }> {
+  let bid = bookingId ?? null;
+  const tid = tripId ?? null;
+
+  if (tid) {
+    let tripBookingId: string | null = null;
+    try {
+      const trip = await prisma.trip.findUnique({
+        where: { id: tid },
+        select: { bookingId: true },
+      });
+      tripBookingId = trip?.bookingId ?? null;
+    } catch {
+      // ignore link resolution errors; fall through to 403
+    }
+
+    if (!tripBookingId) {
+      throw new ApiError(403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+    }
+    if (bid && bid !== tripBookingId) {
+      throw new ApiError(403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+    }
+    bid = tripBookingId;
+  }
+
+  if (!bid) {
+    throw new ApiError(403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+  }
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: bid },
+    select: { id: true, userId: true, driver: { select: { userId: true } } },
+  });
+
+  if (!booking) {
+    throw new ApiError(403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+  }
+
+  const isParticipant =
+    booking.userId === user.id ||
+    booking.driver?.userId === user.id ||
+    user.role === 'ADMIN';
+
+  if (!isParticipant) {
+    throw new ApiError(403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+  }
+
+  return { bookingId: bid, tripId: tid, booking };
+}
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   const user = await getSessionUser();
@@ -29,30 +100,18 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     );
   }
 
-  // Single source of truth: Prisma (server-side postgres role). The anon-key REST
-  // path was removed — with RLS deny-all it silently returned [] instead of falling
-  // through, emptying chat history.
-  // Direct PostgreSQL via Prisma queryRaw
+  const { bookingId: bid } = await authorizeChat(user, bookingId, tripId);
+
   try {
-    const messages = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT id, booking_id AS "bookingId", trip_id AS "tripId", sender_id AS "senderId", 
-              sender_name AS "senderName", sender_role AS "senderRole", receiver_id AS "receiverId", 
-              message, is_read AS "isRead", created_at AS "createdAt"
-       FROM fleet_chat_messages
-       WHERE (
-         ($1::text IS NOT NULL AND booking_id = $1)
-         OR ($2::text IS NOT NULL AND trip_id = $2)
-       )
-       ORDER BY created_at ASC
-       LIMIT 100`,
-      bookingId ?? null,
-      tripId ?? null
-    );
+    const messages = await prisma.fleetChatMessage.findMany({
+      where: { bookingId: bid },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
     return NextResponse.json({ data: messages });
   } catch (err: unknown) {
     console.error('[Driver Data Fetch Error] /api/chat/messages GET:', err);
-    // If table doesn't exist yet, return empty list gracefully
-    return NextResponse.json({ data: [] });
+    throw new ApiError(503, 'CHAT_UNAVAILABLE', 'Pesan tidak dapat dimuat. Coba lagi.');
   }
 });
 
@@ -61,117 +120,92 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   const body = await req.json();
   const validated = sendMessageSchema.parse(body);
 
-  const senderId = user.id;
-  const senderName = validated.senderName || user.name || 'User';
+  const { bookingId: bid, tripId: canonicalTripId, booking } = await authorizeChat(
+    user,
+    validated.bookingId,
+    validated.tripId
+  );
 
-  // Auto-link bookingId and tripId if one is omitted
-  if (validated.bookingId && !validated.tripId) {
+  const senderName = validated.senderName || user.name || 'User';
+  // senderRole is derived server-side; a session user can never be SYSTEM.
+  const senderRole = user.role;
+
+  // Auto-link bookingId -> tripId (store the active trip when omitted). The
+  // active trip is scoped to `bid`, so it always belongs to the canonical booking.
+  let tid = canonicalTripId;
+  if (!tid) {
     try {
       const activeTrip = await prisma.trip.findFirst({
-        where: { bookingId: validated.bookingId, status: 'ACTIVE' },
+        where: { bookingId: bid, status: 'ACTIVE' },
         select: { id: true },
       });
-      if (activeTrip) {
-        validated.tripId = activeTrip.id;
-      }
+      if (activeTrip) tid = activeTrip.id;
     } catch {
-      // ignore
-    }
-  } else if (validated.tripId && !validated.bookingId) {
-    try {
-      const trip = await prisma.trip.findUnique({
-        where: { id: validated.tripId },
-        select: { bookingId: true },
-      });
-      if (trip?.bookingId) {
-        validated.bookingId = trip.bookingId;
-      }
-    } catch {
-      // ignore
+      // ignore link resolution errors
     }
   }
 
-  let savedMessage: any = null;
+  // Derive / validate receiverId server-side
+  const validReceivers = [booking.userId, booking.driver?.userId ?? null].filter(
+    (x): x is string => Boolean(x)
+  );
+  let resolvedReceiverId: string | null;
+  if (validated.receiverId) {
+    if (!validReceivers.includes(validated.receiverId)) {
+      throw new ApiError(403, 'FORBIDDEN', FORBIDDEN_MESSAGE);
+    }
+    resolvedReceiverId = validated.receiverId;
+  } else if (user.role === 'DRIVER') {
+    resolvedReceiverId = booking.userId;
+  } else {
+    resolvedReceiverId = booking.driver?.userId ?? null;
+  }
 
-  // 1. Try insert via Supabase client if configured
-  if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('fleet_chat_messages')
-        .insert({
-          booking_id: validated.bookingId || null,
-          trip_id: validated.tripId || null,
-          sender_id: senderId,
-          sender_name: senderName,
-          sender_role: validated.senderRole,
-          receiver_id: validated.receiverId || null,
-          message: validated.message,
-          is_read: false,
-        })
-        .select()
-        .single();
-
-      if (!error && data) {
-        savedMessage = data;
-      }
-    } catch {
-      // Fallback to direct PostgreSQL
+  // Presence: only drivers have an online/offline state via an ACTIVE session.
+  let delivered = true;
+  if (resolvedReceiverId) {
+    const d = await prisma.driver.findFirst({
+      where: { OR: [{ userId: resolvedReceiverId }, { id: resolvedReceiverId }] },
+      select: { sessions: { where: { status: 'ACTIVE' }, select: { id: true }, take: 1 } },
+    });
+    if (d) {
+      delivered = d.sessions.length > 0;
     }
   }
 
-  // 2. Direct PostgreSQL insert fallback via Prisma if Supabase direct insert didn't run
-  if (!savedMessage) {
-    try {
-      const rows = await prisma.$queryRawUnsafe<any[]>(
-        `INSERT INTO fleet_chat_messages (
-            booking_id, trip_id, sender_id, sender_name, sender_role, receiver_id, message, is_read
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, false)
-         RETURNING id, booking_id AS "booking_id", trip_id AS "trip_id", sender_id AS "sender_id", 
-                   sender_name AS "sender_name", sender_role AS "sender_role", receiver_id AS "receiver_id", 
-                   message, is_read AS "is_read", created_at AS "created_at"`,
-        validated.bookingId ?? null,
-        validated.tripId ?? null,
-        senderId,
+  let saved;
+  try {
+    saved = await prisma.fleetChatMessage.create({
+      data: {
+        bookingId: bid,
+        tripId: tid,
+        senderId: user.id,
         senderName,
-        validated.senderRole,
-        validated.receiverId ?? null,
-        validated.message
-      );
-      savedMessage = rows[0];
-    } catch (err: unknown) {
-      // In-memory format fallback if DB table not yet migrated
-      savedMessage = {
-        id: `local-${Date.now()}`,
-        booking_id: validated.bookingId,
-        trip_id: validated.tripId,
-        sender_id: senderId,
-        sender_name: senderName,
-        sender_role: validated.senderRole,
-        receiver_id: validated.receiverId,
+        senderRole,
+        receiverId: resolvedReceiverId,
         message: validated.message,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      };
-    }
+        isRead: false,
+      },
+    });
+  } catch (err: unknown) {
+    console.error('[Driver Data Fetch Error] /api/chat/messages POST:', err);
+    throw new ApiError(503, 'CHAT_UNAVAILABLE', 'Pesan tidak dapat disimpan. Coba lagi.');
   }
 
-  // Broadcast message over Supabase channel for instant delivery
-  const channelName = validated.bookingId
-    ? `chat:booking-${validated.bookingId}`
-    : `chat:trip-${validated.tripId}`;
-
+  // Best-effort broadcast (unreliable; persistence + delivered is source of truth)
+  const channelName = `chat:booking-${bid}`;
   try {
     const channel = supabase.channel(channelName);
     await channel.send({
       type: 'broadcast',
       event: 'new-message',
-      payload: savedMessage,
+      payload: saved,
     });
   } catch {
     // Ignore channel broadcast error
   }
 
-  return NextResponse.json({ data: savedMessage }, { status: 201 });
+  return NextResponse.json({ data: saved, delivered }, { status: 201 });
 });
 
 export const PATCH = withErrorHandling(async (req: NextRequest) => {
@@ -187,57 +221,21 @@ export const PATCH = withErrorHandling(async (req: NextRequest) => {
     );
   }
 
-  // 1. Try Supabase update if configured
-  if (isSupabaseConfigured) {
-    try {
-      let query = supabase
-        .from('fleet_chat_messages')
-        .update({ is_read: true })
-        .neq('sender_id', user.id);
+  const { bookingId: bid } = await authorizeChat(user, bookingId, tripId);
 
-      if (bookingId && tripId) {
-        query = query.or(`booking_id.eq.${bookingId},trip_id.eq.${tripId}`);
-      } else if (bookingId) {
-        query = query.eq('booking_id', bookingId);
-      } else if (tripId) {
-        query = query.eq('trip_id', tripId);
-      }
+  await prisma.fleetChatMessage.updateMany({
+    where: { senderId: { not: user.id }, bookingId: bid },
+    data: { isRead: true },
+  });
 
-      await query;
-    } catch {
-      // ignore
-    }
-  }
-
-  // 2. Direct PostgreSQL update fallback via Prisma
-  try {
-    await prisma.$queryRawUnsafe(
-      `UPDATE fleet_chat_messages
-       SET is_read = true
-       WHERE sender_id != $1
-         AND (
-           ($2::text IS NOT NULL AND booking_id = $2)
-           OR ($3::text IS NOT NULL AND trip_id = $3)
-         )`,
-      user.id,
-      bookingId ?? null,
-      tripId ?? null
-    );
-  } catch {
-    // ignore
-  }
-
-  // Broadcast read event over channel
-  const channelName = bookingId
-    ? `chat:booking-${bookingId}`
-    : `chat:trip-${tripId}`;
-
+  // Best-effort broadcast read event
+  const channelName = `chat:booking-${bid}`;
   try {
     const channel = supabase.channel(channelName);
     await channel.send({
       type: 'broadcast',
       event: 'messages-read',
-      payload: { readerId: user.id, bookingId, tripId },
+      payload: { readerId: user.id, bookingId: bid, tripId },
     });
   } catch {
     // ignore

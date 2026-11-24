@@ -15,6 +15,7 @@ export interface ChatMessage {
   message: string;
   is_read: boolean;
   created_at: string;
+  delivered?: boolean;
 }
 
 interface UseRealtimeChatProps {
@@ -95,6 +96,7 @@ export function useRealtimeChat({
               message: m.message,
               is_read: m.is_read ?? m.isRead ?? false,
               created_at: m.created_at ?? m.createdAt ?? new Date().toISOString(),
+              delivered: m.delivered,
             }));
             setMessages(normalized);
 
@@ -137,6 +139,7 @@ export function useRealtimeChat({
       message: msg.message,
       is_read: msg.is_read ?? msg.isRead ?? false,
       created_at: msg.created_at ?? msg.createdAt ?? new Date().toISOString(),
+      delivered: msg.delivered,
     };
 
     setMessages((prev) => {
@@ -260,7 +263,7 @@ export function useRealtimeChat({
 
       const json = await res.json();
       if (json.data) {
-        appendMessage(json.data);
+        appendMessage({ ...json.data, delivered: json.delivered });
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Kesalahan jaringan saat mengirim pesan');

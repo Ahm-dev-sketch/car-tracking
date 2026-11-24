@@ -208,6 +208,14 @@ export function ChatDrawer({
 
                 const isMe = m.sender_id === currentUserId;
 
+                const tick = !isMe
+                  ? null
+                  : m.is_read
+                    ? { name: 'checkCheck' as const, title: 'Dibaca', className: 'text-brand-600' }
+                    : m.delivered === false
+                      ? { name: 'clock' as const, title: 'Tertunda · pengemudi offline', className: 'text-amber-500' }
+                      : { name: 'check' as const, title: 'Terkirim', className: 'text-slate-400' };
+
                 return (
                   <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                     <div
@@ -227,12 +235,9 @@ export function ChatDrawer({
                       </p>
                       <div className="mt-1 flex items-center justify-end gap-1 text-[10px]">
                         <span className="font-mono tabular-nums text-slate-400">{formattedTime}</span>
-                        {isMe && (
-                          <span
-                            title={m.is_read ? 'Sudah dibaca' : 'Terkirim'}
-                            className={m.is_read ? 'text-brand-600' : 'text-slate-400'}
-                          >
-                            <Icon name={m.is_read ? 'checkCheck' : 'check'} className="size-3.5" />
+                        {isMe && tick && (
+                          <span title={tick.title} className={tick.className}>
+                            <Icon name={tick.name} className="size-3.5" />
                           </span>
                         )}
                       </div>

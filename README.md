@@ -5,14 +5,15 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev:all
 ```
+
+> `npm run dev` starts **only** the Next.js server on `:3000`. The live
+> WebSocket server (`:3001`), used for real-time vehicle/booking updates,
+> runs via the `realtime:dev` script and is started together by `dev:all`
+> (`concurrently "next dev" "node scripts/realtime-dev.mjs"`). If you run
+> plain `npm run dev`, the browser will spam `ws://localhost:3001/ failed`
+> and live updates won't stream. For UI-only work, `npm run dev` alone is fine.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 

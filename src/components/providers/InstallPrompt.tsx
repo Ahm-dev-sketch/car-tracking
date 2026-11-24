@@ -135,15 +135,23 @@ export function isIosDismissed(): boolean {
 export function InstallPrompt() {
   const { status } = useSession();
   const prevStatusRef = useRef(status);
-  const [promptAvailable, setPromptAvailable] = useState(Boolean(globalDeferredPrompt));
-  const [isDismissed, setIsDismissed] = useState(isInstallDismissed());
-  const [isInstalled, setIsInstalled] = useState(isAppStandalone());
+  const [promptAvailable, setPromptAvailable] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   const checkState = useCallback(() => {
     setIsInstalled(isAppStandalone());
     setPromptAvailable(Boolean(globalDeferredPrompt));
     setIsDismissed(isInstallDismissed());
   }, []);
+
+  // Resolve client-only state after mount so the server-rendered HTML (all false)
+  // matches the client's first render and hydration does not mismatch. Deferred via
+  // a zero-delay timeout so setState does not run synchronously in the effect body.
+  useEffect(() => {
+    const id = window.setTimeout(checkState, 0);
+    return () => window.clearTimeout(id);
+  }, [checkState]);
 
   // Listen to session status changes (Login & Logout trigger reset)
   useEffect(() => {

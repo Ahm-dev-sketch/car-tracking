@@ -76,9 +76,6 @@
   --color-info-600: #475569;
   --color-info-700: #334155;
 
-  /* Hairline + surface helpers */
-  --color-hairline: #e2e8f0;
-  --color-canvas: #f8fafc;
 }
 
 /* ---- Control-Room dark mode -------------------------------------------
@@ -136,8 +133,6 @@
   --color-info-100: #1e293b;
   --color-info-200: #334155;
 
-  --color-canvas: #090d16;
-  --color-hairline: #1e293b;
 }
 
 /* Light-mode normalizer happens to hardcode white — needs !important to lose. */
@@ -167,17 +162,12 @@
 .dark .button-primary { background: #e11d48; }
 .dark .button-primary:hover:not(:disabled) { background: #dc2626; }
 .dark .button-primary:active:not(:disabled) { background: #b91c1c; }
-.dark .button-secondary,
-.dark .icon-button {
+.dark .button-secondary {
   background: #0f172a;
   color: #f8fafc;
   border-color: #1e293b;
 }
 .dark .button-secondary:hover:not(:disabled) { background: #1e293b; border-color: #334155; color: #f8fafc; }
-.dark .button-icon { background: #1e293b; color: #f8fafc; }
-.dark .button-secondary .button-icon { background: #334155; }
-.dark a:hover .button-icon,
-.dark button:hover .button-icon { background: #334155; }
 
 /* text-white follows the inverted --color-white token, which is right on slate
    chips (dark bg -> light chip) but leaves dark text on crimson CTAs. Restore
@@ -342,7 +332,7 @@ p { text-wrap: pretty; }
 .metric-value { font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; letter-spacing: -0.04em; line-height: 1.1; font-variant-numeric: tabular-nums; }
 
 /* Flat 2.0 buttons */
-.button-primary, .button-secondary, .icon-button {
+.button-primary, .button-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -373,35 +363,10 @@ p { text-wrap: pretty; }
   border-color: #cbd5e1;
   color: #0f172a;
 }
-.icon-button {
-  width: 2.75rem;
-  min-height: 2.75rem;
-  padding: 0;
-  background: #ffffff;
-  color: #0f172a;
-  border-color: #e2e8f0;
-}
-.icon-button:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-.button-primary:disabled, .button-secondary:disabled, .icon-button:disabled {
+.button-primary:disabled, .button-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.button-secondary .button-icon { background: #f1f5f9; }
-.button-icon {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
-  transition: background-color 150ms ease;
-}
-a:hover .button-icon, button:hover .button-icon { background: #f1f5f9; }
 .skip-link {
   position: fixed;
   top: 1rem;
@@ -608,15 +573,6 @@ a:hover .button-icon, button:hover .button-icon { background: #f1f5f9; }
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
-.driver-trip-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-.driver-trip-actions > button {
-  min-height: 3rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.625rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  box-shadow: none;
-}
 .skeleton {
   border-radius: 0.5rem;
   border: 1px solid #e2e8f0;
@@ -624,15 +580,11 @@ a:hover .button-icon, button:hover .button-icon { background: #f1f5f9; }
   animation: skeleton-breathe 1.8s var(--motion) infinite alternate;
 }
 .overflow-x-auto, .overflow-y-auto { -webkit-overflow-scrolling: touch; }
-.safe-top { padding-top: env(safe-area-inset-top, 0px); }
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 @keyframes surface-arrive { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes page-arrive { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheet-arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes skeleton-breathe { from { opacity: 0.55; } to { opacity: 1; } }
-@keyframes markerPulse { 0% { opacity: 0.85; transform: scale(0.92); } 100% { opacity: 1; transform: scale(1.05); } }
-.pulse-marker { animation: markerPulse 1.8s var(--motion) infinite alternate; border-radius: 9999px; }
 /* Live telemetry dot: a quiet ring that never overwhelms a flat surface */
 @keyframes status-ping { 0% { transform: scale(1); opacity: 0.55; } 70%, 100% { transform: scale(2.1); opacity: 0; } }
 .status-ping::after {
@@ -651,7 +603,6 @@ a:hover .button-icon, button:hover .button-icon { background: #f1f5f9; }
   .app-main :where([class~="text-[11px]"]) { font-size: 0.75rem; }
   .app-main :where(form.flex) { min-width: 0; }
   .app-main :where(form.flex input) { width: 100%; }
-  .driver-trip-actions > button { width: 100%; }
   .app-main :where(.flex.items-center.justify-between) { gap: 0.75rem; }
 }
 @media (min-width: 640px) {

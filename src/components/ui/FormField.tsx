@@ -38,7 +38,7 @@ export function FormField({
 
   return (
     <div
-      className={`flex min-w-0 flex-col gap-1.5 [&>:is(input,select,textarea)]:min-h-12 [&>:is(input,select,textarea)]:w-full [&>:is(input,select,textarea)]:rounded-lg [&>:is(input,select,textarea)]:border [&>:is(input,select,textarea)]:border-slate-200 [&>:is(input,select,textarea)]:bg-white [&>:is(input,select,textarea)]:px-3.5 [&>:is(input,select,textarea)]:py-3 [&>:is(input,select,textarea)]:text-base [&>:is(input,select,textarea)]:text-slate-900 [&>:is(input,select,textarea)]:transition-colors [&>:is(input,select,textarea)]:focus:border-brand-500 [&>:is(input,select,textarea)]:focus:outline-none [&>:is(input,select,textarea)]:focus:ring-3 [&>:is(input,select,textarea)]:focus:ring-brand-500/15 sm:[&>:is(input,select,textarea)]:text-sm ${className}`}
+      className={`flex min-w-0 flex-col gap-1.5 [&>:is(input,select,textarea)]:min-h-12 [&>:is(input,select,textarea)]:w-full [&>:is(input,select,textarea)]:rounded-lg [&>:is(input,select,textarea)]:border [&>:is(input,select,textarea)]:border-slate-200 [&>:is(input,select,textarea)]:bg-white [&>:is(input,select,textarea):not([class*="pl-"])]:pl-3.5 [&>:is(input,select,textarea):not([class*="pr-"])]:pr-3.5 [&>:is(input,select,textarea)]:py-3 [&>:is(input,select,textarea)]:text-base [&>:is(input,select,textarea)]:text-slate-900 [&>:is(input,select,textarea)]:transition-colors [&>:is(input,select,textarea)]:focus:border-brand-500 [&>:is(input,select,textarea)]:focus:outline-none [&>:is(input,select,textarea)]:focus:ring-3 [&>:is(input,select,textarea)]:focus:ring-brand-500/15 sm:[&>:is(input,select,textarea)]:text-sm ${className}`}
     >
       <label htmlFor={fieldId} className="text-xs font-semibold text-slate-700">
         {label}

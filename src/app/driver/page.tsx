@@ -1943,7 +1943,7 @@ export default function DriverDashboardPage() {
 
             {!completedTripSummary.aborted && (
               <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-700">
-                <span className="mb-0.5 block font-semibold">Status: Menunggu Approval Nota Dinas</span>
+                <span className="mb-0.5 block font-semibold">Status: Menunggu Nota Dinas</span>
                 <p className="text-[11px] font-medium leading-relaxed text-warning-700">
                   Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum diselesaikan
                   resmi oleh admin KCIC.

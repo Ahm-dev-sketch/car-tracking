@@ -77,6 +77,7 @@ describe('GET /api/admin/bookings/action-required', () => {
           },
           {
             status: BookingStatus.PENDING_COMPLETION,
+            notaDinasUrl: { not: null },
             rejectedReason: null,
           },
         ],

@@ -41,6 +41,7 @@ export const GET = withErrorHandling(async () => {
           },
           {
             status: BookingStatus.PENDING_COMPLETION,
+            notaDinasUrl: { not: null },
             rejectedReason: null,
           },
         ],

@@ -926,7 +926,7 @@ function AdminBookingsContent() {
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            Menunggu Approval Nota
+            Menunggu Nota Dinas
           </button>
         </div>
 
@@ -963,7 +963,7 @@ function AdminBookingsContent() {
               <option value="DRIVER_EN_ROUTE">Driver En Route</option>
               <option value="ARRIVED">Arrived</option>
               <option value="IN_PROGRESS">In Progress</option>
-              <option value="PENDING_COMPLETION">Menunggu Approval Nota</option>
+              <option value="PENDING_COMPLETION">Menunggu Nota Dinas</option>
               <option value="COMPLETED">Completed</option>
               <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
               <option value="ADMIN_INTERVENTION">Admin Intervention</option>

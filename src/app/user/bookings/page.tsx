@@ -579,7 +579,7 @@ function UserBookingsContent() {
               <option value="DRIVER_EN_ROUTE">Driver En Route</option>
               <option value="ARRIVED">Arrived</option>
               <option value="IN_PROGRESS">In Progress</option>
-              <option value="PENDING_COMPLETION">Menunggu Approval Nota</option>
+              <option value="PENDING_COMPLETION">Menunggu Nota Dinas</option>
               <option value="COMPLETED">Completed</option>
               <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
               <option value="ADMIN_INTERVENTION">Admin Intervention</option>

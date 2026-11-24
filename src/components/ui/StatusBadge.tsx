@@ -103,7 +103,7 @@ export function StatusBadge({ status, className = '' }: { status: StatusType; cl
   const isDanger = dangerStates.has(normalized);
   const label =
     normalized === 'PENDING_COMPLETION'
-      ? 'Menunggu Approval Nota'
+      ? 'Menunggu Nota Dinas'
       : normalized === 'PENDING'
       ? 'Menunggu Admin'
       : normalized.replace(/_/g, ' ');

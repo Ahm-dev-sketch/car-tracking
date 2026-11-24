@@ -192,40 +192,10 @@ export function useRealtimeChat({
       }
     });
 
-    // 2. Database changes via Postgres Realtime Replication
-    channel.on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'fleet_chat_messages',
-        filter: bookingId ? `booking_id=eq.${bookingId}` : tripId ? `trip_id=eq.${tripId}` : undefined,
-      },
-      (payload) => {
-        appendMessage(payload.new);
-      }
-    );
-
-    channel.on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'fleet_chat_messages',
-        filter: bookingId ? `booking_id=eq.${bookingId}` : tripId ? `trip_id=eq.${tripId}` : undefined,
-      },
-      (payload) => {
-        const updated = payload.new;
-        if (updated?.id) {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === String(updated.id) ? { ...m, is_read: Boolean(updated.is_read) } : m
-            )
-          );
-        }
-      }
-    );
-
+    // NOTE: no postgres_changes listener here. RLS is deny-all on
+    // fleet_chat_messages (no policies), so Postgres Realtime replication never
+    // emits events for it. Delivery is: (1) Broadcast 'new-message'/'messages-read'
+    // for live peers, (2) history GET on mount for offline/backfill.
     channel.subscribe();
 
     return () => {

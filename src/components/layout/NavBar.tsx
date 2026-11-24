@@ -262,13 +262,20 @@ export function NavBar() {
         <div className="border-t border-slate-200 pt-4">
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               resetInstallDismissal();
               if (role === 'DRIVER') {
-                void fetch('/api/driver/sessions/current/end', {
+                // End the driver session BEFORE signOut clears the auth cookie,
+                // so presence flips to offline. Bounded wait keeps logout snappy
+                // while still giving the PATCH a real chance to land.
+                const endSession = fetch('/api/driver/sessions/current/end', {
                   method: 'PATCH',
                   keepalive: true,
                 }).catch(() => {});
+                await Promise.race([
+                  endSession,
+                  new Promise((resolve) => setTimeout(resolve, 1500)),
+                ]);
               }
               onExplicitLogout();
               signOut({ callbackUrl: '/login' });

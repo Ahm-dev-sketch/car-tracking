@@ -163,16 +163,16 @@ export function NavBar() {
           </nav>
           <div className="flex shrink-0 items-center gap-1.5">
             <GreetingClock variant="navbar" />
-            <button type="button" onClick={toggleTheme} className="inline-flex size-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900" aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} aria-pressed={isDark}>
-              <Icon name={isDark ? 'sun' : 'moon'} className="size-5" />
+            <button type="button" onClick={toggleTheme} className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:bg-[#334155] dark:hover:text-[#f8fafc]" aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} aria-pressed={isDark}>
+              <Icon name={isDark ? 'sun' : 'moon'} className="size-[18px]" />
             </button>
-            <button type="button" onClick={() => setNotificationsOpen(true)} className="relative inline-flex size-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-haspopup="dialog">
-              <Icon name="bell" className="size-5" />
-              {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 inline-flex size-3.5 items-center justify-center rounded-full bg-brand-500 text-[9px] font-semibold leading-none text-white ring-2 ring-white">{unreadCount}</span>}
+            <button type="button" onClick={() => setNotificationsOpen(true)} className="relative inline-flex size-9 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:bg-[#334155] dark:hover:text-[#f8fafc]" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-haspopup="dialog">
+              <Icon name="bell" className="size-[18px]" />
+              {unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-brand-500 text-[9px] font-semibold leading-none tabular-nums text-white ring-2 ring-white dark:ring-[#1e293b]">{unreadCount}</span>}
             </button>
-            <span className="mx-0.5 h-6 w-px bg-slate-200" aria-hidden="true" />
-            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 pl-1 pr-2 text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:hover:bg-slate-100" aria-label="Open account and navigation" aria-haspopup="dialog" aria-expanded={menuOpen}>
-              <span className="grid size-8 place-items-center rounded-md bg-slate-900 text-xs font-semibold text-white">{initials}</span>
+            <span className="mx-0.5 h-6 w-px bg-slate-200 dark:bg-[#334155]" aria-hidden="true" />
+            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 pl-1 pr-2 text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:border-[#475569] dark:hover:bg-[#334155]" aria-label="Open account and navigation" aria-haspopup="dialog" aria-expanded={menuOpen}>
+              <span className="grid size-7 place-items-center rounded-md border border-slate-200 bg-slate-100 text-[11px] font-semibold tabular-nums text-slate-700 dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#e2e8f0]">{initials}</span>
               <span className="hidden text-xs font-medium text-slate-600 xl:inline">{role === 'ADMIN' ? 'Admin' : role === 'DRIVER' ? 'Driver' : 'Workspace'}</span>
             </button>
           </div>
@@ -196,7 +196,7 @@ export function NavBar() {
                 {showBadge && (
                   <span
                     aria-label={`${pendingActionCount} pesanan butuh aksi`}
-                    className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[9px] font-semibold tabular-nums leading-none text-white ring-2 ring-white"
+                    className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[9px] font-semibold tabular-nums leading-none text-white ring-2 ring-white dark:ring-[#111827]"
                   >
                     {pendingActionCount > 99 ? '99+' : pendingActionCount}
                   </span>
@@ -226,8 +226,8 @@ export function NavBar() {
 
       <Drawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} title="Your workspace" description="Everything you need for the road ahead.">
         <GreetingClock variant="compact" userName={session?.user?.name} className="w-full justify-between" />
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
-          <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-slate-900 text-sm font-semibold text-white">{initials}</span>
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-[#334155] dark:bg-[#111827]">
+          <span className="grid size-11 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#e2e8f0]">{initials}</span>
           <div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-900">{name}</p><p className="mt-0.5 text-xs font-medium text-slate-500">{role === 'ADMIN' ? 'Fleet administrator' : role === 'DRIVER' ? 'Driver workspace' : 'Employee workspace'}</p></div>
         </div>
         <nav aria-label="Workspace navigation" className="space-y-0.5">

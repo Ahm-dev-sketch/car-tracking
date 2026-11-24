@@ -1033,7 +1033,7 @@ export default function DriverDashboardPage() {
                   {confidenceScore > 0 ? `${confidenceScore}% Akurat` : signalStatus}
                 </span>
 
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 dark:border-[#334155] dark:bg-[#111827] dark:text-[#cbd5e1]">
                   <Icon
                     name={locationSource === 'wifi_cell_triangulation' ? 'wifi' : 'satellite'}
                     className="size-3 text-slate-400"

@@ -4,7 +4,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f8fafc;
+  --background: #f4f6f9;
   --foreground: #0f172a;
   --accent: #c8102e;
   --accent-soft: #fee2e2;
@@ -149,15 +149,26 @@
 .dark .page-heading,
 .dark .section-title { color: #f8fafc; }
 
+/* ---- Dark 3-tier surface hierarchy ------------------------------------
+   Tier 0 canvas #090D16 (--background above) · tier 1 page cards #0f172a ·
+   tier 1.5 floating chrome #111827 · tier 2 interactive #1e293b.
+   Hairlines climb #1e293b -> #334155 as a surface gets closer to the user.
+   Previously every widget shared #0f172a, so nothing read as floating. */
 .dark .surface,
+.dark .tracking-map { background: #0f172a; border-color: #1e293b; }
+/* The driver strip is a status surface, not a card: same fill, crisper edge. */
+.dark .driver-live-banner { background: #0f172a; border-color: #334155; }
 .dark .header-island,
 .dark .mobile-dock,
-.dark .install-toast,
-.dark .driver-live-banner,
-.dark .tracking-map {
-  background: #0f172a;
-  border-color: #1e293b;
-}
+.dark .install-toast { background: #111827; border-color: #334155; }
+/* Slightly translucent so the backdrop blur in the chrome reads over content. */
+.dark .header-island { background: rgba(17, 24, 39, 0.9); }
+.dark .mobile-dock { background: rgba(17, 24, 39, 0.94); }
+/* One-step lift only — Flat 2.0 keeps chrome edges, not drop-shadow drama.
+   A 1px inner highlight tops the edge so the card separates from #090D16. */
+.dark .header-island { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 24px -18px rgba(0, 0, 0, 0.9); }
+.dark .mobile-dock { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 32px -20px rgba(0, 0, 0, 0.9); }
+.dark .driver-live-banner { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
 
 .dark .button-primary { background: #e11d48; }
 .dark .button-primary:hover:not(:disabled) { background: #dc2626; }
@@ -194,20 +205,22 @@
 
 .dark .dock-tab-icon,
 .dark .dock-tab-label { color: #94a3b8; }
-.dark .dock-tab[aria-current="page"] { background: #2a0a14; color: #fb7185; }
-/* The icon chip keeps its light-mode #fde2e5 fill, which turns into a glaring
-   pale square on the dark dock — give it a dark step instead. */
+/* Active dock tab: rose tier-2 pill on the tier-1 bar (never a pale square). */
+.dark .dock-tab[aria-current="page"] { color: #fb7185; }
 .dark .dock-tab[aria-current="page"] .dock-tab-icon,
 .dark .dock-tab[aria-expanded="true"] .dock-tab-icon {
-  background-color: #3b0f1c;
+  background-color: rgba(244, 63, 94, 0.15);
+  border-color: rgba(251, 113, 133, 0.32);
   color: #fb7185;
 }
 .dark .dock-tab[aria-current="page"] .dock-tab-label,
 .dark .dock-tab[aria-expanded="true"] .dock-tab-label { color: #fb7185; }
 .dark .dock-tab:hover:not([aria-current="page"]):not([aria-expanded="true"]) .dock-tab-icon {
   background-color: #1e293b;
-  color: #f8fafc;
+  border-color: #334155;
+  color: #e2e8f0;
 }
+.dark .dock-tab:focus-visible .dock-tab-icon { outline-color: #e2e8f0; }
 
 .dark .eyebrow { color: #94a3b8; border-left-color: #e11d48; }
 
@@ -404,20 +417,31 @@ p { text-wrap: pretty; }
 .skip-link:focus { transform: translateY(0); }
 
 /* Navigation & Island */
-.app-header { position: relative; z-index: var(--layer-nav); padding: max(0.875rem, env(safe-area-inset-top)) 1rem 0; }
+.app-header {
+  position: relative;
+  z-index: var(--layer-nav);
+  padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem 0;
+}
+/* Floating capsule: separated from the canvas by margin, a hairline and a
+   one-step shadow. Desktop keeps the same shell, just wider. */
 .header-island {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   max-width: 87rem;
-  min-height: 4.25rem;
+  min-height: 4rem;
   margin-inline: auto;
-  padding: 0.625rem 0.875rem 0.625rem 1rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.875rem;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  margin-top: 0.125rem;
+  padding: 0.5rem 0.75rem 0.5rem 0.875rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 8px 24px -18px rgba(15, 23, 42, 0.35);
 }
 .brand-mark {
   display: grid;
@@ -467,8 +491,8 @@ p { text-wrap: pretty; }
   position: fixed;
   z-index: var(--layer-nav);
   bottom: max(0.875rem, env(safe-area-inset-bottom));
-  left: 1rem;
-  right: 1rem;
+  left: 0.875rem;
+  right: 0.875rem;
   max-width: 25rem;
   margin-inline: auto;
   display: grid;
@@ -477,11 +501,19 @@ p { text-wrap: pretty; }
   grid-auto-columns: minmax(0, 1fr);
   align-items: stretch;
   height: 4rem;
-  padding: 0 0.5rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 1rem;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  padding: 0 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.125rem;
+  background: rgba(255, 255, 255, 0.96);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 10px 28px -20px rgba(15, 23, 42, 0.4);
+}
+/* The dock sits above the home indicator; only raise it when the inset is real. */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .mobile-dock { bottom: max(0.875rem, calc(env(safe-area-inset-bottom) + 0.5rem)); }
 }
 .dock-tab {
   position: relative;
@@ -506,26 +538,28 @@ p { text-wrap: pretty; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
+  width: 2.625rem;
   height: 2.25rem;
-  border-radius: 0.625rem;
+  border-radius: 9999px;
   border: 1px solid transparent;
   background: transparent;
-  color: #94a3b8;
+  color: #64748b;
   transition:
     transform 220ms cubic-bezier(0.34, 1.4, 0.64, 1),
     background-color 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    border-color 150ms ease;
 }
-/* Active: soft crimson tint with a crimson icon — same weight for every tab. */
+/* Active: soft rose pill behind a crimson glyph — same weight for every tab. */
 .dock-tab[aria-current="page"] .dock-tab-icon,
 .dock-tab[aria-expanded="true"] .dock-tab-icon {
-  background-color: #fde2e5;
+  background-color: #fff1f2;
+  border-color: #fecdd3;
   color: #c8102e;
 }
 .dock-tab:hover:not([aria-current="page"]):not([aria-expanded="true"]) .dock-tab-icon {
   background-color: #f1f5f9;
-  color: #0f172a;
+  color: #334155;
 }
 .dock-tab:active .dock-tab-icon { transform: scale(0.94); }
 .dock-tab-label {
@@ -535,7 +569,7 @@ p { text-wrap: pretty; }
   font-weight: 500;
   line-height: 1;
   letter-spacing: -0.005em;
-  color: #94a3b8;
+  color: #64748b;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -585,13 +619,16 @@ p { text-wrap: pretty; }
 }
 .leaflet-bar a { min-width: 2.75rem; min-height: 2.75rem; display: grid; place-items: center; color: #0f172a; }
 .leaflet-control-attribution { font-size: 0.625rem; }
+/* Driver live strip: a compact tier-1 pill that sits in page flow directly
+   above the dock, separated by its own margin instead of a full-width slab. */
 .driver-live-banner {
   position: relative;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.875rem;
-  padding: 1.25rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1rem;
+  padding: 0.75rem 0.875rem;
+  margin-bottom: 0.5rem;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 .skeleton {
   border-radius: 0.5rem;

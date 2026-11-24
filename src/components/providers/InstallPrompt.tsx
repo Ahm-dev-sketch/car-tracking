@@ -290,8 +290,11 @@ export function IosInstallHint() {
       /iPad|iPhone|iPod/.test(navigator.userAgent) &&
       !('MSStream' in window);
     const standalone = isAppStandalone();
-    setIsIosEligible(isIos && !standalone);
-    setDismissed(isIosDismissed());
+    const id = window.setTimeout(() => {
+      setIsIosEligible(isIos && !standalone);
+      setDismissed(isIosDismissed());
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [status]);
 
   if (!isIosEligible || dismissed) return null;

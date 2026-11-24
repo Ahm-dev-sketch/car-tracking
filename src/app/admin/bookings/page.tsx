@@ -806,7 +806,15 @@ function AdminBookingsContent() {
   const activeCount = bookings.filter((b) =>
     ['SEARCHING_DRIVER', 'DRIVER_NOTIFIED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(b.status)
   ).length;
-  const completionCount = bookings.filter((b) => b.status === 'PENDING_COMPLETION').length;
+  // Verification-ready mirrors the nav action-required query (PENDING_COMPLETION
+  // + notaDinasUrl + no rejection). The sub-count is not-yet-uploaded only, so
+  // neither number can inflate the admin's actionable queue.
+  const completionReadyCount = bookings.filter(
+    (b) => b.status === 'PENDING_COMPLETION' && Boolean(b.notaDinasUrl) && !b.rejectedReason
+  ).length;
+  const completionAwaitingUploadCount = bookings.filter(
+    (b) => b.status === 'PENDING_COMPLETION' && !b.notaDinasUrl
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -843,8 +851,13 @@ function AdminBookingsContent() {
           <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{activeCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Menunggu Nota</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{completionCount}</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Siap Verifikasi</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{completionReadyCount}</p>
+          {completionAwaitingUploadCount > 0 && (
+            <p className="mt-1 text-[10px] font-medium tabular-nums leading-relaxed text-slate-400">
+              {completionAwaitingUploadCount} menunggu upload
+            </p>
+          )}
         </div>
       </div>
 

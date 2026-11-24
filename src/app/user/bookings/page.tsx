@@ -504,7 +504,14 @@ function UserBookingsContent() {
   const activeCount = bookings.filter((b) =>
     ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(b.status)
   ).length;
-  const needNotaCount = bookings.filter((b) => b.status === 'PENDING_COMPLETION').length;
+  // Split by upload state. Rejected notas count as the user's action (they must
+  // re-upload), so a rejection never inflates the "awaiting verification" side.
+  const needUploadCount = bookings.filter(
+    (b) => b.status === 'PENDING_COMPLETION' && (!b.notaDinasUrl || b.rejectedReason)
+  ).length;
+  const awaitingVerifyCount = bookings.filter(
+    (b) => b.status === 'PENDING_COMPLETION' && Boolean(b.notaDinasUrl) && !b.rejectedReason
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -540,7 +547,12 @@ function UserBookingsContent() {
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Perlu Nota Dinas</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{needNotaCount}</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{needUploadCount}</p>
+          {awaitingVerifyCount > 0 && (
+            <p className="mt-1 text-[10px] font-medium tabular-nums leading-relaxed text-slate-400">
+              {awaitingVerifyCount} menunggu verifikasi
+            </p>
+          )}
         </div>
       </div>
 

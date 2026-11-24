@@ -48,6 +48,7 @@ interface ActiveBookingInfo {
   etaEstimated?: boolean;
   passengerCount?: number;
   vehicleId?: string | null;
+  notaDinasUrl?: string | null;
   vehicle?: {
     id: string;
     plateNumber: string;
@@ -291,7 +292,7 @@ function UserTrackingContent() {
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
           Perjalanan aktif Anda
         </p>
-        <StatusBadge status={selectedBooking.status} />
+        <StatusBadge status={selectedBooking.status} hasNotaDinas={Boolean(selectedBooking.notaDinasUrl)} />
       </div>
 
       {/* Proximity headline */}
@@ -347,7 +348,7 @@ function UserTrackingContent() {
         </div>
       </div>
 
-      <DispatchProgress status={selectedBooking.status} etaSeconds={selectedBooking.etaSeconds} etaEstimated={selectedBooking.etaEstimated} compact />
+      <DispatchProgress status={selectedBooking.status} etaSeconds={selectedBooking.etaSeconds} etaEstimated={selectedBooking.etaEstimated} hasNotaDinas={Boolean(selectedBooking.notaDinasUrl)} compact />
     </section>
   );
 

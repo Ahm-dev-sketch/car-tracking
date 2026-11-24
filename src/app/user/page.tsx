@@ -23,6 +23,7 @@ interface Booking {
   purpose: string;
   status: string;
   createdAt: string;
+  notaDinasUrl?: string | null;
   vehicle?: {
     id: string;
     plateNumber: string;
@@ -151,7 +152,7 @@ export default function UserOverviewPage() {
                   <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-slate-700 tabular-nums">
                     {activeBooking.bookingNumber}
                   </span>
-                  <StatusBadge status={activeBooking.status} />
+                  <StatusBadge status={activeBooking.status} hasNotaDinas={Boolean(activeBooking.notaDinasUrl)} />
                 </div>
 
                 {/* Route spine */}
@@ -429,7 +430,7 @@ export default function UserOverviewPage() {
                         <span className="wrap-anywhere rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700 tabular-nums">
                           {booking.bookingNumber}
                         </span>
-                        <StatusBadge status={booking.status} />
+                        <StatusBadge status={booking.status} hasNotaDinas={Boolean(booking.notaDinasUrl)} />
                       </div>
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-relaxed">
                         <span className="wrap-anywhere font-medium text-slate-500">

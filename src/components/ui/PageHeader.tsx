@@ -1,7 +1,10 @@
 import React from "react";
+import { SplitTextReveal } from "./SplitTextReveal";
 
 interface PageHeaderProps {
   title: string;
+  /** Plain-text version of `title` for word-by-word reveals (defaults to `title`). */
+  revealText?: string;
   description?: string;
   actions?: React.ReactNode;
   className?: string;
@@ -9,6 +12,7 @@ interface PageHeaderProps {
 
 export function PageHeader({
   title,
+  revealText,
   description,
   actions,
   className = "",
@@ -18,9 +22,11 @@ export function PageHeader({
       className={`mb-7 flex min-w-0 flex-col gap-5 pb-2 sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:gap-6 ${className}`}
     >
       <div className="min-w-0">
-        <h1 className="page-heading text-3xl leading-tight tracking-tight text-slate-900 sm:text-4xl">
-          {title}
-        </h1>
+        <SplitTextReveal
+          as="h1"
+          text={revealText ?? title}
+          className="page-heading text-3xl leading-tight tracking-tight text-slate-900 sm:text-4xl"
+        />
         {description && (
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
             {description}

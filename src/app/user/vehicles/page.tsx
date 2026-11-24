@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
 import { Icon } from '@/components/ui/Icon';
+import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
 
 interface VehicleLocation {
   id: string;
@@ -283,11 +284,12 @@ function UserVehiclesContent() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-          {vehicles.map((v) => {
+          {vehicles.map((v, index) => {
             const currentLoc = v.currentLocation || v.currentOperationalLocation;
             return (
-              <article
+              <MotionBentoCard
                 key={v.id}
+                index={index}
                 className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-colors hover:border-slate-300"
               >
                 {/* Thumbnail */}
@@ -384,7 +386,7 @@ function UserVehiclesContent() {
                     Pesan
                   </button>
                 </div>
-              </article>
+              </MotionBentoCard>
             );
           })}
         </div>

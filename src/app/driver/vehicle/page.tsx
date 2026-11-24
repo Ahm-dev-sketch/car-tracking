@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
 import { fetchJson } from '@/lib/fetch-json';
+import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
 
 interface VehicleLocation {
   id: string;
@@ -174,7 +175,7 @@ function DriverVehicleContent() {
       ) : (
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3 lg:gap-4">
           {/* Main Vehicle Profile */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white md:col-span-2">
+          <MotionBentoCard index={0} className="overflow-hidden rounded-xl border border-slate-200 bg-white md:col-span-2">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                 Vehicle assignment
@@ -253,10 +254,10 @@ function DriverVehicleContent() {
                 No permanent vehicle assignment. Search below to inspect available vehicles.
               </div>
             )}
-          </div>
+          </MotionBentoCard>
 
           {/* Driver Badge & Info */}
-          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+          <MotionBentoCard index={1} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
             <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
               Driver credentials
             </span>
@@ -290,12 +291,12 @@ function DriverVehicleContent() {
                 assignment requires updates.
               </p>
             </div>
-          </div>
+          </MotionBentoCard>
         </div>
       )}
 
       {/* Fleet Search / Inspection */}
-      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+      <MotionBentoCard index={2} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
             Inspect fleet
@@ -440,7 +441,7 @@ function DriverVehicleContent() {
             })}
           </div>
         )}
-      </div>
+      </MotionBentoCard>
     </div>
   );
 }

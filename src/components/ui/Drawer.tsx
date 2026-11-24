@@ -69,7 +69,7 @@ export function Drawer({
               <Icon name="close" className="size-4" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">{children}</div>
+          <div data-lenis-prevent className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">{children}</div>
           {footer && (
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2.5 border-t border-slate-200 bg-slate-50/60 px-5 py-4 sm:px-6">
               {footer}

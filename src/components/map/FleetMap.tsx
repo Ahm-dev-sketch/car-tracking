@@ -246,7 +246,7 @@ export default function FleetMap({
   const shouldFitBounds = fitPoints.length >= 2;
 
   return (
-    <div className={`relative overflow-hidden isolate ${className}`}>
+    <div data-lenis-prevent className={`relative overflow-hidden isolate ${className}`}>
       <MapContainer
         center={mapCenter}
         zoom={zoom}

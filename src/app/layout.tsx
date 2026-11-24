@@ -7,6 +7,8 @@ import { NetworkStatus } from '@/components/providers/NetworkStatus';
 import { InstallPrompt } from '@/components/providers/InstallPrompt';
 import { ServiceWorkerRegister } from '@/components/providers/ServiceWorkerRegister';
 import { LaunchSplash } from '@/components/providers/LaunchSplash';
+import { MotionProvider } from '@/components/providers/MotionProvider';
+import { SmoothScrollProvider } from '@/components/providers/SmoothScrollProvider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -88,7 +90,9 @@ export default function RootLayout({
         <AuthProvider>
           <NetworkStatus />
           <InstallPrompt />
-          {children}
+          <MotionProvider>
+            <SmoothScrollProvider>{children}</SmoothScrollProvider>
+          </MotionProvider>
         </AuthProvider>
       </body>
     </html>

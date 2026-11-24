@@ -155,7 +155,7 @@ export function ChatDrawer({
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto bg-slate-50/80">
+        <div data-lenis-prevent className="flex-1 overflow-y-auto bg-slate-50/80">
           {isLoading ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-500">
               <Spinner size="md" />

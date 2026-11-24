@@ -10,6 +10,7 @@ import { IosInstallHint } from '@/components/providers/InstallPrompt';
 import { Icon as OverviewIcon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { selectNextDeparture } from '@/lib/booking-status';
+import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
 
 interface Booking {
   id: string;
@@ -264,7 +265,7 @@ export default function UserOverviewPage() {
         {/* Side column */}
         <div className="grid min-w-0 content-start gap-3.5 lg:gap-4">
           <section aria-labelledby="next-departure-heading" className="min-w-0">
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <MotionBentoCard index={1} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                 <h2
                   id="next-departure-heading"
@@ -316,14 +317,15 @@ export default function UserOverviewPage() {
                   </p>
                 </div>
               )}
-            </div>
+            </MotionBentoCard>
           </section>
 
           <div className="grid min-w-0 grid-cols-1 gap-3.5 sm:grid-cols-2 lg:gap-4">
-            <section
-              aria-labelledby="fleet-heading"
-              className="min-w-0 rounded-xl border border-slate-200 bg-white p-4"
-            >
+            <section aria-labelledby="fleet-heading" className="min-w-0">
+              <MotionBentoCard
+                index={2}
+                className="min-w-0 rounded-xl border border-slate-200 bg-white p-4"
+              >
               <div className="flex items-center justify-between">
                 <h2
                   id="fleet-heading"
@@ -337,11 +339,13 @@ export default function UserOverviewPage() {
                 {isLoading ? <Spinner size="sm" /> : availableCount}
               </div>
               <p className="mt-2 text-[11px] font-medium text-slate-500">Vehicles ready for assignment</p>
+              </MotionBentoCard>
             </section>
-            <section
-              aria-labelledby="recent-count-heading"
-              className="min-w-0 rounded-xl border border-slate-200 bg-white p-4"
-            >
+            <section aria-labelledby="recent-count-heading" className="min-w-0">
+              <MotionBentoCard
+                index={3}
+                className="min-w-0 rounded-xl border border-slate-200 bg-white p-4"
+              >
               <div className="flex items-center justify-between">
                 <h2
                   id="recent-count-heading"
@@ -355,6 +359,7 @@ export default function UserOverviewPage() {
                 {isLoading ? <Spinner size="sm" /> : bookings.length}
               </div>
               <p className="mt-2 text-[11px] font-medium text-slate-500">In your latest activity</p>
+              </MotionBentoCard>
             </section>
           </div>
         </div>
@@ -362,7 +367,7 @@ export default function UserOverviewPage() {
 
       {/* Recent bookings */}
       <section aria-labelledby="recent-bookings-heading" className="min-w-0">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <MotionBentoCard index={4} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-100 px-5 py-4 sm:px-6">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
@@ -477,7 +482,7 @@ export default function UserOverviewPage() {
               ))}
             </ul>
           )}
-        </div>
+        </MotionBentoCard>
       </section>
     </div>
   );

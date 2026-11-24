@@ -261,7 +261,10 @@ export function Modal({
         </div>
 
         {/* Zone 2 — scrollable body */}
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
+        <div
+          data-lenis-prevent
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5"
+        >
           {children}
         </div>
 

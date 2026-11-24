@@ -6,6 +6,7 @@ import { signIn } from 'next-auth/react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Spinner } from '@/components/ui/Spinner';
 import { Icon as LoginIcon } from '@/components/ui/Icon';
+import { SplitTextReveal } from '@/components/ui/SplitTextReveal';
 import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
 
 function LoginForm() {
@@ -142,9 +143,16 @@ function LoginForm() {
       {/* Two-tone headline */}
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Masuk Akun Operasional</p>
-        <h1 className="mt-3 text-3xl font-bold leading-[1.15] tracking-tight sm:text-4xl">
-          <span className="block text-slate-900">Armada terpantau.</span>
-          <span className="block text-[#C8102E]">Operasional lebih cepat.</span>
+        <h1
+          className="mt-3 text-3xl font-bold leading-[1.15] tracking-tight sm:text-4xl"
+          aria-label="Armada terpantau. Operasional lebih cepat."
+        >
+          <span className="block text-slate-900" aria-hidden="true">
+            <SplitTextReveal as="span" text="Armada terpantau." />
+          </span>
+          <span className="block text-[#C8102E]" aria-hidden="true">
+            <SplitTextReveal as="span" text="Operasional lebih cepat." />
+          </span>
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-slate-500">
           Satu ruang kerja untuk pemesanan kendaraan, pelacakan GPS real-time, dan pengelolaan armada.

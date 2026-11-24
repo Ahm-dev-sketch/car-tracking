@@ -180,14 +180,34 @@
   .bg-warning-600, .bg-warning-700
 ) { color: #f8fafc; }
 
+/* Active tint pills pair bg-brand-50/100 (or bg-white) with text-brand-700.
+   Under .dark those tint surfaces go near-black (#2a0a14 / #0f172a) while
+   brand-700 drops to #b91c1c — 2.6-2.8:1, i.e. the label effectively vanishes.
+   Base classes only, so hover:/focus: variants keep their own intent. */
+.dark :is(.bg-brand-50, .bg-brand-100, .bg-white).text-brand-700 { color: #fb7185; }
+
 .dark .desktop-link { color: #94a3b8; }
 .dark .desktop-link:hover { background: #1e293b; color: #f8fafc; }
+/* The base rule paints the current page #0f172a, which is the island colour. */
+.dark .desktop-link[aria-current="page"] { color: #f8fafc; }
+.dark .desktop-link[aria-current="page"]::after { background: #e11d48; }
 
 .dark .dock-tab-icon,
 .dark .dock-tab-label { color: #94a3b8; }
-.dark .dock-tab[aria-current="page"] { background: #2a0a14; color: #e11d48; }
+.dark .dock-tab[aria-current="page"] { background: #2a0a14; color: #fb7185; }
+/* The icon chip keeps its light-mode #fde2e5 fill, which turns into a glaring
+   pale square on the dark dock — give it a dark step instead. */
 .dark .dock-tab[aria-current="page"] .dock-tab-icon,
-.dark .dock-tab[aria-current="page"] .dock-tab-label { color: #e11d48; }
+.dark .dock-tab[aria-expanded="true"] .dock-tab-icon {
+  background-color: #3b0f1c;
+  color: #fb7185;
+}
+.dark .dock-tab[aria-current="page"] .dock-tab-label,
+.dark .dock-tab[aria-expanded="true"] .dock-tab-label { color: #fb7185; }
+.dark .dock-tab:hover:not([aria-current="page"]):not([aria-expanded="true"]) .dock-tab-icon {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
 
 .dark .eyebrow { color: #94a3b8; border-left-color: #e11d48; }
 

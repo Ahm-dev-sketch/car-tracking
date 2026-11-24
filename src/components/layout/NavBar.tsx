@@ -136,7 +136,7 @@ export function NavBar() {
           <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="KCIC Fleet home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/icon-192.png" alt="" width={36} height={36} className="size-9 shrink-0 rounded-lg shadow-xs" />
-            <span className="text-lg font-semibold tracking-tight text-slate-900">KCIC <span className="font-bold text-brand-500">Fleet</span></span>
+            <span className="text-lg font-semibold tracking-tight text-slate-900">KCIC <span className="font-bold text-brand-500 dark:text-rose-400">Fleet</span></span>
           </Link>
           <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Main navigation">
             {links.map((link) => {
@@ -171,7 +171,7 @@ export function NavBar() {
               {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 inline-flex size-3.5 items-center justify-center rounded-full bg-brand-500 text-[9px] font-semibold leading-none text-white ring-2 ring-white">{unreadCount}</span>}
             </button>
             <span className="mx-0.5 h-6 w-px bg-slate-200" aria-hidden="true" />
-            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 pl-1 pr-2 text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900" aria-label="Open account and navigation" aria-haspopup="dialog" aria-expanded={menuOpen}>
+            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 pl-1 pr-2 text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:hover:bg-slate-100" aria-label="Open account and navigation" aria-haspopup="dialog" aria-expanded={menuOpen}>
               <span className="grid size-8 place-items-center rounded-md bg-slate-900 text-xs font-semibold text-white">{initials}</span>
               <span className="hidden text-xs font-medium text-slate-600 xl:inline">{role === 'ADMIN' ? 'Admin' : role === 'DRIVER' ? 'Driver' : 'Workspace'}</span>
             </button>
@@ -241,11 +241,11 @@ export function NavBar() {
                 onClick={() => setMenuOpen(false)}
                 aria-current={active ? 'page' : undefined}
                 className={`relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors ${
-                  active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-100'
                 }`}
               >
                 {active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand-500" aria-hidden="true" />}
-                <Icon name={link.icon} className={`size-4 ${active ? 'text-brand-500' : 'text-slate-400'}`} />
+                <Icon name={link.icon} className={`size-4 ${active ? 'text-brand-500 dark:text-rose-400' : 'text-slate-400'}`} />
                 <span className="flex-1">{link.label}</span>
                 {showBadge && (
                   <span
@@ -255,7 +255,7 @@ export function NavBar() {
                     {pendingActionCount > 99 ? '99+' : pendingActionCount}
                   </span>
                 )}
-                <Icon name="chevronRight" className="size-4 text-slate-300" />
+                <Icon name="chevronRight" className="size-4 text-slate-300 dark:text-slate-400" />
               </Link>
             );
           })}

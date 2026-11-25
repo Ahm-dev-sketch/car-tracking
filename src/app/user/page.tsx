@@ -5,13 +5,18 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner } from '@/components/ui/Spinner';
-import { RelativeTime } from '@/components/ui/RelativeTime';
 import { IosInstallHint } from '@/components/providers/InstallPrompt';
 import { Icon as OverviewIcon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { selectNextDeparture } from '@/lib/booking-status';
 import { useTranslation } from '@/components/providers/LanguageProvider';
 import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
+import {
+  formatBookingDateTime,
+  formatJakartaDate,
+  formatJakartaTime,
+  isLastMinuteBooking,
+} from '@/lib/booking-time';
 
 interface Booking {
   id: string;
@@ -49,7 +54,6 @@ export default function UserOverviewPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [availableCount, setAvailableCount] = useState<number>(0);
   const { locale, t, format } = useTranslation();
-  const dateLocale = locale === 'id' ? 'id-ID' : 'en-US';
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -219,12 +223,7 @@ export default function UserOverviewPage() {
                   <span>
                     {t.userPages.home.departurePrefix}
                     <time dateTime={activeBooking.departureAt} className="tabular-nums">
-                      {new Date(activeBooking.departureAt).toLocaleDateString(dateLocale, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatBookingDateTime(activeBooking.departureAt, locale)}
                     </time>
                   </span>
                 </div>
@@ -294,16 +293,10 @@ export default function UserOverviewPage() {
                     className="flex flex-wrap items-baseline gap-x-3 gap-y-1"
                   >
                     <span className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
-                      {new Date(upcomingBooking.departureAt).toLocaleDateString(dateLocale, {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {formatJakartaDate(upcomingBooking.departureAt, locale)}
                     </span>
                     <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 tabular-nums">
-                      {new Date(upcomingBooking.departureAt).toLocaleTimeString(dateLocale, {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatJakartaTime(upcomingBooking.departureAt, locale)}
                     </span>
                   </time>
                   <p className="mt-3 flex items-start gap-2 text-sm font-medium text-slate-700">
@@ -444,21 +437,24 @@ export default function UserOverviewPage() {
                           {booking.destination}
                         </span>
                       </div>
-                      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-medium text-slate-400">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium text-slate-400">
                         <span>
-                          Depart{' '}
-                          <time dateTime={booking.departureAt} className="tabular-nums">
-                            {new Date(booking.departureAt).toLocaleDateString(dateLocale, {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                          {t.userPages.home.departShortPrefix}{' '}
+                          <time dateTime={booking.departureAt} className="tabular-nums text-slate-600">
+                            {formatBookingDateTime(booking.departureAt, locale)}
                           </time>
                         </span>
                         <span>
-                          Created <RelativeTime date={booking.createdAt} />
+                          {t.userPages.home.bookedShortPrefix}{' '}
+                          <time dateTime={booking.createdAt} className="tabular-nums text-slate-500">
+                            {formatBookingDateTime(booking.createdAt, locale)}
+                          </time>
                         </span>
+                        {isLastMinuteBooking(booking.createdAt, booking.departureAt) && (
+                          <span className="inline-flex items-center rounded border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[10px] font-semibold text-warning-700">
+                            {t.userPages.home.lastMinuteBadge}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

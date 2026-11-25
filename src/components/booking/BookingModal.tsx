@@ -13,6 +13,7 @@ import { findNearestHub } from '@/lib/operational-locations';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
 import { enqueueOfflineAction } from '@/lib/offline-sync';
 import { useTranslation } from '@/components/providers/LanguageProvider';
+import { formatBookingDateTime } from '@/lib/booking-time';
 import { looksLikeGoogleMapsUrl, isShortLink, parseGoogleMapsUrl } from '@/lib/google-maps-url';
 
 export interface LocationOption {
@@ -495,6 +496,7 @@ export function BookingModal({
         ...payload,
         bookingNumber: `OFFLINE-${Date.now().toString(36).toUpperCase()}`,
         status: 'OFFLINE_PENDING',
+        createdAt: new Date().toISOString(),
       };
 
       setOfflineNotice(
@@ -618,10 +620,19 @@ export function BookingModal({
 
               {/* Route Summary Preview */}
               <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-left text-xs">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
                   <span className="font-medium text-slate-500">{t.bookingModal.serviceTypeLabel}</span>
-                  <span className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
-                    {submittedBooking.serviceType === 'STANDBY' ? t.bookingModal.standbyModeLabel : t.bookingModal.dropOffModeLabel}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <StatusBadge status={submittedBooking.status} />
+                    <span className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
+                      {submittedBooking.serviceType === 'STANDBY' ? t.bookingModal.standbyModeLabel : t.bookingModal.dropOffModeLabel}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                  <span className="font-medium text-slate-500">{t.bookingModal.bookedAtLabel}</span>
+                  <span className="font-medium tabular-nums text-slate-900">
+                    {formatBookingDateTime(submittedBooking.createdAt || new Date(), locale)}
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -708,6 +719,12 @@ export function BookingModal({
 
               {/* Route Summary Preview */}
               <div className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 text-left text-xs">
+                <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-2">
+                  <span className="shrink-0 font-medium text-slate-500">{t.bookingModal.bookedAtLabel}</span>
+                  <span className="text-right font-medium tabular-nums text-slate-700">
+                    {formatBookingDateTime(submittedBooking.createdAt || new Date(), locale)}
+                  </span>
+                </div>
                 <div className="flex items-start gap-3">
                   <span aria-hidden="true" className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded bg-success-50 text-[10px] leading-none text-success-600">
                     &#9679;
@@ -832,6 +849,12 @@ export function BookingModal({
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-slate-500">{t.bookingModal.pickupStatusLabel}</span>
                   <StatusBadge status={submittedBooking.status} />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="shrink-0 font-medium text-slate-500">{t.bookingModal.bookedAtLabel}</span>
+                  <span className="text-right font-medium tabular-nums text-slate-700">
+                    {formatBookingDateTime(submittedBooking.createdAt || new Date(), locale)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="shrink-0 font-medium text-slate-500">{t.bookingModal.pickupLabelShort}</span>

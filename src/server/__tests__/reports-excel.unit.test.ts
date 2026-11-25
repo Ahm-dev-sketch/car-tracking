@@ -69,6 +69,7 @@ describe('GET /api/admin/reports/excel', () => {
         bookingNumber: 'KCIC-2026-0001',
         serviceType: ServiceType.DROP_OFF,
         status: BookingStatus.COMPLETED,
+        createdAt: new Date('2026-03-10T07:15:00Z'),
         departureAt: new Date('2026-03-10T08:00:00Z'),
         expectedReturnAt: new Date('2026-03-10T11:00:00Z'),
         pickupLocation: 'Stasiun Halim',
@@ -114,7 +115,8 @@ describe('GET /api/admin/reports/excel', () => {
         id: 'booking-2',
         bookingNumber: 'KCIC-2026-0002',
         serviceType: ServiceType.STANDBY,
-        status: BookingStatus.PENDING_COMPLETION,
+        status: BookingStatus.PENDING,
+        createdAt: new Date('2026-03-11T08:00:00Z'),
         departureAt: new Date('2026-03-11T09:00:00Z'),
         expectedReturnAt: new Date('2026-03-11T17:00:00Z'),
         pickupLocation: 'Stasiun Tegalluar',
@@ -164,8 +166,10 @@ describe('GET /api/admin/reports/excel', () => {
 
     // Check header row (row 7)
     expect(worksheet?.getCell('B7').value).toBe('NO. BOOKING');
-    expect(worksheet?.getCell('P7').value).toBe('STATUS NOTA DINAS');
-    expect(worksheet?.getCell('Q7').value).toBe('FOTO NOTA DINAS');
+    expect(worksheet?.getCell('E7').value).toBe('WAKTU PEMESANAN');
+    expect(worksheet?.getCell('F7').value).toBe('WAKTU BERANGKAT');
+    expect(worksheet?.getCell('Q7').value).toBe('STATUS NOTA DINAS');
+    expect(worksheet?.getCell('R7').value).toBe('FOTO NOTA DINAS');
 
     // Check data row 1 (row 8) - Image embedded
     const bookingNumCell = worksheet?.getCell('B8');
@@ -174,10 +178,14 @@ describe('GET /api/admin/reports/excel', () => {
     const serviceTypeCell = worksheet?.getCell('C8');
     expect(serviceTypeCell?.value).toBe('Drop Off');
 
-    const distanceCell = worksheet?.getCell('O8');
+    // 2026-03-10T07:15:00Z in Asia/Jakarta (UTC+7) = 10/03/2026, 14:15 WIB
+    expect(worksheet?.getCell('E8').value).toContain('14:15 WIB');
+    expect(worksheet?.getCell('F8').value).toContain('15:00 WIB');
+
+    const distanceCell = worksheet?.getCell('P8');
     expect(distanceCell?.value).toBe(18.5);
 
-    const notaStatusCell = worksheet?.getCell('P8');
+    const notaStatusCell = worksheet?.getCell('Q8');
     expect(notaStatusCell?.value).toBe('Terverifikasi & Selesai');
 
     // Row height should be expanded for photo
@@ -187,8 +195,9 @@ describe('GET /api/admin/reports/excel', () => {
     const images = worksheet?.getImages();
     expect(images && images.length).toBeGreaterThan(0);
 
-    // Check data row 2 (row 9) - PDF document fallback with link
-    const pdfCell = worksheet?.getCell('Q9');
+    // Check data row 2 (row 9) - PENDING label + PDF document fallback with link
+    expect(worksheet?.getCell('D9').value).toBe('Menunggu Persetujuan Admin');
+    const pdfCell = worksheet?.getCell('R9');
     expect(pdfCell?.value).toMatchObject({
       text: expect.stringContaining('dokumen-nota.pdf'),
       hyperlink: expect.stringContaining('/uploads/nota-dinas/dokumen-nota.pdf'),
@@ -224,6 +233,7 @@ describe('GET /api/admin/reports/excel', () => {
           bookingNumber: 'KCIC-2026-REMOTE',
           serviceType: ServiceType.DROP_OFF,
           status: BookingStatus.COMPLETED,
+          createdAt: new Date('2026-03-10T07:00:00Z'),
           departureAt: new Date('2026-03-10T08:00:00Z'),
           expectedReturnAt: new Date('2026-03-10T11:00:00Z'),
           pickupLocation: 'Stasiun Halim',

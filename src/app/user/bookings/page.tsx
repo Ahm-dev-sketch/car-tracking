@@ -17,6 +17,12 @@ import { BookingModal, LocationOption } from '@/components/booking/BookingModal'
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 import { useTranslation } from '@/components/providers/LanguageProvider';
 import { translateServiceType, translateStatus } from '@/lib/i18n';
+import {
+  formatBookingDateTime,
+  formatJakartaDate,
+  formatJakartaTime,
+  isLastMinuteBooking,
+} from '@/lib/booking-time';
 import { saveSnapshot, getSnapshot, getOfflineQueue, processOfflineQueue } from '@/lib/offline-sync';
 import {
   clearPendingRejectedAcks,
@@ -74,7 +80,6 @@ interface Booking {
 
 function UserBookingsContent() {
   const { locale, t, format } = useTranslation();
-  const dateLocale = locale === 'id' ? 'id-ID' : 'en-US';
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
@@ -479,20 +484,35 @@ function UserBookingsContent() {
       ),
     },
     {
+      header: t.userPages.bookings.colBookedAt,
+      cell: (b) => (
+        <div className="text-xs tabular-nums">
+          <div className="font-medium text-slate-900">
+            {formatJakartaDate(b.createdAt, locale, { includeYear: true })}
+          </div>
+          <div className="text-slate-500">
+            {formatJakartaTime(b.createdAt, locale)}
+          </div>
+          {isLastMinuteBooking(b.createdAt, b.departureAt) && (
+            <span
+              title={t.userPages.bookings.lastMinuteTooltip}
+              className="mt-1 inline-flex items-center rounded border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[10px] font-semibold text-warning-700"
+            >
+              {t.userPages.bookings.lastMinuteBadge}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
       header: t.userPages.bookings.colDeparture,
       cell: (b) => (
         <div className="text-xs tabular-nums">
           <div className="font-medium text-slate-900">
-            {new Date(b.departureAt).toLocaleDateString(dateLocale, {
-              month: 'short',
-              day: 'numeric',
-            })}
+            {formatJakartaDate(b.departureAt, locale)}
           </div>
           <div className="text-slate-500">
-            {new Date(b.departureAt).toLocaleTimeString(dateLocale, {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {formatJakartaTime(b.departureAt, locale)}
           </div>
         </div>
       ),
@@ -599,6 +619,7 @@ function UserBookingsContent() {
   const pendingCount = bookings.filter((b) =>
     ['PENDING', 'SEARCHING_DRIVER', 'DRIVER_NOTIFIED'].includes(b.status)
   ).length;
+  const awaitingAdminCount = bookings.filter((b) => b.status === 'PENDING').length;
   const activeCount = bookings.filter((b) =>
     ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(b.status)
   ).length;
@@ -638,6 +659,11 @@ function UserBookingsContent() {
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.statSearching}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{pendingCount}</p>
+          {awaitingAdminCount > 0 && (
+            <p className="mt-1 text-[10px] font-medium tabular-nums leading-relaxed text-slate-400">
+              {format(t.userPages.bookings.awaitingAdminSub, { count: awaitingAdminCount })}
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.statActive}</p>
@@ -685,6 +711,7 @@ function UserBookingsContent() {
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="">{t.userPages.bookings.allStatuses}</option>
+              <option value="PENDING">{translateStatus(locale, 'PENDING')}</option>
               <option value="SEARCHING_DRIVER">{translateStatus(locale, 'SEARCHING_DRIVER')}</option>
               <option value="DRIVER_NOTIFIED">{translateStatus(locale, 'DRIVER_NOTIFIED')}</option>
               <option value="DRIVER_ASSIGNED">{translateStatus(locale, 'DRIVER_ASSIGNED')}</option>
@@ -727,11 +754,7 @@ function UserBookingsContent() {
         description={
           selectedBooking
             ? format(t.userPages.bookings.drawerCreated, {
-                date: new Date(selectedBooking.createdAt).toLocaleDateString(dateLocale, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                }),
+                date: formatBookingDateTime(selectedBooking.createdAt, locale),
               })
             : ''
         }
@@ -955,16 +978,32 @@ function UserBookingsContent() {
 
             {/* Trip Schedule & Purpose */}
             <div className="grid grid-cols-2 gap-3 border-b border-slate-200 pb-3 text-xs">
+              <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                <div>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.bookedAtLabel}</span>
+                  <span className="font-medium tabular-nums text-slate-900">
+                    {formatBookingDateTime(selectedBooking.createdAt, locale)}
+                  </span>
+                </div>
+                {isLastMinuteBooking(selectedBooking.createdAt, selectedBooking.departureAt) && (
+                  <span
+                    title={t.userPages.bookings.lastMinuteTooltip}
+                    className="inline-flex items-center rounded border border-warning-200 bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700"
+                  >
+                    {t.userPages.bookings.lastMinuteBadge}
+                  </span>
+                )}
+              </div>
               <div>
                 <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.departureLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
-                  {new Date(selectedBooking.departureAt).toLocaleString(dateLocale)}
+                  {formatBookingDateTime(selectedBooking.departureAt, locale)}
                 </span>
               </div>
               <div>
                 <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.expectedReturnLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
-                  {new Date(selectedBooking.expectedReturnAt).toLocaleString(dateLocale)}
+                  {formatBookingDateTime(selectedBooking.expectedReturnAt, locale)}
                 </span>
               </div>
               <div>

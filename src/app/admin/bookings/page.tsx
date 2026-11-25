@@ -18,6 +18,12 @@ import { ExportReportModal } from '@/components/admin/ExportReportModal';
 import { useTranslation } from '@/components/providers/LanguageProvider';
 import { translateServiceType, translateStatus } from '@/lib/i18n';
 import {
+  formatBookingDateTime,
+  formatJakartaDate,
+  formatJakartaTime,
+  isLastMinuteBooking,
+} from '@/lib/booking-time';
+import {
   saveSnapshot,
   getSnapshot,
   enqueueOfflineAction,
@@ -617,20 +623,35 @@ function AdminBookingsContent() {
       ),
     },
     {
+      header: t.adminPages.bookings.colBookedAt,
+      cell: (b) => (
+        <div className="text-xs tabular-nums">
+          <div className="font-medium text-slate-900">
+            {formatJakartaDate(b.createdAt, locale, { includeYear: true })}
+          </div>
+          <div className="text-slate-500">
+            {formatJakartaTime(b.createdAt, locale)}
+          </div>
+          {isLastMinuteBooking(b.createdAt, b.departureAt) && (
+            <span
+              title={t.adminPages.bookings.lastMinuteTooltip}
+              className="mt-1 inline-flex items-center rounded border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[10px] font-semibold text-warning-700"
+            >
+              {t.adminPages.bookings.lastMinuteBadge}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
       header: t.adminPages.bookings.colDeparture,
       cell: (b) => (
         <div className="text-xs tabular-nums">
           <div className="font-medium text-slate-900">
-            {new Date(b.departureAt).toLocaleDateString([], {
-              month: 'short',
-              day: 'numeric',
-            })}
+            {formatJakartaDate(b.departureAt, locale)}
           </div>
           <div className="text-slate-500">
-            {new Date(b.departureAt).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
+            {formatJakartaTime(b.departureAt, locale)}
           </div>
         </div>
       ),
@@ -810,6 +831,7 @@ function AdminBookingsContent() {
   ];
 
   const pendingCount = bookings.filter((b) => b.status === 'PENDING' || b.status === 'ADMIN_INTERVENTION').length;
+  const awaitingAdminApprovalCount = bookings.filter((b) => b.status === 'PENDING').length;
   const activeCount = bookings.filter((b) =>
     ['SEARCHING_DRIVER', 'DRIVER_NOTIFIED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(b.status)
   ).length;
@@ -852,6 +874,11 @@ function AdminBookingsContent() {
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.statNeedAction}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{pendingCount}</p>
+          {awaitingAdminApprovalCount > 0 && (
+            <p className="mt-1 text-[10px] font-medium tabular-nums leading-relaxed text-slate-400">
+              {format(t.adminPages.bookings.awaitingAdminSub, { count: awaitingAdminApprovalCount })}
+            </p>
+          )}
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.statActiveFleet}</p>
@@ -904,6 +931,17 @@ function AdminBookingsContent() {
             }`}
           >
             {t.adminPages.bookings.pillAll}
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('PENDING')}
+            className={`cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              statusFilter === 'PENDING'
+                ? 'border-warning-200 bg-warning-600 text-white'
+                : 'border-slate-200 bg-white text-warning-700 hover:bg-warning-50'
+            }`}
+          >
+            {translateStatus(locale, 'PENDING')}
           </button>
           <button
             type="button"
@@ -979,6 +1017,7 @@ function AdminBookingsContent() {
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="">{t.adminPages.bookings.allStatusesOption}</option>
+              <option value="PENDING">{translateStatus(locale, 'PENDING')}</option>
               <option value="SEARCHING_DRIVER">{translateStatus(locale, 'SEARCHING_DRIVER')}</option>
               <option value="DRIVER_NOTIFIED">{translateStatus(locale, 'DRIVER_NOTIFIED')}</option>
               <option value="DRIVER_ASSIGNED">{translateStatus(locale, 'DRIVER_ASSIGNED')}</option>
@@ -990,7 +1029,6 @@ function AdminBookingsContent() {
               <option value="NO_DRIVER_AVAILABLE">{translateStatus(locale, 'NO_DRIVER_AVAILABLE')}</option>
               <option value="ADMIN_INTERVENTION">{translateStatus(locale, 'ADMIN_INTERVENTION')}</option>
               <option value="CANCELLED">{translateStatus(locale, 'CANCELLED')}</option>
-              <option value="PENDING">{t.adminPages.bookings.legacyPendingOption}</option>
             </select>
           </div>
         </div>
@@ -1311,16 +1349,32 @@ function AdminBookingsContent() {
 
             {/* Schedule */}
             <div className="grid grid-cols-2 gap-3 border-b border-slate-200 pb-3 text-xs">
+              <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                <div>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.bookedAtLabel}</span>
+                  <span className="font-medium tabular-nums text-slate-900">
+                    {formatBookingDateTime(selectedBooking.createdAt, locale)}
+                  </span>
+                </div>
+                {isLastMinuteBooking(selectedBooking.createdAt, selectedBooking.departureAt) && (
+                  <span
+                    title={t.adminPages.bookings.lastMinuteTooltip}
+                    className="inline-flex items-center rounded border border-warning-200 bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700"
+                  >
+                    {t.adminPages.bookings.lastMinuteBadge}
+                  </span>
+                )}
+              </div>
               <div>
                 <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.departureLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
-                  {new Date(selectedBooking.departureAt).toLocaleString()}
+                  {formatBookingDateTime(selectedBooking.departureAt, locale)}
                 </span>
               </div>
               <div>
                 <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.returnLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
-                  {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
+                  {formatBookingDateTime(selectedBooking.expectedReturnAt, locale)}
                 </span>
               </div>
               <div>
@@ -1369,6 +1423,30 @@ function AdminBookingsContent() {
           maxWidth="2xl"
         >
           <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                <div>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.bookedAtLabel}</span>
+                  <span className="font-medium tabular-nums text-slate-900">
+                    {formatBookingDateTime(interventionBooking.createdAt, locale)}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.departureLabel}</span>
+                  <span className="font-medium tabular-nums text-slate-900">
+                    {formatBookingDateTime(interventionBooking.departureAt, locale)}
+                  </span>
+                </div>
+              </div>
+              {isLastMinuteBooking(interventionBooking.createdAt, interventionBooking.departureAt) && (
+                <span
+                  title={t.adminPages.bookings.lastMinuteTooltip}
+                  className="inline-flex items-center rounded border border-warning-200 bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700"
+                >
+                  {t.adminPages.bookings.lastMinuteBadge}
+                </span>
+              )}
+            </div>
             {interventionError && (
               <ErrorBanner message={interventionError} onDismiss={() => setInterventionError(null)} />
             )}

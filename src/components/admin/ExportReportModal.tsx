@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateStatus } from '@/lib/i18n';
 
 interface LocationItem {
   id: string;
@@ -20,7 +21,7 @@ interface ExportReportModalProps {
 }
 
 export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportReportModalProps) {
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
@@ -207,6 +208,7 @@ export function ExportReportModal({ isOpen, onClose, locations = [] }: ExportRep
               className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none transition-colors hover:border-slate-400 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             >
               <option value="ALL">{t.admin.exportModal.allStatuses}</option>
+              <option value="PENDING">{translateStatus(locale, 'PENDING')}</option>
               <option value="COMPLETED">{t.admin.exportModal.optCompleted}</option>
               <option value="PENDING_COMPLETION">{t.admin.exportModal.optPendingNota}</option>
               <option value="IN_PROGRESS">{t.admin.exportModal.optInProgress}</option>

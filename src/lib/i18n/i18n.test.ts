@@ -94,6 +94,8 @@ describe('i18n dictionaries & helpers', () => {
       expect(idLabel === status && status.length > 2).toBe(false);
     }
 
+    expect(translateStatus('id', 'PENDING')).toBe('Menunggu Persetujuan Admin');
+    expect(translateStatus('en', 'PENDING')).toBe('Awaiting Admin Approval');
     expect(translateStatus('id', 'PENDING_COMPLETION', false)).toBe('Menunggu Nota Dinas');
     expect(translateStatus('id', 'PENDING_COMPLETION', true)).toBe('Menunggu Verifikasi Nota');
     expect(translateStatus('en', 'PENDING_COMPLETION', false)).toBe('Awaiting Official Note');

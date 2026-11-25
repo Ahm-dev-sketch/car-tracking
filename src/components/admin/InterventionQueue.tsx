@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FleetMap, VehicleMarkerData } from '@/components/map';
 import { useTranslation } from '@/components/providers/LanguageProvider';
+import { formatBookingDateTime, isLastMinuteBooking } from '@/lib/booking-time';
 import { formatEta } from '@/components/booking/DispatchProgress';
 import { Icon } from '@/components/ui/Icon';
 
@@ -37,6 +38,7 @@ export interface InterventionBooking {
   pickupLocation: string;
   destination: string;
   departureAt: string;
+  createdAt?: string;
   passengerCount: number;
   purpose: string;
   notes?: string | null;
@@ -280,12 +282,24 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
               <div>
                 <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.admin.interventionQueue.departure}</span>
                 <span className="font-mono font-medium tabular-nums text-slate-800">
-                  {new Date(selectedBooking.departureAt).toLocaleTimeString(locale === 'id' ? 'id-ID' : 'en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatBookingDateTime(selectedBooking.departureAt, locale)}
                 </span>
               </div>
+              {selectedBooking.createdAt && (
+                <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                  <div>
+                    <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.admin.interventionQueue.bookedAt}</span>
+                    <span className="font-medium tabular-nums text-slate-700">
+                      {formatBookingDateTime(selectedBooking.createdAt, locale)}
+                    </span>
+                  </div>
+                  {isLastMinuteBooking(selectedBooking.createdAt, selectedBooking.departureAt) && (
+                    <span className="inline-flex items-center rounded border border-warning-200 bg-warning-50 px-1.5 py-0.5 text-[10px] font-semibold text-warning-700">
+                      {t.admin.interventionQueue.lastMinuteBadge}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {selectedBooking.purpose && (

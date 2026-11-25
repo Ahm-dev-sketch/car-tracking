@@ -16,7 +16,7 @@ function formatDate(date: Date | null | undefined): string {
   if (!date) return '-';
   const d = new Date(date);
   if (isNaN(d.getTime())) return '-';
-  return d.toLocaleString('id-ID', {
+  const formatted = d.toLocaleString('id-ID', {
     timeZone: 'Asia/Jakarta',
     day: '2-digit',
     month: '2-digit',
@@ -24,11 +24,12 @@ function formatDate(date: Date | null | undefined): string {
     hour: '2-digit',
     minute: '2-digit',
   }).replace(/\./g, ':');
+  return `${formatted} WIB`;
 }
 
 function formatStatus(status: BookingStatus): string {
   const map: Record<BookingStatus, string> = {
-    PENDING: 'Menunggu Persetujuan',
+    PENDING: 'Menunggu Persetujuan Admin',
     APPROVED: 'Disetujui',
     REJECTED: 'Ditolak',
     SEARCHING_DRIVER: 'Mencari Driver',
@@ -149,24 +150,24 @@ export const GET = withRateLimit(
   const COLOR_CARD_BG = 'FAFAFA';
 
   // 1. Title Block
-  worksheet.mergeCells('A1:Q1');
+  worksheet.mergeCells('A1:R1');
   const title1 = worksheet.getCell('A1');
   title1.value = 'PT KERETA CEPAT INDONESIA CHINA (KCIC)';
   title1.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLOR_DARK_CRIMSON } };
   title1.alignment = { vertical: 'middle', horizontal: 'left' };
   worksheet.getRow(1).height = 24;
 
-  worksheet.mergeCells('A2:Q2');
+  worksheet.mergeCells('A2:R2');
   const title2 = worksheet.getCell('A2');
   title2.value = 'LAPORAN REKAPITULASI OPERASIONAL PERJALANAN ARMADA & NOTA DINAS';
   title2.font = { name: 'Calibri', size: 12, bold: true, color: { argb: '18181B' } };
   title2.alignment = { vertical: 'middle', horizontal: 'left' };
   worksheet.getRow(2).height = 20;
 
-  worksheet.mergeCells('A3:Q3');
+  worksheet.mergeCells('A3:R3');
   const title3 = worksheet.getCell('A3');
   const dateRangeStr = `${startDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'long', year: 'numeric' })} s/d ${endDate.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'long', year: 'numeric' })}`;
-  title3.value = `Periode: ${dateRangeStr}  |  Dicetak pada: ${formatDate(new Date())} WIB  |  Admin: ${user.name || user.email}`;
+  title3.value = `Periode: ${dateRangeStr}  |  Dicetak pada: ${formatDate(new Date())}  |  Admin: ${user.name || user.email}`;
   title3.font = { name: 'Calibri', size: 10, italic: true, color: { argb: '71717A' } };
   title3.alignment = { vertical: 'middle', horizontal: 'left' };
   worksheet.getRow(3).height = 18;
@@ -192,7 +193,7 @@ export const GET = withRateLimit(
     { cell: 'D5:F5', label: `SELESAI (COMPLETED): ${completedCount}`, color: '15803D', bg: 'F0FDF4' },
     { cell: 'G5:I5', label: `DROP OFF: ${dropOffCount}  |  STANDBY: ${standbyCount}`, color: '9F1239', bg: 'FFF1F2' },
     { cell: 'J5:L5', label: `TOTAL JARAK: ${totalDistanceKm} KM`, color: '0369A1', bg: 'F0F9FF' },
-    { cell: 'M5:Q5', label: `NOTA DINAS TERLAMPIR: ${notaDinasCount} / ${totalBookings}`, color: 'B45309', bg: 'FFFBEB' },
+    { cell: 'M5:R5', label: `NOTA DINAS TERLAMPIR: ${notaDinasCount} / ${totalBookings}`, color: 'B45309', bg: 'FFFBEB' },
   ];
 
   kpiItems.forEach((kpi) => {
@@ -218,9 +219,10 @@ export const GET = withRateLimit(
     { header: 'NO', key: 'no', width: 6 },
     { header: 'NO. BOOKING', key: 'bookingNumber', width: 18 },
     { header: 'TIPE LAYANAN', key: 'serviceType', width: 14 },
-    { header: 'STATUS PERJALANAN', key: 'status', width: 22 },
-    { header: 'WAKTU BERANGKAT', key: 'departureAt', width: 18 },
-    { header: 'WAKTU SELESAI', key: 'returnAt', width: 18 },
+    { header: 'STATUS PERJALANAN', key: 'status', width: 26 },
+    { header: 'WAKTU PEMESANAN', key: 'createdAt', width: 22 },
+    { header: 'WAKTU BERANGKAT', key: 'departureAt', width: 22 },
+    { header: 'WAKTU SELESAI', key: 'returnAt', width: 22 },
     { header: 'NAMA PEMESAN', key: 'userName', width: 22 },
     { header: 'KONTAK PEMESAN', key: 'userPhone', width: 16 },
     { header: 'LOKASI PENJEMPUTAN', key: 'pickupLocation', width: 28 },
@@ -372,25 +374,26 @@ export const GET = withRateLimit(
       b.bookingNumber, // 2. No Booking
       b.serviceType === ServiceType.STANDBY ? 'Standby' : 'Drop Off', // 3. Tipe Layanan
       formatStatus(b.status), // 4. Status
-      formatDate(b.departureAt), // 5. Waktu Berangkat
-      formatDate(b.expectedReturnAt), // 6. Waktu Selesai
-      b.user.name, // 7. Nama Pemesan
-      b.user.phone || '-', // 8. Kontak
-      b.pickupLocation, // 9. Jemput
-      b.destination, // 10. Tujuan
-      [b.purpose, b.notes].filter(Boolean).join(' | '), // 11. Keperluan
-      b.driver?.user?.name ? `${b.driver.user.name} (${b.driver.user.phone || '-'})` : 'Belum Ditugaskan', // 12. Driver
-      b.vehicle ? `${b.vehicle.plateNumber} (${b.vehicle.brand} ${b.vehicle.model})` : 'Belum Ditentukan', // 13. Kendaraan
-      b.operationalLocation ? `${b.operationalLocation.name} (${b.operationalLocation.code})` : '-', // 14. Hub
-      distanceKm !== '-' ? Number(distanceKm) : '-', // 15. Jarak
-      notaStatus, // 16. Status Nota
+      formatDate(b.createdAt), // 5. Waktu Pemesanan
+      formatDate(b.departureAt), // 6. Waktu Berangkat
+      formatDate(b.expectedReturnAt), // 7. Waktu Selesai
+      b.user.name, // 8. Nama Pemesan
+      b.user.phone || '-', // 9. Kontak
+      b.pickupLocation, // 10. Jemput
+      b.destination, // 11. Tujuan
+      [b.purpose, b.notes].filter(Boolean).join(' | '), // 12. Keperluan
+      b.driver?.user?.name ? `${b.driver.user.name} (${b.driver.user.phone || '-'})` : 'Belum Ditugaskan', // 13. Driver
+      b.vehicle ? `${b.vehicle.plateNumber} (${b.vehicle.brand} ${b.vehicle.model})` : 'Belum Ditentukan', // 14. Kendaraan
+      b.operationalLocation ? `${b.operationalLocation.name} (${b.operationalLocation.code})` : '-', // 15. Hub
+      distanceKm !== '-' ? Number(distanceKm) : '-', // 16. Jarak
+      notaStatus, // 17. Status Nota
       hasPhoto
         ? (fullNotaUrl ? { text: ' ', hyperlink: fullNotaUrl } : '')
         : isPdf
         ? { text: `[Dokumen PDF] ${b.notaDinasFilename || 'Buka PDF'}`, hyperlink: fullNotaUrl }
         : fullNotaUrl
         ? { text: b.notaDinasFilename || 'Buka Dokumen', hyperlink: fullNotaUrl }
-        : '-', // 17. Foto / Dokumen
+        : '-', // 18. Foto / Dokumen
     ];
 
     rowData.forEach((val, colIdx) => {
@@ -413,16 +416,23 @@ export const GET = withRateLimit(
         // Booking Number
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLOR_DARK_CRIMSON } };
-      } else if (colIdx === 2 || colIdx === 3 || colIdx === 4 || colIdx === 5 || colIdx === 13) {
-        // Type, Status, Dates, Hub
+      } else if (
+        colIdx === 2 ||
+        colIdx === 3 ||
+        colIdx === 4 ||
+        colIdx === 5 ||
+        colIdx === 6 ||
+        colIdx === 14
+      ) {
+        // Type, Status, Dates (createdAt, departureAt, returnAt), Hub
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      } else if (colIdx === 14) {
+      } else if (colIdx === 15) {
         // Distance
         cell.alignment = { vertical: 'middle', horizontal: 'right' };
         if (typeof val === 'number') {
           cell.numFmt = '#,##0.00 "km"';
         }
-      } else if (colIdx === 15) {
+      } else if (colIdx === 16) {
         // Status Nota
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         if (notaStatus.includes('Terverifikasi')) {
@@ -430,7 +440,7 @@ export const GET = withRateLimit(
         } else if (notaStatus.includes('Ditolak')) {
           cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'BE123C' } };
         }
-      } else if (colIdx === 16) {
+      } else if (colIdx === 17) {
         // Foto / Link Nota Dinas
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         if (!hasPhoto && fullNotaUrl) {
@@ -449,8 +459,8 @@ export const GET = withRateLimit(
       });
 
       worksheet.addImage(imageId, {
-        tl: { col: 16 + 0.05, row: rowNumber - 1 + 0.05 } as any,
-        br: { col: 17 - 0.05, row: rowNumber - 0.05 } as any,
+        tl: { col: 17 + 0.05, row: rowNumber - 1 + 0.05 } as any,
+        br: { col: 18 - 0.05, row: rowNumber - 0.05 } as any,
         editAs: 'oneCell',
         hyperlinks: fullNotaUrl
           ? {

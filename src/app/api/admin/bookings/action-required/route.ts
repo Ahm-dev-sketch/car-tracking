@@ -20,7 +20,7 @@ export const GET = withErrorHandling(async () => {
   requireRole(user, 'ADMIN');
 
   try {
-    await dispatchSweep();
+    await dispatchSweep({ throttled: true });
   } catch {
     // Non-blocking if background sweep fails
   }

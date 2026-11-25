@@ -79,22 +79,11 @@ function UserTrackingContent() {
   // Fetch active bookings
   const fetchActiveBookings = useCallback(async (signal: AbortSignal) => {
     try {
-      const res = await fetch('/api/bookings?limit=100', { signal, cache: 'no-store' });
+      const res = await fetch('/api/bookings?active=true&limit=20', { signal, cache: 'no-store' });
       if (res.ok) {
         const json = await res.json();
-        const list: ActiveBookingInfo[] = json.data || [];
+        const active: ActiveBookingInfo[] = json.data || [];
         if (signal.aborted) return;
-        const active = list.filter((b) =>
-          [
-            'APPROVED',
-            'SEARCHING_DRIVER',
-            'DRIVER_NOTIFIED',
-            'DRIVER_ASSIGNED',
-            'DRIVER_EN_ROUTE',
-            'ARRIVED',
-            'IN_PROGRESS',
-          ].includes(b.status)
-        );
         setActiveBookings(active);
         setSelectedBookingId((current) => {
           if (active.some((b) => b.id === current)) return current;
@@ -156,8 +145,9 @@ function UserTrackingContent() {
   useEffect(() => {
     const controller = new AbortController();
     let fetching = false;
-    const poll = async () => {
+    const poll = async (force = false) => {
       if (fetching) return;
+      if (!force && typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       fetching = true;
       try {
         await Promise.all([fetchLiveTracking(controller.signal), fetchActiveBookings(controller.signal)]);
@@ -165,11 +155,20 @@ function UserTrackingContent() {
         fetching = false;
       }
     };
-    void poll();
-    const interval = setInterval(poll, 10000);
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void poll(true);
+      }
+    };
+    void poll(true);
+    const interval = setInterval(() => {
+      void poll();
+    }, 10000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       controller.abort();
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [fetchLiveTracking, fetchActiveBookings]);
 

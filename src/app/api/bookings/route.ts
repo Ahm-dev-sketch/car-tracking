@@ -17,6 +17,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     page: searchParams.get('page') ?? undefined,
     limit: searchParams.get('limit') ?? undefined,
     status: searchParams.get('status') ?? undefined,
+    active: searchParams.get('active') ?? undefined,
     vehicleId: searchParams.get('vehicle_id') ?? searchParams.get('vehicleId') ?? undefined,
     locationId: searchParams.get('location_id') ?? searchParams.get('locationId') ?? undefined,
     startDate: searchParams.get('start_date') ?? searchParams.get('startDate') ?? undefined,
@@ -40,9 +41,9 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     });
   }
 
-  // Lazy sweep on read: advance expired offers before listing
+  // Lazy sweep on read: throttled cooldown + quick check before running full dispatch sweep
   try {
-    await dispatchSweep();
+    await dispatchSweep({ throttled: true });
   } catch (err: unknown) {
     console.error('[Driver Data Fetch Error] lazy dispatch sweep in bookings read:', err);
     logger.warn({

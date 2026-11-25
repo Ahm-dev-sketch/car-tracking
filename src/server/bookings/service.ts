@@ -40,6 +40,7 @@ export interface BookingQueryFilters {
   vehicleId?: string;
   locationId?: string;
   status?: BookingStatus;
+  active?: boolean;
   startDate?: Date;
   endDate?: Date;
 }
@@ -952,6 +953,18 @@ export async function listBookings(
     where.status = { in: [BookingStatus.APPROVED, BookingStatus.DRIVER_ASSIGNED, BookingStatus.DRIVER_EN_ROUTE, BookingStatus.ARRIVED, BookingStatus.IN_PROGRESS] };
   } else if (filters.status) {
     where.status = filters.status;
+  } else if (filters.active) {
+    where.status = {
+      in: [
+        BookingStatus.APPROVED,
+        BookingStatus.SEARCHING_DRIVER,
+        BookingStatus.DRIVER_NOTIFIED,
+        BookingStatus.DRIVER_ASSIGNED,
+        BookingStatus.DRIVER_EN_ROUTE,
+        BookingStatus.ARRIVED,
+        BookingStatus.IN_PROGRESS,
+      ],
+    };
   }
 
   if (filters.locationId) {

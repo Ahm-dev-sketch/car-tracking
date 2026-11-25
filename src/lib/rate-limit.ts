@@ -114,6 +114,21 @@ export const RATE_LIMIT_CONFIG = {
     limit: 30,
     windowMs: 60 * 1000,
   },
+  // Admin Excel export: 10 requests per minute
+  REPORT_EXPORT: {
+    limit: 10,
+    windowMs: 60 * 1000,
+  },
+  // Nota Dinas file upload: 20 requests per minute
+  UPLOAD: {
+    limit: 20,
+    windowMs: 60 * 1000,
+  },
+  // Reverse geocoding proxy: 30 requests per minute
+  GEOCODE: {
+    limit: 30,
+    windowMs: 60 * 1000,
+  },
 } as const;
 
 export function getClientIp(req: NextRequest): string {

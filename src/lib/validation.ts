@@ -403,6 +403,11 @@ export const bookingQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
   status: bookingStatusEnum.optional(),
+  active: z
+    .preprocess(
+      (v) => (v === 'true' || v === true ? true : v === 'false' || v === false ? false : undefined),
+      z.boolean().optional()
+    ),
   vehicle_id: z.string().optional(),
   vehicleId: z.string().optional(),
   location_id: z.string().optional(),

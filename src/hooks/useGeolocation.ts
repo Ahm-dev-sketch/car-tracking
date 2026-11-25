@@ -8,7 +8,7 @@ import {
   requestCurrentPosition,
   requestPositionWithFallback,
 } from '@/lib/geolocation';
-import { GpsJitterFilter, calculateConfidenceScore } from '@/lib/gps-filter';
+import { GpsJitterFilter, calculateConfidenceScore, haversineMeters } from '@/lib/gps-filter';
 
 export interface GeoPoint {
   lat: number;
@@ -26,10 +26,19 @@ export type LocationSource = 'gps_high_precision' | 'wifi_cell_triangulation' | 
 
 export interface UseGeolocationOptions {
   intervalSec?: number;
+  wakeLockEnabled?: boolean;
+  minDistanceMeters?: number;
+  heartbeatIntervalSec?: number;
   onFlush?: (points: GeoPoint[]) => Promise<void> | void;
 }
 
-export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptions = {}) {
+export function useGeolocation({
+  intervalSec = 5,
+  wakeLockEnabled = true,
+  minDistanceMeters = 15,
+  heartbeatIntervalSec = 50,
+  onFlush,
+}: UseGeolocationOptions = {}) {
   const [isTracking, setIsTracking] = useState(false);
   const [currentPosition, setCurrentPosition] = useState<GeoPoint | null>(null);
   const [quality, setQuality] = useState<AccuracyQuality>('LOW');
@@ -53,11 +62,38 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
   const onFlushRef = useRef(onFlush);
   const bufferRef = useRef<ReturnType<typeof createLocationBuffer<GeoPoint>> | null>(null);
   const latestPositionRef = useRef<GeoPoint | null>(null);
+  const lastQueuedPointRef = useRef<GeoPoint | null>(null);
+  const lastQueuedAtRef = useRef<number>(0);
+  const minDistanceRef = useRef(minDistanceMeters);
+  const heartbeatSecRef = useRef(heartbeatIntervalSec);
   const jitterFilterRef = useRef<GpsJitterFilter>(new GpsJitterFilter());
   useEffect(() => {
     onFlushRef.current = onFlush;
     bufferRef.current ??= createLocationBuffer<GeoPoint>(() => onFlushRef.current);
   }, [onFlush]);
+
+  useEffect(() => {
+    minDistanceRef.current = minDistanceMeters;
+    heartbeatSecRef.current = heartbeatIntervalSec;
+  }, [minDistanceMeters, heartbeatIntervalSec]);
+
+  const maybeQueuePoint = useCallback((point: GeoPoint) => {
+    const nowMs = Date.now();
+    const prev = lastQueuedPointRef.current;
+    const movedMeters = prev
+      ? haversineMeters(prev.lat, prev.lng, point.lat, point.lng)
+      : Number.POSITIVE_INFINITY;
+    const hbSec = heartbeatSecRef.current;
+    const heartbeatDue = hbSec > 0 && nowMs - lastQueuedAtRef.current >= hbSec * 1000;
+
+    if (!prev || movedMeters >= minDistanceRef.current || heartbeatDue) {
+      bufferRef.current?.push(point);
+      lastQueuedPointRef.current = point;
+      lastQueuedAtRef.current = nowMs;
+      return true;
+    }
+    return false;
+  }, []);
 
   const getCurrentPosition = useCallback(async (opts?: { allowCached?: boolean; maxAgeMs?: number }): Promise<GeoPoint> => {
     const allowCached = opts?.allowCached ?? true;
@@ -105,7 +141,7 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
         setCurrentPosition(point);
         setLastUpdated(new Date());
         setIsStale(false);
-        if (trackingRef.current) bufferRef.current?.push(point);
+        if (trackingRef.current) maybeQueuePoint(point);
       }
       return point;
     } catch (cause) {
@@ -137,7 +173,11 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
       clearInterval(flushTimerRef.current);
       flushTimerRef.current = null;
     }
-    if (discard) bufferRef.current?.clear();
+    if (discard) {
+      bufferRef.current?.clear();
+      lastQueuedPointRef.current = null;
+      lastQueuedAtRef.current = 0;
+    }
   }, []);
 
   const stopTracking = useCallback((discard = true) => {
@@ -216,7 +256,7 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
         setError(null);
         setPermissionDenied(false);
 
-        bufferRef.current?.push(point);
+        maybeQueuePoint(point);
       },
       (cause) => {
         if (!trackingRef.current || generation !== watchGenerationRef.current) return;
@@ -250,8 +290,10 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
                   setConfidenceScore(fr.confidenceScore);
                   setQuality(acc <= 40 ? 'MEDIUM' : 'LOW');
                   setSignalStatus(acc <= 40 ? 'amber' : 'red');
+                  setLastUpdated(new Date());
+                  setIsStale(false);
                   setError(null);
-                  bufferRef.current?.push(resolvedPoint);
+                  maybeQueuePoint(resolvedPoint);
                   return;
                 }
               },
@@ -286,20 +328,6 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
         return;
       }
       watchIdRef.current = watchId;
-      flushTimerRef.current = setInterval(() => {
-        // If device is stationary (no movement-driven watch updates queued), keep-alive telemetry
-        if (trackingRef.current && latestPositionRef.current && !bufferRef.current?.hasPending()) {
-          bufferRef.current?.push({
-            ...latestPositionRef.current,
-            recordedAt: new Date().toISOString(),
-            speedMps: 0,
-          });
-        }
-        void flushBuffer().catch((cause: unknown) => {
-          if (generation !== watchGenerationRef.current) return;
-          setError(cause instanceof Error ? cause.message : 'Unable to send location updates. Will retry.');
-        });
-      }, intervalSec * 1000);
     } catch (cause) {
       const err = normalizeGeolocationError(cause);
       stopTracking();
@@ -307,7 +335,45 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
       setError(err.message);
       setSignalStatus('red');
     }
-  }, [flushBuffer, intervalSec, stopTracking]);
+  }, [maybeQueuePoint, stopTracking]);
+
+  // Dynamic flush & stationary heartbeat timer: responds to intervalSec changes (idle vs trip) without restarting watchPosition
+  useEffect(() => {
+    if (!isTracking) return;
+
+    flushTimerRef.current = setInterval(() => {
+      const nowMs = Date.now();
+      const hbSec = heartbeatSecRef.current;
+      const heartbeatDue = hbSec > 0 && nowMs - lastQueuedAtRef.current >= hbSec * 1000;
+      if (
+        trackingRef.current &&
+        latestPositionRef.current &&
+        !bufferRef.current?.hasPending() &&
+        heartbeatDue
+      ) {
+        const hbPoint: GeoPoint = {
+          ...latestPositionRef.current,
+          recordedAt: new Date(nowMs).toISOString(),
+          speedMps: 0,
+        };
+        bufferRef.current?.push(hbPoint);
+        lastQueuedPointRef.current = hbPoint;
+        lastQueuedAtRef.current = nowMs;
+      }
+      if (bufferRef.current?.hasPending()) {
+        void flushBuffer().catch((cause: unknown) => {
+          setError(cause instanceof Error ? cause.message : 'Unable to send location updates. Will retry.');
+        });
+      }
+    }, intervalSec * 1000);
+
+    return () => {
+      if (flushTimerRef.current !== null) {
+        clearInterval(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+    };
+  }, [isTracking, intervalSec, flushBuffer]);
 
   // Staleness monitor: if last update is older than 2x interval while tracking
   useEffect(() => {
@@ -349,7 +415,7 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
     let wakeLockSentinel: any = null;
 
     const requestWakeLock = async () => {
-      if ('wakeLock' in navigator && isTracking && document.visibilityState === 'visible') {
+      if ('wakeLock' in navigator && isTracking && wakeLockEnabled && document.visibilityState === 'visible') {
         try {
           wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
           wakeLockSentinel?.addEventListener?.('release', () => {
@@ -372,14 +438,14 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
       }
     };
 
-    if (isTracking) {
+    if (isTracking && wakeLockEnabled) {
       void requestWakeLock();
     } else {
       void releaseWakeLock();
     }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isTracking && !wakeLockSentinel) {
+      if (document.visibilityState === 'visible' && isTracking && wakeLockEnabled && !wakeLockSentinel) {
         void requestWakeLock();
       }
     };
@@ -390,7 +456,7 @@ export function useGeolocation({ intervalSec = 5, onFlush }: UseGeolocationOptio
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       void releaseWakeLock();
     };
-  }, [isTracking]);
+  }, [isTracking, wakeLockEnabled]);
 
   useEffect(() => () => stopWatch(), [stopWatch]);
 

@@ -89,7 +89,7 @@ interface VehicleOption {
 }
 
 interface DashboardConfig {
-  config?: { tripIntervalSec?: number };
+  config?: { tripIntervalSec?: number; idleIntervalSec?: number };
   sessionState: { activeTrip: ActiveTrip | null; activeSession: DriverSession | null };
   realtimeToken?: string | null;
 }
@@ -167,6 +167,8 @@ export default function DriverDashboardPage() {
   const [activeSession, setActiveSession] = useState<DriverSession | null>(null);
   const [offers, setOffers] = useState<DriverOffer[]>([]);
   const [tripIntervalSec, setTripIntervalSec] = useState(5);
+  const [idleIntervalSec, setIdleIntervalSec] = useState(25);
+  const lastPoolFetchLocationRef = useRef<string | undefined>('__UNLOADED__');
   const [isLoading, setIsLoading] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
   const [realtimeToken, setRealtimeToken] = useState<string | undefined>(undefined);
@@ -292,7 +294,10 @@ export default function DriverDashboardPage() {
     stopTracking,
     flushBuffer,
   } = useGeolocation({
-    intervalSec: tripIntervalSec,
+    intervalSec: activeTrip ? tripIntervalSec : idleIntervalSec,
+    wakeLockEnabled: Boolean(activeTrip),
+    minDistanceMeters: 15,
+    heartbeatIntervalSec: 50,
     onFlush: handleLocationFlush,
   });
 
@@ -425,6 +430,9 @@ export default function DriverDashboardPage() {
       if (config) {
         if (config.realtimeToken) setRealtimeToken(config.realtimeToken);
         if (config.config?.tripIntervalSec) setTripIntervalSec(config.config.tripIntervalSec);
+        if (config.config?.idleIntervalSec) {
+          setIdleIntervalSec(Math.max(20, config.config.idleIntervalSec));
+        }
         const trip = config.sessionState?.activeTrip || null;
         const sess = config.sessionState?.activeSession || null;
         setActiveTrip(trip);
@@ -460,35 +468,46 @@ export default function DriverDashboardPage() {
         setAssignedBookings(readSnapshot<AssignedBooking[]>('driver_bookings') ?? []);
       }
 
-      try {
-        const poolParams = new URLSearchParams({ status: 'AVAILABLE', limit: '30' });
-        if (selectedLocationId) poolParams.set('locationId', selectedLocationId);
+      const currentTripState = config
+        ? config.sessionState?.activeTrip || null
+        : (readSnapshot<ActiveTrip | null>('driver_active_trip') ?? null);
+      const shouldFetchPoolAndLocations =
+        !currentTripState || lastPoolFetchLocationRef.current !== selectedLocationId;
 
-        const [poolResult, locsResult] = await Promise.allSettled([
-          fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?${poolParams.toString()}`),
-          fetchJson<{ data: LocationOption[] }>('/api/locations'),
-        ]);
-        if (version === dashboardRequest.current) {
-          if (poolResult.status === 'fulfilled') {
-            const pool = poolResult.value?.data || [];
-            setPoolVehicles(pool);
-            writeSnapshot('driver_vehicle', pool);
-          } else {
-            console.error('[Driver Data Fetch Error] client pool vehicles:', poolResult.reason);
-            const cached = readSnapshot<VehicleOption[]>('driver_vehicle');
-            if (cached) setPoolVehicles(cached);
+      if (shouldFetchPoolAndLocations) {
+        try {
+          const poolParams = new URLSearchParams({ status: 'AVAILABLE', limit: '30' });
+          if (selectedLocationId) poolParams.set('locationId', selectedLocationId);
+
+          const [poolResult, locsResult] = await Promise.allSettled([
+            fetchJson<{ data: VehicleOption[] }>(`/api/vehicles?${poolParams.toString()}`),
+            fetchJson<{ data: LocationOption[] }>('/api/locations'),
+          ]);
+          if (version === dashboardRequest.current) {
+            if (poolResult.status === 'fulfilled' && locsResult.status === 'fulfilled') {
+              lastPoolFetchLocationRef.current = selectedLocationId;
+            }
+            if (poolResult.status === 'fulfilled') {
+              const pool = poolResult.value?.data || [];
+              setPoolVehicles(pool);
+              writeSnapshot('driver_vehicle', pool);
+            } else {
+              console.error('[Driver Data Fetch Error] client pool vehicles:', poolResult.reason);
+              const cached = readSnapshot<VehicleOption[]>('driver_vehicle');
+              if (cached) setPoolVehicles(cached);
+            }
+            if (locsResult.status === 'fulfilled' && locsResult.value?.data) {
+              setLocations(locsResult.value.data);
+              writeSnapshot('driver_locations', locsResult.value.data);
+            } else if (locsResult.status === 'rejected') {
+              console.error('[Driver Data Fetch Error] client locations:', locsResult.reason);
+              const cached = readSnapshot<LocationOption[]>('driver_locations');
+              if (cached) setLocations(cached);
+            }
           }
-          if (locsResult.status === 'fulfilled' && locsResult.value?.data) {
-            setLocations(locsResult.value.data);
-            writeSnapshot('driver_locations', locsResult.value.data);
-          } else if (locsResult.status === 'rejected') {
-            console.error('[Driver Data Fetch Error] client locations:', locsResult.reason);
-            const cached = readSnapshot<LocationOption[]>('driver_locations');
-            if (cached) setLocations(cached);
-          }
+        } catch (poolErr) {
+          console.error('[Driver Data Fetch Error] client pool vehicles/locations:', poolErr);
         }
-      } catch (poolErr) {
-        console.error('[Driver Data Fetch Error] client pool vehicles/locations:', poolErr);
       }
 
       try {
@@ -1013,7 +1032,7 @@ export default function DriverDashboardPage() {
                   </p>
                 ) : (
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
-                    Transmitting telemetry every {tripIntervalSec} seconds
+                    Transmitting telemetry every {activeTrip ? tripIntervalSec : idleIntervalSec} seconds
                   </p>
                 )}
               </div>

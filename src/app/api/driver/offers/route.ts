@@ -36,9 +36,9 @@ export const GET = withErrorHandling(async () => {
     return NextResponse.json({ data: [] });
   }
 
-  // Lazy sweep on read: advance expired offers before listing
+  // Lazy sweep on read: throttled cooldown + quick check before running full dispatch sweep
   try {
-    await dispatchSweep();
+    await dispatchSweep({ throttled: true });
   } catch (err: unknown) {
     console.error('[Driver Data Fetch Error] lazy dispatch sweep in driver offers:', err);
     logger.warn({

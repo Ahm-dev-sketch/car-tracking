@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { getSessionUser } from '@/lib/auth-guard';
 import { getClientContext } from '@/lib/request-context';
+import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { prisma } from '@/lib/prisma';
 import { logAuditEvent } from '@/server/audit';
 import { notifyAdmins } from '@/server/notifications/service';
@@ -21,7 +22,7 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.webp']);
 
-export async function POST(
+async function handleNotaDinasPost(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -300,3 +301,5 @@ export async function POST(
     );
   }
 }
+
+export const POST = withRateLimit(handleNotaDinasPost, RATE_LIMIT_CONFIG.UPLOAD);

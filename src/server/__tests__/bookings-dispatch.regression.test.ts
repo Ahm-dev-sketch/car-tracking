@@ -17,7 +17,7 @@ const db = vi.hoisted(() => ({
   driverSession: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   vehicle: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   vehicleAssignment: { findFirst: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
-  vehicleLocation: { findUnique: vi.fn(), updateMany: vi.fn() },
+  vehicleLocation: { findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
   trip: { findFirst: vi.fn() },
   user: { findUnique: vi.fn() },
 }));
@@ -236,7 +236,7 @@ describe('Dispatch offer creation', () => {
       vehicle,
       driver: { id: 'driver-1', licenseNumber: 'license', user: { id: 'driver-user', name: 'Driver', phone: null } },
     }]);
-    db.vehicleLocation.findUnique.mockResolvedValue({ lat: 1, lng: 1, receivedAt: new Date() });
+    db.vehicleLocation.findMany.mockResolvedValue([{ vehicleId: vehicle.id, lat: 1, lng: 1, receivedAt: new Date() }]);
     const result = await findEligibleCandidates('booking-1');
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0].vehicleId).toBe(vehicle.id);

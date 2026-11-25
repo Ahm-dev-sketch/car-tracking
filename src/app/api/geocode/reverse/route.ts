@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandling } from '@/lib/errors';
 import { getSessionUser } from '@/lib/auth-guard';
+import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
 const cache = new Map<string, { address: string; timestamp: number }>();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-export const GET = withErrorHandling(async (req: Request) => {
+export const GET = withRateLimit(
+  withErrorHandling(async (req: NextRequest) => {
   await getSessionUser();
 
   const { searchParams } = new URL(req.url);
@@ -100,4 +102,4 @@ export const GET = withErrorHandling(async (req: Request) => {
       },
     });
   }
-});
+}), RATE_LIMIT_CONFIG.GEOCODE);

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getCached, setCached } from '@/lib/server-cache';
 import { ensureVehicleAssignment } from '@/server/assignments/service';
 import { ApiError } from '@/lib/errors';
 import { logAuditEvent } from '@/server/audit';
@@ -244,29 +245,80 @@ export async function findEligibleCandidates(
     receivedAt: Date | null;
   }> = [];
 
+  const sessionDriverIds = Array.from(new Set(activeSessions.map((s) => s.driver.id)));
+  const sessionVehicleIds = Array.from(
+    new Set(
+      activeSessions
+        .map((s) => (s.vehicle ?? s.driver.currentVehicle)?.id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  const conflictWhere = {
+    id: { not: booking.id },
+    status: {
+      in: [
+        BookingStatus.APPROVED,
+        BookingStatus.DRIVER_ASSIGNED,
+        BookingStatus.DRIVER_EN_ROUTE,
+        BookingStatus.ARRIVED,
+        BookingStatus.IN_PROGRESS,
+      ],
+    },
+    departureAt: { lt: booking.expectedReturnAt },
+    expectedReturnAt: { gt: booking.departureAt },
+  };
+
+  const [driverConflicts, vehicleConflicts, vehicleLocations] =
+    activeSessions.length === 0
+      ? [[], [], []]
+      : await Promise.all([
+          prisma.booking.findMany({
+            where: {
+              driverId: { in: sessionDriverIds },
+              ...conflictWhere,
+            },
+            select: { driverId: true },
+          }),
+          sessionVehicleIds.length > 0
+            ? prisma.booking.findMany({
+                where: {
+                  vehicleId: { in: sessionVehicleIds },
+                  ...conflictWhere,
+                },
+                select: { vehicleId: true },
+              })
+            : Promise.resolve([]),
+          sessionVehicleIds.length > 0
+            ? prisma.vehicleLocation.findMany({
+                where: { vehicleId: { in: sessionVehicleIds } },
+              })
+            : Promise.resolve([]),
+        ]);
+
+  const conflictedDriverIds = new Set(
+    (driverConflicts ?? [])
+      .map((c) => c.driverId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const conflictedVehicleIds = new Set(
+    (vehicleConflicts ?? [])
+      .map((c) => c.vehicleId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const vehicleLocationMap = new Map(
+    (vehicleLocations ?? []).map((loc) => [loc.vehicleId, loc])
+  );
+
+  // In active standby sessions, stationary drivers waiting at hubs remain eligible
+  // within a 15-minute window even if browser GPS is throttled or stationary.
+  const standbyCutoff = new Date(Date.now() - 15 * 60 * 1000);
+
   for (const session of activeSessions) {
     const driver = session.driver;
 
     // Check if driver has conflicting active bookings
-    const driverConflict = await prisma.booking.findFirst({
-      where: {
-        driverId: driver.id,
-        id: { not: booking.id },
-        status: {
-          in: [
-            BookingStatus.APPROVED,
-            BookingStatus.DRIVER_ASSIGNED,
-            BookingStatus.DRIVER_EN_ROUTE,
-            BookingStatus.ARRIVED,
-            BookingStatus.IN_PROGRESS,
-          ],
-        },
-        departureAt: { lt: booking.expectedReturnAt },
-        expectedReturnAt: { gt: booking.departureAt },
-      },
-    });
-
-    if (driverConflict) {
+    if (conflictedDriverIds.has(driver.id)) {
       continue;
     }
 
@@ -301,36 +353,13 @@ export async function findEligibleCandidates(
     }
 
     // Check vehicle conflicting bookings
-    const vehicleConflict = await prisma.booking.findFirst({
-      where: {
-        vehicleId: vehicle.id,
-        id: { not: booking.id },
-        status: {
-          in: [
-            BookingStatus.APPROVED,
-            BookingStatus.DRIVER_ASSIGNED,
-            BookingStatus.DRIVER_EN_ROUTE,
-            BookingStatus.ARRIVED,
-            BookingStatus.IN_PROGRESS,
-          ],
-        },
-        departureAt: { lt: booking.expectedReturnAt },
-        expectedReturnAt: { gt: booking.departureAt },
-      },
-    });
-
-    if (vehicleConflict) {
+    if (conflictedVehicleIds.has(vehicle.id)) {
       continue;
     }
 
     // GPS location & freshness check
-    const vehicleLocation = await prisma.vehicleLocation.findUnique({
-      where: { vehicleId: vehicle.id },
-    });
+    const vehicleLocation = vehicleLocationMap.get(vehicle.id);
 
-    // In active standby sessions, stationary drivers waiting at hubs remain eligible
-    // within a 15-minute window even if browser GPS is throttled or stationary.
-    const standbyCutoff = new Date(Date.now() - 15 * 60 * 1000);
     const candidateFreshnessThreshold =
       session.status === DriverSessionStatus.ACTIVE ? standbyCutoff : freshnessThreshold;
 
@@ -999,7 +1028,37 @@ export async function rejectOffer(
   return { success: true, nextOfferEtaSec: DISPATCH_CONFIG.offerTimeoutSec };
 }
 
-export async function dispatchSweep() {
+const DISPATCH_SWEEP_CACHE_KEY = 'dispatch:sweep:cooldown';
+const DISPATCH_SWEEP_COOLDOWN_MS = 10_000;
+
+export async function dispatchSweep(options?: { throttled?: boolean }) {
+  if (options?.throttled) {
+    if (getCached<boolean>(DISPATCH_SWEEP_CACHE_KEY)) {
+      return { sweptAt: new Date().toISOString() };
+    }
+    setCached(DISPATCH_SWEEP_CACHE_KEY, true, DISPATCH_SWEEP_COOLDOWN_MS);
+
+    const checkNow = new Date();
+    const [expiredOffer, activeSearchBooking] = await Promise.all([
+      prisma.bookingOffer.findFirst({
+        where: { status: OfferStatus.SENT, expiresAt: { lte: checkNow } },
+        select: { id: true },
+      }),
+      prisma.booking.findFirst({
+        where: {
+          status: {
+            in: [BookingStatus.SEARCHING_DRIVER, BookingStatus.DRIVER_NOTIFIED],
+          },
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!expiredOffer && !activeSearchBooking) {
+      return { sweptAt: checkNow.toISOString() };
+    }
+  }
+
   const now = new Date();
 
   // (a) Expire SENT offers past expiresAt
@@ -1650,7 +1709,7 @@ export async function getAdminStats() {
     activeSessions,
     onTripDrivers,
     offlineDrivers,
-    bookings,
+    bookingGroups,
     locations,
   ] = await Promise.all([
     prisma.vehicle.findMany({
@@ -1671,12 +1730,9 @@ export async function getAdminStats() {
     }),
     prisma.driver.count({ where: { status: DriverStatus.ON_TRIP } }),
     prisma.driver.count({ where: { status: DriverStatus.OFFLINE } }),
-    prisma.booking.findMany({
-      select: {
-        id: true,
-        status: true,
-        operationalLocationId: true,
-      },
+    prisma.booking.groupBy({
+      by: ['status', 'operationalLocationId'],
+      _count: { _all: true },
     }),
     prisma.location.findMany({
       where: { isActive: true },
@@ -1700,30 +1756,41 @@ export async function getAdminStats() {
     offline: offlineDrivers,
   };
 
+  const sumBookings = (
+    predicate: (group: { status: BookingStatus; operationalLocationId: string }) => boolean
+  ) => bookingGroups.reduce((sum, group) => (predicate(group) ? sum + group._count._all : sum), 0);
+
+  const activeBookingStatuses = new Set<BookingStatus>([
+    BookingStatus.DRIVER_ASSIGNED,
+    BookingStatus.DRIVER_EN_ROUTE,
+    BookingStatus.ARRIVED,
+    BookingStatus.IN_PROGRESS,
+  ]);
+  const searchingStatuses = new Set<BookingStatus>([
+    BookingStatus.SEARCHING_DRIVER,
+    BookingStatus.DRIVER_NOTIFIED,
+  ]);
+  const unassignedStatuses = new Set<BookingStatus>([
+    BookingStatus.PENDING,
+    BookingStatus.NO_DRIVER_AVAILABLE,
+  ]);
+  const terminalStatuses = new Set<BookingStatus>([
+    BookingStatus.COMPLETED,
+    BookingStatus.CANCELLED,
+    BookingStatus.REJECTED,
+  ]);
+  const pendingStatuses = new Set<BookingStatus>([
+    BookingStatus.PENDING,
+    BookingStatus.SEARCHING_DRIVER,
+    BookingStatus.DRIVER_NOTIFIED,
+    BookingStatus.ADMIN_INTERVENTION,
+  ]);
+
   const bookingStats = {
-    active: bookings.filter((b) =>
-      (
-        [
-          BookingStatus.DRIVER_ASSIGNED,
-          BookingStatus.DRIVER_EN_ROUTE,
-          BookingStatus.ARRIVED,
-          BookingStatus.IN_PROGRESS,
-        ] as BookingStatus[]
-      ).includes(b.status)
-    ).length,
-    searching: bookings.filter((b) =>
-      (
-        [BookingStatus.SEARCHING_DRIVER, BookingStatus.DRIVER_NOTIFIED] as BookingStatus[]
-      ).includes(b.status)
-    ).length,
-    unassigned: bookings.filter((b) =>
-      (
-        [BookingStatus.PENDING, BookingStatus.NO_DRIVER_AVAILABLE] as BookingStatus[]
-      ).includes(b.status)
-    ).length,
-    adminIntervention: bookings.filter(
-      (b) => b.status === BookingStatus.ADMIN_INTERVENTION
-    ).length,
+    active: sumBookings((b) => activeBookingStatuses.has(b.status)),
+    searching: sumBookings((b) => searchingStatuses.has(b.status)),
+    unassigned: sumBookings((b) => unassignedStatuses.has(b.status)),
+    adminIntervention: sumBookings((b) => b.status === BookingStatus.ADMIN_INTERVENTION),
   };
 
   const byLocation = locations.map((loc) => {
@@ -1745,30 +1812,13 @@ export async function getAdminStats() {
       return v && (v.homeLocationId === loc.id || v.currentLocationId === loc.id);
     }).length;
 
-    const locBookings = bookings.filter(
-      (b) =>
-        b.operationalLocationId === loc.id &&
-        !(
-          [
-            BookingStatus.COMPLETED,
-            BookingStatus.CANCELLED,
-            BookingStatus.REJECTED,
-          ] as BookingStatus[]
-        ).includes(b.status)
-    ).length;
+    const locBookings = sumBookings(
+      (b) => b.operationalLocationId === loc.id && !terminalStatuses.has(b.status)
+    );
 
-    const locPending = bookings.filter(
-      (b) =>
-        b.operationalLocationId === loc.id &&
-        (
-          [
-            BookingStatus.PENDING,
-            BookingStatus.SEARCHING_DRIVER,
-            BookingStatus.DRIVER_NOTIFIED,
-            BookingStatus.ADMIN_INTERVENTION,
-          ] as BookingStatus[]
-        ).includes(b.status)
-    ).length;
+    const locPending = sumBookings(
+      (b) => b.operationalLocationId === loc.id && pendingStatuses.has(b.status)
+    );
 
     return {
       locationId: loc.id,

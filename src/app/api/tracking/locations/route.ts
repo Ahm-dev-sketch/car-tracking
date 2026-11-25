@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { withErrorHandling } from '@/lib/errors';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
 import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
@@ -6,6 +7,29 @@ import { locationIngestSchema, locationPointSchema } from '@/lib/validation';
 import { ingestLocations, LocationPointInput } from '@/server/tracking/service';
 import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
+
+async function trackingLocationKeyGenerator(req: NextRequest): Promise<string> {
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (secret) {
+    const isHttps =
+      req.nextUrl?.protocol === 'https:' ||
+      req.headers.get('x-forwarded-proto') === 'https';
+    try {
+      const token =
+        (await getToken({ req, secret, secureCookie: isHttps })) ??
+        (await getToken({ req, secret, secureCookie: !isHttps }));
+      const userId = (token?.userId as string | undefined) ?? token?.sub;
+      if (userId) {
+        return `loc:driver:${userId}`;
+      }
+    } catch {
+      // Fallback to client IP bucket when JWT cookie cannot be decoded
+    }
+  }
+  const forwarded = req.headers.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0].trim() : (req.headers.get('x-real-ip') ?? '127.0.0.1');
+  return `loc:ip:${ip}`;
+}
 
 export const POST = withRateLimit(
   withErrorHandling(async (req: NextRequest) => {
@@ -106,5 +130,8 @@ export const POST = withRateLimit(
       throw new ApiError(500, 'TRACKING_INGEST_ERROR', message);
     }
   }),
-  RATE_LIMIT_CONFIG.LOCATION_INGEST
+  {
+    ...RATE_LIMIT_CONFIG.LOCATION_INGEST,
+    keyGenerator: trackingLocationKeyGenerator,
+  }
 );

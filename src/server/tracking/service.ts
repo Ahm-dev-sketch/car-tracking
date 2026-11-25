@@ -211,9 +211,10 @@ export async function ingestLocations(
       if ((!currentTrip && !currentSession) || currentTrip?.id !== activeTrip?.id || currentVehicleId !== targetVehicleId || (!currentTrip && currentSession?.id !== activeSession?.id)) {
         throw new ApiError(409, 'TRACKING_SESSION_CHANGED', 'Tracking session changed during upload. Refresh the driver dashboard.');
       }
-      for (const p of accepted) {
-        await tx.driverLocation.create({
-          data: {
+      if (accepted.length > 0) {
+        const batchReceivedAt = new Date();
+        await tx.driverLocation.createMany({
+          data: accepted.map((p) => ({
             driverId,
             vehicleId: targetVehicleId,
             tripId: activeTrip?.id ?? null,
@@ -223,8 +224,8 @@ export async function ingestLocations(
             speedMps: p.speedMps ?? null,
             headingDeg: p.headingDeg ?? null,
             recordedAt: p.recordedAt,
-            receivedAt: new Date(),
-          },
+            receivedAt: batchReceivedAt,
+          })),
         });
       }
       const prevLocation = await tx.vehicleLocation.findUnique({

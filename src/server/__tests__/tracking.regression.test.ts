@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({
   trip: { findFirst: vi.fn() },
   driverSession: { findFirst: vi.fn() },
-  driverLocation: { create: vi.fn() },
+  driverLocation: { createMany: vi.fn() },
   vehicleLocation: { findUnique: vi.fn(), upsert: vi.fn(), updateMany: vi.fn() },
   vehicle: { findUnique: vi.fn(), findMany: vi.fn() },
   booking: { findFirst: vi.fn(), findMany: vi.fn() },
@@ -37,7 +37,7 @@ describe('Tracking domain regressions (no database)', () => {
   it('requires an active trip or tracking session before accepting coordinates', async () => {
     db.driverSession.findFirst.mockResolvedValue(null);
     await expect(ingestLocations('driver', [point()])).rejects.toMatchObject({ status: 403, code: 'TRACKING_SESSION_REQUIRED' });
-    expect(db.driverLocation.create).not.toHaveBeenCalled();
+    expect(db.driverLocation.createMany).not.toHaveBeenCalled();
   });
 
   it('uses the idle cadence for idle-session points, rather than the trip cadence', async () => {
@@ -57,7 +57,7 @@ describe('Tracking domain regressions (no database)', () => {
     const result = await ingestLocations('driver', [{ ...point(), ...invalid }]);
     expect(result.accepted).toBe(0);
     expect(result.rejected).toHaveLength(1);
-    expect(db.driverLocation.create).not.toHaveBeenCalled();
+    expect(db.driverLocation.createMany).not.toHaveBeenCalled();
     expect(publish).not.toHaveBeenCalled();
   });
 
@@ -65,7 +65,7 @@ describe('Tracking domain regressions (no database)', () => {
     const p = point();
     db.vehicleLocation.findUnique.mockResolvedValue({ ...p, recordedAt: new Date(p.recordedAt.getTime() + 1000) });
     expect((await ingestLocations('driver', [p])).accepted).toBe(1);
-    expect(db.driverLocation.create).toHaveBeenCalled();
+    expect(db.driverLocation.createMany).toHaveBeenCalledTimes(1);
     expect(db.$queryRaw).toHaveBeenCalled();
     expect(db.vehicleLocation.upsert).not.toHaveBeenCalled();
     expect(publish).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe('Tracking domain regressions (no database)', () => {
   it('does not revive an offline snapshot when the session ends during upload', async () => {
     db.driverSession.findFirst.mockResolvedValueOnce({ id: 'session', vehicleId: 'vehicle', driver: { currentVehicleId: 'vehicle' } }).mockResolvedValue(null);
     await expect(ingestLocations('driver', [point()])).rejects.toMatchObject({ code: 'TRACKING_SESSION_CHANGED' });
-    expect(db.driverLocation.create).not.toHaveBeenCalled();
+    expect(db.driverLocation.createMany).not.toHaveBeenCalled();
     expect(db.vehicleLocation.upsert).not.toHaveBeenCalled();
     expect(publish).not.toHaveBeenCalled();
   });

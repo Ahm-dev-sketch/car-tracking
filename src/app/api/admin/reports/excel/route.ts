@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { withErrorHandling } from '@/lib/errors';
+import { withRateLimit, RATE_LIMIT_CONFIG } from '@/lib/rate-limit';
 import { getSessionUser, requireRole } from '@/lib/auth-guard';
 import { prisma } from '@/lib/prisma';
 import ExcelJS from 'exceljs';
@@ -45,7 +46,8 @@ function formatStatus(status: BookingStatus): string {
   return map[status] || status;
 }
 
-export const GET = withErrorHandling(async (req: NextRequest) => {
+export const GET = withRateLimit(
+  withErrorHandling(async (req: NextRequest) => {
   const user = await getSessionUser();
   requireRole(user, 'ADMIN');
 
@@ -112,6 +114,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       },
     },
     orderBy: { departureAt: 'asc' },
+    take: 1000,
   });
 
   // Calculate base URL for absolute hyperlinks
@@ -252,67 +255,73 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     worksheet.getColumn(colNumber).width = h.width;
   });
 
-  // 4. Pre-fetch Nota Dinas photos in parallel (local files or private Supabase objects via signed URLs)
+  // 4. Pre-fetch Nota Dinas photos in small concurrent chunks (max 5 simultaneous) to stay within serverless memory & timeout limits
   const photoMap = new Map<string, { buffer: Buffer; extension: 'png' | 'jpeg' }>();
   const publicUploadsDir = path.resolve(process.cwd(), 'public', 'uploads');
+  const PHOTO_CONCURRENCY = 5;
 
-  await Promise.all(
-    bookings.map(async (b) => {
-      if (!b.notaDinasUrl) return;
+  const bookingsWithPhotos = bookings.filter((b) => {
+    if (!b.notaDinasUrl) return false;
+    const isPdf =
+      b.notaDinasUrl.toLowerCase().endsWith('.pdf') ||
+      Boolean(b.notaDinasFilename && b.notaDinasFilename.toLowerCase().endsWith('.pdf'));
+    return !isPdf;
+  });
 
-      const isPdf =
-        Boolean(b.notaDinasUrl && b.notaDinasUrl.toLowerCase().endsWith('.pdf')) ||
-        Boolean(b.notaDinasFilename && b.notaDinasFilename.toLowerCase().endsWith('.pdf'));
+  for (let i = 0; i < bookingsWithPhotos.length; i += PHOTO_CONCURRENCY) {
+    const batch = bookingsWithPhotos.slice(i, i + PHOTO_CONCURRENCY);
+    await Promise.all(
+      batch.map(async (b) => {
+        if (!b.notaDinasUrl) return;
 
-      if (isPdf) return;
+        try {
+          let rawBuf: Buffer | null = null;
 
-      try {
-        let rawBuf: Buffer | null = null;
-
-        // Local filesystem fallback: read only inside public/uploads
-        if (b.notaDinasUrl.startsWith('/uploads/')) {
-          const diskPath = path.resolve(process.cwd(), 'public', b.notaDinasUrl.replace(/^\/+/, ''));
-          if (diskPath.startsWith(publicUploadsDir) && fs.existsSync(diskPath)) {
-            rawBuf = await fs.promises.readFile(diskPath);
-          }
-        } else {
-          // Supabase private object key: fetch via short-lived signed URL
-          const signedUrl = await getSignedStorageUrl('nota-dinas', b.notaDinasUrl, 60);
-          if (signedUrl) {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 6000);
-            try {
-              const resp = await fetch(signedUrl, { signal: controller.signal });
-              if (resp.ok) {
-                const arrayBuffer = await resp.arrayBuffer();
-                rawBuf = Buffer.from(arrayBuffer);
+          // Local filesystem fallback: read only inside public/uploads
+          if (b.notaDinasUrl.startsWith('/uploads/')) {
+            const diskPath = path.resolve(process.cwd(), 'public', b.notaDinasUrl.replace(/^\/+/, ''));
+            if (diskPath.startsWith(publicUploadsDir) && fs.existsSync(diskPath)) {
+              rawBuf = await fs.promises.readFile(diskPath);
+            }
+          } else {
+            // Supabase private object key: fetch via short-lived signed URL
+            const signedUrl = await getSignedStorageUrl('nota-dinas', b.notaDinasUrl, 60);
+            if (signedUrl) {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 6000);
+              try {
+                const resp = await fetch(signedUrl, { signal: controller.signal });
+                if (resp.ok) {
+                  const arrayBuffer = await resp.arrayBuffer();
+                  rawBuf = Buffer.from(arrayBuffer);
+                }
+              } catch {
+                // ignore fetch failure, leave rawBuf null
+              } finally {
+                clearTimeout(timeoutId);
               }
-            } catch {
-              // ignore fetch failure, leave rawBuf null
-            } finally {
-              clearTimeout(timeoutId);
             }
           }
-        }
 
-        if (rawBuf && rawBuf.length > 0) {
-          try {
-            const resized = await sharp(rawBuf)
-              .resize({ width: 220, height: 110, fit: 'inside', withoutEnlargement: true })
-              .png()
-              .toBuffer();
-            photoMap.set(b.id, { buffer: resized, extension: 'png' });
-          } catch {
-            // Fallback to raw buffer
-            const isPng = rawBuf[0] === 0x89 && rawBuf[1] === 0x50;
-            photoMap.set(b.id, { buffer: rawBuf, extension: isPng ? 'png' : 'jpeg' });
+          if (rawBuf && rawBuf.length > 0) {
+            try {
+              const resized = await sharp(rawBuf)
+                .resize({ width: 220, height: 110, fit: 'inside', withoutEnlargement: true })
+                .png()
+                .toBuffer();
+              photoMap.set(b.id, { buffer: resized, extension: 'png' });
+            } catch {
+              // Fallback to raw buffer
+              const isPng = rawBuf[0] === 0x89 && rawBuf[1] === 0x50;
+              photoMap.set(b.id, { buffer: rawBuf, extension: isPng ? 'png' : 'jpeg' });
+            }
           }
+        } catch (err) {
+          console.warn(`[Excel Export] Failed to fetch photo for booking ${b.bookingNumber}:`, err);
         }
-      } catch (err) {
-        console.warn(`[Excel Export] Failed to fetch photo for booking ${b.bookingNumber}:`, err);
-      }
-    })
-  );
+      })
+    );
+  }
 
   // 5. Data Rows
   for (let index = 0; index < bookings.length; index++) {
@@ -467,4 +476,4 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       'Cache-Control': 'no-store, max-age=0',
     },
   });
-});
+}), RATE_LIMIT_CONFIG.REPORT_EXPORT);

@@ -22,7 +22,7 @@ import {
   ALL_HUBS_CORRIDOR_ZOOM,
 } from '@/lib/operational-locations';
 
-type TrackingRow = Pick<VehicleMarkerData, 'vehicleId' | 'plateNumber' | 'brand' | 'model' | 'status' | 'homeLocation'> & {
+type TrackingRow = Pick<VehicleMarkerData, 'vehicleId' | 'plateNumber' | 'brand' | 'model' | 'status' | 'homeLocation' | 'activeRelocation'> & {
   driver?: { name: string; phone: string } | null;
   location: Pick<VehicleMarkerData, 'lat' | 'lng' | 'accuracyM' | 'speedMps' | 'headingDeg' | 'recordedAt' | 'movement'>;
   currentLocationInfo?: VehicleMarkerData['currentOperationalLocation'];
@@ -104,6 +104,13 @@ function AdminFleetMapContent() {
             movement: r.location.movement || 'STOPPED',
             homeLocation: r.homeLocation || null,
             currentOperationalLocation: r.currentLocationInfo || null,
+            activeRelocation: r.activeRelocation || null,
+            tripOrigin: r.activeRelocation
+              ? `${r.activeRelocation.fromLocation.name} (${r.activeRelocation.fromLocation.code})`
+              : null,
+            tripDestination: r.activeRelocation
+              ? `${r.activeRelocation.toLocation.name} (${r.activeRelocation.toLocation.code})`
+              : null,
           }));
 
         // Load registered fleet units to ensure ALL units (Available, Inactive, Maintenance, etc.)
@@ -567,6 +574,22 @@ function AdminFleetMapContent() {
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {selectedVehicle.activeRelocation && (
+                    <div className="space-y-1.5 rounded-xl border border-brand-200 bg-brand-50/70 p-3 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-brand-700">
+                          {t.adminPages.fleet.relocationTag}
+                        </span>
+                        <span className="font-mono text-[11px] font-semibold text-brand-800">
+                          {selectedVehicle.activeRelocation.relocationCode}
+                        </span>
+                      </div>
+                      <div className="font-semibold text-slate-900">
+                        {selectedVehicle.activeRelocation.fromLocation.name} → {selectedVehicle.activeRelocation.toLocation.name}
+                      </div>
                     </div>
                   )}
 

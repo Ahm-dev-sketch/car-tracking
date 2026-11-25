@@ -79,6 +79,8 @@ describe('i18n dictionaries & helpers', () => {
       'IN_USE',
       'MAINTENANCE',
       'INACTIVE',
+      'SCHEDULED',
+      'IN_TRANSIT',
       'OFFLINE',
       'ONLINE',
       'ON_TRIP',

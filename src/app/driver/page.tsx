@@ -22,6 +22,7 @@ import { saveSnapshot, getSnapshot, enqueueOfflineAction, processOfflineQueue } 
 import { TripCommunicationWidget } from '@/components/communication/TripCommunicationWidget';
 import { useTranslation } from '@/components/providers/LanguageProvider';
 import { translateStatus } from '@/lib/i18n';
+import { formatBookingDateTime } from '@/lib/booking-time';
 
 interface ActiveTrip {
   id: string;
@@ -110,6 +111,24 @@ interface DriverSession {
   } | null;
 }
 
+interface DriverRelocation {
+  id: string;
+  relocationCode: string;
+  status: 'SCHEDULED' | 'IN_TRANSIT' | string;
+  scheduledAt: string;
+  departedAt?: string | null;
+  notes?: string | null;
+  vehicle: {
+    id: string;
+    plateNumber: string;
+    brand: string;
+    model: string;
+    status: string;
+  };
+  fromLocation: LocationOption;
+  toLocation: LocationOption;
+}
+
 // Offline-first safe cache read/write (storage failures are non-fatal to the driver flow)
 function readSnapshot<T>(key: string): T | null {
   try {
@@ -189,6 +208,15 @@ export default function DriverDashboardPage() {
   const [matchingVehicles, setMatchingVehicles] = useState<VehicleOption[]>([]);
   const [poolVehicles, setPoolVehicles] = useState<VehicleOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [relocations, setRelocations] = useState<DriverRelocation[]>([]);
+  const [relocationActionId, setRelocationActionId] = useState<string | null>(null);
+  const [relocationNotice, setRelocationNotice] = useState<string | null>(null);
+  const [confirmCompleteRelocation, setConfirmCompleteRelocation] = useState<DriverRelocation | null>(null);
+
+  const inTransitRelocation = useMemo(
+    () => relocations.find((r) => r.status === 'IN_TRANSIT') ?? null,
+    [relocations]
+  );
 
   // Instant render (stale-while-revalidate): seed from last-known snapshots on mount
   // so an active trip / assignments never flash as empty; loadDashboardData revalidates.
@@ -206,6 +234,8 @@ export default function DriverDashboardPage() {
     if (cachedVehicles && cachedVehicles.length > 0) setPoolVehicles(cachedVehicles);
     const cachedLocations = getSnapshot<LocationOption[]>('driver_locations');
     if (cachedLocations && cachedLocations.length > 0) setLocations(cachedLocations);
+    const cachedRelocations = getSnapshot<DriverRelocation[]>('driver_relocations');
+    if (cachedRelocations && cachedRelocations.length > 0) setRelocations(cachedRelocations);
   }, [status]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleOption | null>(null);
@@ -301,8 +331,8 @@ export default function DriverDashboardPage() {
     stopTracking,
     flushBuffer,
   } = useGeolocation({
-    intervalSec: activeTrip ? tripIntervalSec : idleIntervalSec,
-    wakeLockEnabled: Boolean(activeTrip),
+    intervalSec: activeTrip || inTransitRelocation ? tripIntervalSec : idleIntervalSec,
+    wakeLockEnabled: Boolean(activeTrip || inTransitRelocation),
     minDistanceMeters: 15,
     heartbeatIntervalSec: 50,
     onFlush: handleLocationFlush,
@@ -473,6 +503,17 @@ export default function DriverDashboardPage() {
       } catch (bookErr) {
         console.error('[Driver Data Fetch Error] client /api/bookings:', bookErr);
         setAssignedBookings(readSnapshot<AssignedBooking[]>('driver_bookings') ?? []);
+      }
+
+      try {
+        const relRes = await fetchJson<{ data: DriverRelocation[] }>('/api/driver/relocations');
+        if (version !== dashboardRequest.current) return;
+        const relList = Array.isArray(relRes?.data) ? relRes.data : [];
+        setRelocations(relList);
+        writeSnapshot('driver_relocations', relList);
+      } catch (relErr) {
+        console.error('[Driver Data Fetch Error] client /api/driver/relocations:', relErr);
+        setRelocations(readSnapshot<DriverRelocation[]>('driver_relocations') ?? []);
       }
 
       const currentTripState = config
@@ -749,6 +790,83 @@ export default function DriverDashboardPage() {
     setOffers((prev) => prev.filter((o) => o.id !== offerId));
   };
 
+  const resolveOptionalCoords = async (): Promise<{ lat?: number; lng?: number }> => {
+    if (currentPosition && Number.isFinite(currentPosition.lat) && Number.isFinite(currentPosition.lng)) {
+      return { lat: currentPosition.lat, lng: currentPosition.lng };
+    }
+    try {
+      const pos = await getCurrentPosition({ allowCached: true });
+      return { lat: pos.lat, lng: pos.lng };
+    } catch {
+      return {};
+    }
+  };
+
+  const handleStartRelocation = async (rel: DriverRelocation) => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    setRelocationActionId(rel.id);
+    setActionError(null);
+    setRelocationNotice(null);
+    try {
+      const coords = await resolveOptionalCoords();
+      await fetchJson(`/api/admin/relocations/${rel.id}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startLat: coords.lat,
+          startLng: coords.lng,
+        }),
+      });
+      startTracking();
+      setRelocationNotice(
+        format(tRef.current.driverPages.console.relocationStartedNotice, { code: rel.relocationCode })
+      );
+      await loadDashboardData();
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : tRef.current.driverPages.console.relocationActionError
+      );
+    } finally {
+      setRelocationActionId(null);
+      actionInFlight.current = false;
+    }
+  };
+
+  const handleCompleteRelocationConfirm = async () => {
+    const target = confirmCompleteRelocation;
+    if (!target || actionInFlight.current) return;
+    actionInFlight.current = true;
+    setRelocationActionId(target.id);
+    setActionError(null);
+    setRelocationNotice(null);
+    try {
+      const coords = await resolveOptionalCoords();
+      await fetchJson(`/api/admin/relocations/${target.id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endLat: coords.lat,
+          endLng: coords.lng,
+        }),
+      });
+      setConfirmCompleteRelocation(null);
+      setRelocationNotice(
+        format(tRef.current.driverPages.console.relocationCompletedNotice, {
+          hub: `${target.toLocation.name} (${target.toLocation.code})`,
+        })
+      );
+      await loadDashboardData();
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : tRef.current.driverPages.console.relocationActionError
+      );
+    } finally {
+      setRelocationActionId(null);
+      actionInFlight.current = false;
+    }
+  };
+
   // Vehicle plate search autocomplete
   const searchVehicle = async (term: string, locId = selectedLocationId) => {
     const version = ++vehicleSearchRequest.current;
@@ -977,7 +1095,7 @@ export default function DriverDashboardPage() {
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <button
             type="button"
-            disabled={isTogglingOnline || isStartingTrip || isLoading || Boolean(activeTrip)}
+            disabled={isTogglingOnline || isStartingTrip || isLoading || Boolean(activeTrip) || Boolean(inTransitRelocation)}
             onClick={handleToggleOnline}
             className={`${
               isOnline
@@ -989,7 +1107,7 @@ export default function DriverDashboardPage() {
             {isOnline ? t.driverPages.console.onlineGoOfflineBtn : t.driverPages.console.goOnlineBtn}
           </button>
           <p className="text-xs font-medium leading-relaxed text-slate-500">
-            {activeTrip
+            {activeTrip || inTransitRelocation
               ? t.driverPages.console.finishBeforeOfflineHint
               : isOnline
               ? t.driverPages.console.sharingOnHint
@@ -1181,6 +1299,53 @@ export default function DriverDashboardPage() {
 
       {!activeTrip && <IosInstallHint />}
 
+
+      {relocationNotice && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-xs font-medium text-success-800">
+          <div className="flex items-center gap-2">
+            <Icon name="check" className="size-4 shrink-0 text-success-600" />
+            <span>{relocationNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRelocationNotice(null)}
+            className="cursor-pointer rounded px-2 py-1 text-xs font-semibold text-success-700 hover:bg-success-100"
+          >
+            {t.common.close}
+          </button>
+        </div>
+      )}
+
+      {inTransitRelocation && !activeTrip && (
+        <div className="driver-live-banner">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
+                <span
+                  className={`absolute inset-0 rounded-full ${
+                    isSignalLostOrStale ? 'bg-warning-600' : 'bg-success-600'
+                  }`}
+                />
+                {!isSignalLostOrStale && (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-success-600 opacity-60" />
+                )}
+              </span>
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-brand-700">
+                  {t.driverPages.console.relocationEyebrow} · {inTransitRelocation.relocationCode}
+                </div>
+                <div className="text-sm font-semibold text-slate-900">
+                  {inTransitRelocation.vehicle.plateNumber} ({inTransitRelocation.fromLocation.name} → {inTransitRelocation.toLocation.name})
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
+              <MovementBadge movement={movement} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {actionError && (
         <ErrorBanner
@@ -1539,6 +1704,102 @@ export default function DriverDashboardPage() {
       ) : (
         /* NO ACTIVE TRIP: START TRIP INTERFACE */
         <div className="space-y-3.5 lg:space-y-4">
+          {/* Assigned Vehicle Relocations */}
+          {relocations.length > 0 && (
+            <section className="surface space-y-4 border-brand-200 p-4 sm:p-5" aria-label={t.driverPages.console.relocationHeading}>
+              <div>
+                <p className="eyebrow">{t.driverPages.console.relocationEyebrow}</p>
+                <h2 className="section-title mt-2 flex flex-wrap items-center gap-2">
+                  {t.driverPages.console.relocationHeading}
+                  <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-brand-700">
+                    {relocations.length}
+                  </span>
+                </h2>
+                <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
+                  {t.driverPages.console.relocationSub}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+                {relocations.map((rel) => {
+                  const busy = relocationActionId === rel.id;
+                  return (
+                    <div
+                      key={rel.id}
+                      className="flex min-w-0 flex-col justify-between gap-4 rounded-xl border border-brand-200 bg-white p-4"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-700 tabular-nums">
+                            {rel.relocationCode}
+                          </span>
+                          <StatusBadge status={rel.status} />
+                        </div>
+
+                        <div className="rounded-lg border border-brand-100 bg-brand-50/50 px-3 py-2.5">
+                          <div className="text-[10px] font-semibold uppercase tracking-wider text-brand-700">
+                            {t.driverPages.console.relocationRouteLabel}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-900">
+                            <span>{rel.fromLocation.name} ({rel.fromLocation.code})</span>
+                            <Icon name="arrow" className="size-4 text-brand-600" />
+                            <span>{rel.toLocation.name} ({rel.toLocation.code})</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                          <Icon name="car" className="size-4 shrink-0 text-slate-400" />
+                          <span className="font-mono font-semibold text-slate-900">{rel.vehicle.plateNumber}</span>
+                          <span>
+                            ({rel.vehicle.brand} {rel.vehicle.model})
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-medium text-slate-600 tabular-nums">
+                          <div>
+                            {t.driverPages.console.relocationScheduledLabel}: {formatBookingDateTime(rel.scheduledAt, locale)}
+                          </div>
+                          {rel.departedAt && (
+                            <div>
+                              {t.driverPages.console.relocationDepartedLabel}: {formatBookingDateTime(rel.departedAt, locale)}
+                            </div>
+                          )}
+                          {rel.notes && (
+                            <div className="border-t border-slate-200 pt-1 text-slate-500">
+                              {t.driverPages.console.relocationNotesLabel}: {rel.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {rel.status === 'SCHEDULED' ? (
+                        <button
+                          type="button"
+                          disabled={busy || Boolean(inTransitRelocation)}
+                          onClick={() => handleStartRelocation(rel)}
+                          className="button-primary w-full"
+                        >
+                          {busy ? <Spinner size="sm" /> : <Icon name="arrow" />}
+                          <span>{t.driverPages.console.relocationStartBtn}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setConfirmCompleteRelocation(rel)}
+                          className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-success-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-success-700 disabled:opacity-50"
+                        >
+                          {busy ? <Spinner size="sm" /> : <Icon name="check" />}
+                          <span>{t.driverPages.console.relocationCompleteBtn}</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {/* Assigned bookings */}
           <section className="surface space-y-4 p-4 sm:p-5" aria-label={t.driverPages.console.assignedBookingsAria}>
             <div>
@@ -1926,6 +2187,24 @@ export default function DriverDashboardPage() {
           </section>
         </div>
       )}
+
+      {/* Confirmation dialog to complete inter-hub relocation */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmCompleteRelocation)}
+        onClose={() => setConfirmCompleteRelocation(null)}
+        onConfirm={handleCompleteRelocationConfirm}
+        title={t.driverPages.console.relocationConfirmCompleteTitle}
+        message={
+          confirmCompleteRelocation
+            ? format(t.driverPages.console.relocationConfirmCompleteMessage, {
+                plate: confirmCompleteRelocation.vehicle.plateNumber,
+                hub: `${confirmCompleteRelocation.toLocation.name} (${confirmCompleteRelocation.toLocation.code})`,
+              })
+            : ''
+        }
+        confirmLabel={t.driverPages.console.relocationCompleteBtn}
+        isLoading={Boolean(confirmCompleteRelocation && relocationActionId === confirmCompleteRelocation.id)}
+      />
 
       {/* Confirmation dialog to end trip */}
       <ConfirmDialog

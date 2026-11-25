@@ -88,6 +88,9 @@ const statusStyles: Record<string, string> = {
   ON_TRIP: success,
   ACTIVE: success,
   ABORTED: danger,
+  // Relocation
+  SCHEDULED: warning,
+  IN_TRANSIT: success,
 };
 
 /** States that represent a live, moving signal and earn the telemetry dot. */
@@ -97,6 +100,7 @@ const liveStates = new Set([
   'IN_PROGRESS',
   'DRIVER_EN_ROUTE',
   'ONLINE',
+  'IN_TRANSIT',
 ]);
 
 const dangerStates = new Set(['REJECTED', 'ABORTED']);

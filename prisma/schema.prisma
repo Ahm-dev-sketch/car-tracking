@@ -93,6 +93,13 @@ enum MovementStatus {
   OFFLINE
 }
 
+enum RelocationStatus {
+  SCHEDULED
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
 model Location {
   id        String   @id @default(cuid())
   name      String
@@ -103,9 +110,11 @@ model Location {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  homeVehicles               Vehicle[] @relation("VehicleHomeLocation")
-  currentVehicles            Vehicle[] @relation("VehicleCurrentLocation")
+  homeVehicles               Vehicle[]           @relation("VehicleHomeLocation")
+  currentVehicles            Vehicle[]           @relation("VehicleCurrentLocation")
   bookings                   Booking[]
+  relocationsFrom            VehicleRelocation[] @relation("RelocationFromLocation")
+  relocationsTo              VehicleRelocation[] @relation("RelocationToLocation")
 
   @@index([code])
   @@map("locations")
@@ -139,6 +148,7 @@ model User {
   auditLogs     AuditLog[]
   bookings      Booking[]
   notifications Notification[]
+  relocations   VehicleRelocation[] @relation("RelocationCreatedBy")
 
   @@index([roleId])
   @@map("users")
@@ -171,6 +181,7 @@ model Vehicle {
   currentLocation   VehicleLocation?
   driverLocations   DriverLocation[]
   driverSessions    DriverSession[]
+  relocations       VehicleRelocation[]
 
   @@index([status])
   @@index([seatingCapacity])
@@ -198,6 +209,7 @@ model Driver {
   driverLocations  DriverLocation[]
   sessions         DriverSession[]
   offers           BookingOffer[]
+  relocations      VehicleRelocation[]
 
   @@map("drivers")
 }
@@ -436,4 +448,34 @@ model DriverSession {
   @@index([driverId, status])
   @@index([vehicleId])
   @@map("driver_sessions")
+}
+
+model VehicleRelocation {
+  id             String           @id @default(cuid())
+  relocationCode String           @unique @map("relocation_code")
+  vehicleId      String           @map("vehicle_id")
+  vehicle        Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driverId       String?          @map("driver_id")
+  driver         Driver?          @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  fromLocationId String           @map("from_location_id")
+  fromLocation   Location         @relation("RelocationFromLocation", fields: [fromLocationId], references: [id], onDelete: Restrict)
+  toLocationId   String           @map("to_location_id")
+  toLocation     Location         @relation("RelocationToLocation", fields: [toLocationId], references: [id], onDelete: Restrict)
+  status         RelocationStatus @default(SCHEDULED)
+  scheduledAt    DateTime         @map("scheduled_at")
+  departedAt     DateTime?        @map("departed_at")
+  completedAt    DateTime?        @map("completed_at")
+  notes          String?
+  createdById    String           @map("created_by_id")
+  createdBy      User             @relation("RelocationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, scheduledAt])
+  @@index([vehicleId, status])
+  @@index([driverId, status])
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@index([createdById])
+  @@map("vehicle_relocations")
 }

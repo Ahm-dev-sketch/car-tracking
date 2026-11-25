@@ -644,4 +644,129 @@ export function serializeEvent(event: ServerRealtimeMessage): string {
   return JSON.stringify(event);
 }
 
+export const relocationStatusEnum = z.enum([
+  'SCHEDULED',
+  'IN_TRANSIT',
+  'COMPLETED',
+  'CANCELLED',
+]);
+
+export const createRelocationSchema = z
+  .object({
+    vehicle_id: z.string().trim().min(1).optional(),
+    vehicleId: z.string().trim().min(1).optional(),
+    driver_id: z.string().trim().min(1).optional().nullable(),
+    driverId: z.string().trim().min(1).optional().nullable(),
+    from_location_id: z.string().trim().min(1).optional().nullable(),
+    fromLocationId: z.string().trim().min(1).optional().nullable(),
+    to_location_id: z.string().trim().min(1).optional(),
+    toLocationId: z.string().trim().min(1).optional(),
+    scheduled_at: z.coerce.date().optional(),
+    scheduledAt: z.coerce.date().optional(),
+    start_immediately: z.boolean().optional(),
+    startImmediately: z.boolean().optional(),
+    notes: z.string().trim().max(500).optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const vehicleId = data.vehicle_id ?? data.vehicleId;
+    if (!vehicleId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'vehicleId is required',
+        path: ['vehicleId'],
+      });
+    }
+
+    const toLocationId = data.to_location_id ?? data.toLocationId;
+    if (!toLocationId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'toLocationId is required',
+        path: ['toLocationId'],
+      });
+    }
+
+    const fromLocationId = data.from_location_id ?? data.fromLocationId;
+    if (fromLocationId && toLocationId && fromLocationId === toLocationId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Destination hub must be different from origin hub',
+        path: ['toLocationId'],
+      });
+    }
+
+    const startImmediately = data.start_immediately ?? data.startImmediately ?? false;
+    const driverId = data.driver_id ?? data.driverId;
+    if (startImmediately && !driverId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Driver is required when starting relocation immediately',
+        path: ['driverId'],
+      });
+    }
+
+    const scheduled = data.scheduled_at ?? data.scheduledAt;
+    if (scheduled && Number.isNaN(scheduled.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid scheduledAt timestamp',
+        path: ['scheduledAt'],
+      });
+    }
+  })
+  .transform((data) => ({
+    vehicleId: (data.vehicle_id ?? data.vehicleId)!,
+    driverId: data.driver_id ?? data.driverId ?? null,
+    fromLocationId: data.from_location_id ?? data.fromLocationId ?? null,
+    toLocationId: (data.to_location_id ?? data.toLocationId)!,
+    scheduledAt: data.scheduled_at ?? data.scheduledAt ?? new Date(),
+    startImmediately: data.start_immediately ?? data.startImmediately ?? false,
+    notes: data.notes ?? null,
+  }));
+
+export const startRelocationSchema = z
+  .object({
+    driver_id: z.string().trim().min(1).optional().nullable(),
+    driverId: z.string().trim().min(1).optional().nullable(),
+    start_lat: z.coerce.number().min(-90).max(90).optional().nullable(),
+    startLat: z.coerce.number().min(-90).max(90).optional().nullable(),
+    start_lng: z.coerce.number().min(-180).max(180).optional().nullable(),
+    startLng: z.coerce.number().min(-180).max(180).optional().nullable(),
+  })
+  .transform((data) => ({
+    driverId: data.driver_id ?? data.driverId ?? null,
+    startLat: data.start_lat ?? data.startLat ?? null,
+    startLng: data.start_lng ?? data.startLng ?? null,
+  }));
+
+export const completeRelocationSchema = z
+  .object({
+    end_lat: z.coerce.number().min(-90).max(90).optional().nullable(),
+    endLat: z.coerce.number().min(-90).max(90).optional().nullable(),
+    end_lng: z.coerce.number().min(-180).max(180).optional().nullable(),
+    endLng: z.coerce.number().min(-180).max(180).optional().nullable(),
+    notes: z.string().trim().max(500).optional().nullable(),
+  })
+  .transform((data) => ({
+    endLat: data.end_lat ?? data.endLat ?? null,
+    endLng: data.end_lng ?? data.endLng ?? null,
+    notes: data.notes ?? null,
+  }));
+
+export const cancelRelocationSchema = z.object({
+  reason: z.string().trim().max(500).optional().nullable(),
+});
+
+export const relocationQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+  status: relocationStatusEnum.optional(),
+  vehicle_id: z.string().optional(),
+  vehicleId: z.string().optional(),
+  driver_id: z.string().optional(),
+  driverId: z.string().optional(),
+  location_id: z.string().optional(),
+  locationId: z.string().optional(),
+});
+
 

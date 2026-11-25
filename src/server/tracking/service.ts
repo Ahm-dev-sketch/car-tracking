@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { ApiError } from '@/lib/errors';
 import { TRACKING_CONFIG } from './config';
-import { MovementStatus, TripStatus, BookingStatus, DriverSessionStatus } from '@prisma/client';
+import { MovementStatus, TripStatus, BookingStatus, DriverSessionStatus, RelocationStatus } from '@prisma/client';
 import { AuthenticatedUser } from '@/lib/auth-guard';
 import { publishEvent } from '@/server/realtime/hub';
 
@@ -273,6 +273,22 @@ export async function ingestLocations(
     }, { maxWait: 15000, timeout: 20000 });
 
     if (movement !== null) {
+      let tripOrigin = activeTrip?.booking?.pickupLocation ?? null;
+      let tripDestination = activeTrip?.booking?.destination ?? null;
+      if (!tripOrigin && !tripDestination) {
+        const activeReloc = await prisma.vehicleRelocation?.findFirst?.({
+          where: { vehicleId: targetVehicleId, status: RelocationStatus.IN_TRANSIT },
+          include: {
+            fromLocation: { select: { name: true, code: true } },
+            toLocation: { select: { name: true, code: true } },
+          },
+        });
+        if (activeReloc) {
+          tripOrigin = `${activeReloc.fromLocation.name} (${activeReloc.fromLocation.code})`;
+          tripDestination = `${activeReloc.toLocation.name} (${activeReloc.toLocation.code})`;
+        }
+      }
+
       void Promise.resolve(
         publishEvent({
           type: 'location:update',
@@ -289,8 +305,8 @@ export async function ingestLocations(
             driverName: activeTrip?.driver?.user?.name ?? activeSession?.driver?.user?.name ?? null,
             driverPhone: activeTrip?.driver?.user?.phone ?? activeSession?.driver?.user?.phone ?? null,
             plateNumber: activeTrip?.vehicle?.plateNumber ?? activeSession?.vehicle?.plateNumber ?? null,
-            tripOrigin: activeTrip?.booking?.pickupLocation ?? null,
-            tripDestination: activeTrip?.booking?.destination ?? null,
+            tripOrigin,
+            tripDestination,
           },
         })
       ).catch((err) => console.warn('[Publish Event Warning]:', err));
@@ -458,6 +474,15 @@ export async function getLiveTracking(
         take: 1,
         include: { driver: { include: { user: { select: { id: true, name: true, phone: true } } } } },
       },
+      relocations: {
+        where: { status: RelocationStatus.IN_TRANSIT },
+        take: 1,
+        include: {
+          fromLocation: { select: { id: true, name: true, code: true } },
+          toLocation: { select: { id: true, name: true, code: true } },
+          driver: { include: { user: { select: { id: true, name: true, phone: true } } } },
+        },
+      },
       currentDriver: {
         include: { user: { select: { id: true, name: true, phone: true } } },
       },
@@ -467,7 +492,8 @@ export async function getLiveTracking(
   return vehicles.map((v) => {
     const isOwner = Boolean(vehicleIds && vehicleIds.includes(v.id));
     const canSeePhone = isAdmin || isOwner;
-    const driver = v.trips[0]?.driver ?? v.currentDriver;
+    const activeReloc = v.relocations?.[0] ?? null;
+    const driver = v.trips[0]?.driver ?? activeReloc?.driver ?? v.currentDriver;
 
     return {
       vehicleId: v.id,
@@ -478,6 +504,14 @@ export async function getLiveTracking(
       homeLocation: v.homeLocation,
       currentLocationInfo: v.currentOperationalLocation,
       location: v.currentLocation,
+      activeRelocation: activeReloc
+        ? {
+            id: activeReloc.id,
+            relocationCode: activeReloc.relocationCode,
+            fromLocation: activeReloc.fromLocation,
+            toLocation: activeReloc.toLocation,
+          }
+        : null,
       driver: driver?.user
         ? {
             id: driver.id,

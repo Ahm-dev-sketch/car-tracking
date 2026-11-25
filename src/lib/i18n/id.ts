@@ -170,6 +170,8 @@ export const id = {
     ACTIVE: 'Aktif',
     ABORTED: 'Dibatalkan Paksa',
     OFFLINE_PENDING: 'Menunggu Sinkronisasi (Offline)',
+    SCHEDULED: 'Terjadwal',
+    IN_TRANSIT: 'Dalam Perjalanan Relokasi',
   },
   vehicleConditions: {
     MAINTENANCE: 'Perawatan',
@@ -234,6 +236,7 @@ export const id = {
     fromPrefix: 'Dari:',
     toPrefix: 'Ke:',
     kmh: 'km/jam',
+    relocationBadge: 'RELOKASI ANTAR-HUB',
   },
   greeting: {
     loadingTime: 'Memuat waktu...',

@@ -14,6 +14,7 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
 import { useTranslation } from '@/components/providers/LanguageProvider';
 import { translateStatus, translateTransmission, translateVehicleType } from '@/lib/i18n';
+import { formatBookingDateTime } from '@/lib/booking-time';
 
 interface OperationalLocation {
   id: string;
@@ -60,11 +61,57 @@ interface DriverOption {
   };
 }
 
+interface RelocationItem {
+  id: string;
+  relocationCode: string;
+  status: 'SCHEDULED' | 'IN_TRANSIT' | 'COMPLETED' | 'CANCELLED' | string;
+  scheduledAt: string;
+  departedAt?: string | null;
+  completedAt?: string | null;
+  notes?: string | null;
+  vehicle: {
+    id: string;
+    plateNumber: string;
+    brand: string;
+    model: string;
+    status: string;
+  };
+  driver?: {
+    id: string;
+    licenseNumber: string;
+    user: {
+      id: string;
+      name: string;
+      phone?: string | null;
+    };
+  } | null;
+  fromLocation: OperationalLocation;
+  toLocation: OperationalLocation;
+}
+
+function getCurrentJakartaDateTimeInput(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const hour = map.hour === '24' ? '00' : map.hour;
+  return `${map.year}-${map.month}-${map.day}T${hour}:${map.minute}`;
+}
+
 function AdminVehiclesContent() {
   const { locale, t, format } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const [activeTab, setActiveTab] = useState<'fleet' | 'relocations'>(
+    searchParams.get('tab') === 'relocations' ? 'relocations' : 'fleet'
+  );
   const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
   const [locations, setLocations] = useState<OperationalLocation[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -77,6 +124,40 @@ function AdminVehiclesContent() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // Relocations tab state
+  const [relocations, setRelocations] = useState<RelocationItem[]>([]);
+  const [relocationPage, setRelocationPage] = useState(1);
+  const [relocationTotalPages, setRelocationTotalPages] = useState(1);
+  const [relocationTotalRecords, setRelocationTotalRecords] = useState(0);
+  const [relocationStatusFilter, setRelocationStatusFilter] = useState('');
+  const [relocationLocationFilter, setRelocationLocationFilter] = useState('');
+  const [isRelocationsLoading, setIsRelocationsLoading] = useState(false);
+
+  // Create Relocation modal state
+  const [isRelocateModalOpen, setIsRelocateModalOpen] = useState(false);
+  const [relocatePoolVehicles, setRelocatePoolVehicles] = useState<VehicleItem[]>([]);
+  const [relocateVehicleId, setRelocateVehicleId] = useState('');
+  const [relocateToLocationId, setRelocateToLocationId] = useState('');
+  const [relocateDriverId, setRelocateDriverId] = useState('');
+  const [relocateScheduledAt, setRelocateScheduledAt] = useState('');
+  const [relocateNotes, setRelocateNotes] = useState('');
+  const [relocateStartImmediately, setRelocateStartImmediately] = useState(false);
+  const [isCreatingRelocation, setIsCreatingRelocation] = useState(false);
+  const [relocateError, setRelocateError] = useState<string | null>(null);
+
+  // Start Relocation modal state
+  const [startingRelocation, setStartingRelocation] = useState<RelocationItem | null>(null);
+  const [startRelocationDriverId, setStartRelocationDriverId] = useState('');
+  const [isStartingRelocation, setIsStartingRelocation] = useState(false);
+  const [startRelocationError, setStartRelocationError] = useState<string | null>(null);
+
+  // Complete & Cancel Confirm dialogs
+  const [completingRelocation, setCompletingRelocation] = useState<RelocationItem | null>(null);
+  const [isCompletingRelocation, setIsCompletingRelocation] = useState(false);
+  const [cancellingRelocation, setCancellingRelocation] = useState<RelocationItem | null>(null);
+  const [isCancellingRelocation, setIsCancellingRelocation] = useState(false);
 
   // Add / Edit Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -171,22 +252,82 @@ function AdminVehiclesContent() {
       search,
       status: statusFilter,
       locationId: locationFilter,
+      tab: activeTab === 'relocations' ? 'relocations' : '',
     });
   }, [statusFilter, locationFilter]);
 
-  // Keep vehicle pool live without manual refresh
+  const fetchRelocations = async (targetPage = 1, isSilent = false) => {
+    if (!isSilent) setIsRelocationsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(targetPage),
+        limit: '10',
+      });
+      if (relocationStatusFilter) params.set('status', relocationStatusFilter);
+      if (relocationLocationFilter) params.set('locationId', relocationLocationFilter);
+
+      const res = await fetch(`/api/admin/relocations?${params.toString()}`);
+      if (res.ok) {
+        const json = await res.json();
+        setRelocations(json.data || []);
+        setRelocationTotalRecords(json.pagination?.total ?? (json.data?.length || 0));
+        setRelocationTotalPages(json.pagination?.totalPages ?? 1);
+        setRelocationPage(targetPage);
+      } else if (!isSilent) {
+        const err = await res.json();
+        setApiError(err.error?.message || t.adminPages.vehicles.failedLoad);
+      }
+    } catch {
+      if (!isSilent) setApiError(t.adminPages.vehicles.networkLoadError);
+    } finally {
+      if (!isSilent) setIsRelocationsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const isInteracting = isModalOpen || deactivatingVehicle || assigningVehicle;
+    void fetchRelocations(1);
+  }, [relocationStatusFilter, relocationLocationFilter]);
+
+  // Keep vehicle pool & relocations live without manual refresh
+  useEffect(() => {
+    const isInteracting =
+      isModalOpen ||
+      deactivatingVehicle ||
+      assigningVehicle ||
+      isRelocateModalOpen ||
+      startingRelocation ||
+      completingRelocation ||
+      cancellingRelocation;
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible' && !isInteracting) {
-        void fetchVehicles(page, true);
+        if (activeTab === 'relocations') {
+          void fetchRelocations(relocationPage, true);
+        } else {
+          void fetchVehicles(page, true);
+        }
       }
     }, 20000);
 
     return () => {
       clearInterval(interval);
     };
-  }, [page, isModalOpen, deactivatingVehicle, assigningVehicle, search, statusFilter, locationFilter]);
+  }, [
+    page,
+    relocationPage,
+    activeTab,
+    isModalOpen,
+    deactivatingVehicle,
+    assigningVehicle,
+    isRelocateModalOpen,
+    startingRelocation,
+    completingRelocation,
+    cancellingRelocation,
+    search,
+    statusFilter,
+    locationFilter,
+    relocationStatusFilter,
+    relocationLocationFilter,
+  ]);
 
   const handleOpenAdd = () => {
     setEditingVehicle(null);
@@ -374,6 +515,213 @@ function AdminVehiclesContent() {
     }
   };
 
+  const handleTabChange = (nextTab: 'fleet' | 'relocations') => {
+    setActiveTab(nextTab);
+    syncUrlParams({
+      search,
+      status: statusFilter,
+      locationId: locationFilter,
+      tab: nextTab === 'relocations' ? 'relocations' : '',
+    });
+    if (nextTab === 'relocations') {
+      void fetchRelocations(1);
+    } else {
+      void fetchVehicles(page);
+    }
+  };
+
+  const loadDriversForPicker = async () => {
+    try {
+      const res = await fetch('/api/drivers?limit=50');
+      if (res.ok) {
+        const json = await res.json();
+        setAvailableDrivers(json.data || []);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleOpenRelocate = async (presetVehicle?: VehicleItem) => {
+    setRelocateError(null);
+    setActionNotice(null);
+    setRelocateVehicleId(presetVehicle?.id || '');
+    setRelocateToLocationId('');
+    setRelocateDriverId(presetVehicle?.currentDriver?.id || '');
+    setRelocateScheduledAt(getCurrentJakartaDateTimeInput());
+    setRelocateNotes('');
+    setRelocateStartImmediately(Boolean(presetVehicle?.currentDriver?.id));
+    setIsRelocateModalOpen(true);
+
+    try {
+      const [poolRes] = await Promise.all([
+        fetch('/api/vehicles?status=AVAILABLE&limit=100'),
+        loadDriversForPicker(),
+      ]);
+      if (poolRes.ok) {
+        const poolJson = await poolRes.json();
+        const poolList: VehicleItem[] = poolJson.data || [];
+        if (presetVehicle && !poolList.some((item) => item.id === presetVehicle.id)) {
+          poolList.unshift(presetVehicle);
+        }
+        setRelocatePoolVehicles(poolList);
+      }
+    } catch {
+      if (presetVehicle) {
+        setRelocatePoolVehicles([presetVehicle]);
+      }
+    }
+  };
+
+  const selectedRelocateVehicle =
+    relocatePoolVehicles.find((v) => v.id === relocateVehicleId) ||
+    vehicles.find((v) => v.id === relocateVehicleId) ||
+    null;
+
+  const selectedOriginHubId =
+    selectedRelocateVehicle?.currentOperationalLocation?.id ||
+    selectedRelocateVehicle?.homeLocation?.id ||
+    '';
+
+  const handleCreateRelocationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!relocateVehicleId || !relocateToLocationId) return;
+    setIsCreatingRelocation(true);
+    setRelocateError(null);
+    try {
+      const scheduledIso = relocateScheduledAt
+        ? new Date(`${relocateScheduledAt}:00+07:00`).toISOString()
+        : new Date().toISOString();
+
+      const res = await fetch('/api/admin/relocations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId: relocateVehicleId,
+          driverId: relocateDriverId || undefined,
+          fromLocationId: selectedOriginHubId || undefined,
+          toLocationId: relocateToLocationId,
+          scheduledAt: scheduledIso,
+          notes: relocateNotes.trim() || undefined,
+          startImmediately: relocateStartImmediately,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setIsRelocateModalOpen(false);
+        const createdCode = json.data?.relocationCode || '';
+        setActionNotice(
+          format(t.adminPages.vehicles.relocationCreatedToast, { code: createdCode })
+        );
+        handleTabChange('relocations');
+        void fetchVehicles(page, true);
+      } else {
+        setRelocateError(json.error?.message || t.common.genericError);
+      }
+    } catch {
+      setRelocateError(t.common.networkError);
+    } finally {
+      setIsCreatingRelocation(false);
+    }
+  };
+
+  const handleOpenStartRelocation = async (rel: RelocationItem) => {
+    setStartingRelocation(rel);
+    setStartRelocationDriverId(rel.driver?.id || '');
+    setStartRelocationError(null);
+    if (availableDrivers.length === 0) {
+      await loadDriversForPicker();
+    }
+  };
+
+  const handleStartRelocationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!startingRelocation || !startRelocationDriverId) return;
+    setIsStartingRelocation(true);
+    setStartRelocationError(null);
+    try {
+      const res = await fetch(`/api/admin/relocations/${startingRelocation.id}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverId: startRelocationDriverId }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const startedCode = startingRelocation.relocationCode;
+        setStartingRelocation(null);
+        setActionNotice(
+          format(t.adminPages.vehicles.relocationStartedToast, { code: startedCode })
+        );
+        void fetchRelocations(relocationPage);
+        void fetchVehicles(page, true);
+      } else {
+        setStartRelocationError(json.error?.message || t.common.genericError);
+      }
+    } catch {
+      setStartRelocationError(t.common.networkError);
+    } finally {
+      setIsStartingRelocation(false);
+    }
+  };
+
+  const handleCompleteRelocationConfirm = async () => {
+    if (!completingRelocation) return;
+    setIsCompletingRelocation(true);
+    setApiError(null);
+    try {
+      const res = await fetch(`/api/admin/relocations/${completingRelocation.id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const completedCode = completingRelocation.relocationCode;
+        setCompletingRelocation(null);
+        setActionNotice(
+          format(t.adminPages.vehicles.relocationCompletedToast, { code: completedCode })
+        );
+        void fetchRelocations(relocationPage);
+        void fetchVehicles(page, true);
+      } else {
+        setApiError(json.error?.message || t.common.genericError);
+      }
+    } catch {
+      setApiError(t.common.networkError);
+    } finally {
+      setIsCompletingRelocation(false);
+    }
+  };
+
+  const handleCancelRelocationConfirm = async () => {
+    if (!cancellingRelocation) return;
+    setIsCancellingRelocation(true);
+    setApiError(null);
+    try {
+      const res = await fetch(`/api/admin/relocations/${cancellingRelocation.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        const cancelledCode = cancellingRelocation.relocationCode;
+        setCancellingRelocation(null);
+        setActionNotice(
+          format(t.adminPages.vehicles.relocationCancelledToast, { code: cancelledCode })
+        );
+        void fetchRelocations(relocationPage);
+        void fetchVehicles(page, true);
+      } else {
+        setApiError(json.error?.message || t.common.genericError);
+      }
+    } catch {
+      setApiError(t.common.networkError);
+    } finally {
+      setIsCancellingRelocation(false);
+    }
+  };
+
   const columns: Column<VehicleItem>[] = [
     {
       header: t.adminPages.vehicles.colPlate,
@@ -454,6 +802,15 @@ function AdminVehiclesContent() {
           >
             {t.adminPages.vehicles.assignBtn}
           </button>
+          {v.status === 'AVAILABLE' && (
+            <button
+              type="button"
+              onClick={() => handleOpenRelocate(v)}
+              className="cursor-pointer rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100"
+            >
+              {t.adminPages.vehicles.relocateActionBtn}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleOpenEdit(v)}
@@ -475,9 +832,120 @@ function AdminVehiclesContent() {
     },
   ];
 
+  const relocationColumns: Column<RelocationItem>[] = [
+    {
+      header: t.adminPages.vehicles.relocationColCode,
+      cell: (r) => (
+        <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs font-semibold text-slate-800 tabular-nums">
+          {r.relocationCode}
+        </span>
+      ),
+    },
+    {
+      header: t.adminPages.vehicles.relocationColVehicle,
+      cell: (r) => (
+        <div>
+          <div className="font-mono text-xs font-semibold text-slate-900 tabular-nums">
+            {r.vehicle.plateNumber}
+          </div>
+          <div className="text-[11px] text-slate-500">
+            {r.vehicle.brand} {r.vehicle.model}
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: t.adminPages.vehicles.relocationColRoute,
+      cell: (r) => (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-800">
+          <LocationBadge type="home" name={r.fromLocation.name} code={r.fromLocation.code} />
+          <Icon name="arrow" className="size-3.5 text-slate-400" />
+          <LocationBadge type="current" name={r.toLocation.name} code={r.toLocation.code} />
+        </div>
+      ),
+    },
+    {
+      header: t.adminPages.vehicles.relocationColDriver,
+      cell: (r) =>
+        r.driver ? (
+          <div>
+            <div className="text-xs font-medium text-slate-900">{r.driver.user.name}</div>
+            <div className="font-mono text-[11px] text-slate-500">{r.driver.licenseNumber}</div>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400">{t.adminPages.vehicles.relocationNoDriver}</span>
+        ),
+    },
+    {
+      header: t.adminPages.vehicles.relocationColSchedule,
+      cell: (r) => (
+        <div className="space-y-0.5 text-[11px] text-slate-600 tabular-nums">
+          <div>
+            <span className="text-slate-400">{t.adminPages.vehicles.relocationScheduledAtPrefix}</span>{' '}
+            {formatBookingDateTime(r.scheduledAt, locale)}
+          </div>
+          {r.departedAt && (
+            <div>
+              <span className="text-slate-400">{t.adminPages.vehicles.relocationDepartedAtPrefix}</span>{' '}
+              {formatBookingDateTime(r.departedAt, locale)}
+            </div>
+          )}
+          {r.completedAt && (
+            <div>
+              <span className="text-slate-400">{t.adminPages.vehicles.relocationCompletedAtPrefix}</span>{' '}
+              {formatBookingDateTime(r.completedAt, locale)}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      header: t.adminPages.vehicles.relocationColStatus,
+      cell: (r) => <StatusBadge status={r.status} />,
+    },
+    {
+      header: t.adminPages.vehicles.relocationColActions,
+      cell: (r) => (
+        <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {r.status === 'SCHEDULED' && (
+            <button
+              type="button"
+              onClick={() => handleOpenStartRelocation(r)}
+              className="cursor-pointer rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100"
+            >
+              {t.adminPages.vehicles.relocationStartBtn}
+            </button>
+          )}
+          {r.status === 'IN_TRANSIT' && (
+            <button
+              type="button"
+              onClick={() => setCompletingRelocation(r)}
+              className="cursor-pointer rounded-lg border border-success-200 bg-success-50 px-2.5 py-1 text-xs font-medium text-success-700 transition-colors hover:bg-success-100"
+            >
+              {t.adminPages.vehicles.relocationCompleteBtn}
+            </button>
+          )}
+          {(r.status === 'SCHEDULED' || r.status === 'IN_TRANSIT') && (
+            <button
+              type="button"
+              onClick={() => setCancellingRelocation(r)}
+              className="cursor-pointer rounded-lg border border-danger-200 bg-white px-2.5 py-1 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
+            >
+              {t.adminPages.vehicles.relocationCancelBtn}
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   const availableCount = vehicles.filter((v) => v.status === 'AVAILABLE').length;
   const inUseCount = vehicles.filter((v) => v.status === 'RESERVED' || v.status === 'IN_USE').length;
   const maintenanceCount = vehicles.filter((v) => v.status === 'MAINTENANCE').length;
+
+  const relocationInTransitCount = relocations.filter((r) => r.status === 'IN_TRANSIT').length;
+  const relocationScheduledCount = relocations.filter((r) => r.status === 'SCHEDULED').length;
+  const relocationCompletedCount = relocations.filter((r) => r.status === 'COMPLETED').length;
 
   return (
     <div className="space-y-6">
@@ -486,106 +954,253 @@ function AdminVehiclesContent() {
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.adminPages.vehicles.heading}</h1>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.adminPages.vehicles.description}</p>
         </div>
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => handleOpenRelocate()}
+            className="button-secondary inline-flex cursor-pointer items-center gap-1.5"
+          >
+            <Icon name="route" className="size-4 text-brand-600" />
+            <span>{t.adminPages.vehicles.createRelocationBtn}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            className="button-primary inline-flex cursor-pointer items-center gap-1.5"
+          >
+            <Icon name="plus" className="size-4" />
+            <span>{t.adminPages.vehicles.addVehicleBtn}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
         <button
           type="button"
-          onClick={handleOpenAdd}
-          className="button-primary inline-flex cursor-pointer items-center gap-1.5 self-start sm:self-auto"
+          onClick={() => handleTabChange('fleet')}
+          className={`cursor-pointer rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+            activeTab === 'fleet'
+              ? 'bg-slate-900 text-white'
+              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          }`}
         >
-          <Icon name="plus" className="size-4" />
-          <span>{t.adminPages.vehicles.addVehicleBtn}</span>
+          {t.adminPages.vehicles.tabFleet}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange('relocations')}
+          className={`inline-flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+            activeTab === 'relocations'
+              ? 'bg-brand-600 text-white'
+              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          <span>{t.adminPages.vehicles.tabRelocations}</span>
+          {relocationInTransitCount > 0 && (
+            <span
+              className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums ${
+                activeTab === 'relocations' ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700'
+              }`}
+            >
+              {relocationInTransitCount}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Summary strip */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statTotal}</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
+      {actionNotice && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-xs font-medium text-success-800">
+          <div className="flex items-center gap-2">
+            <Icon name="check" className="size-4 shrink-0 text-success-600" />
+            <span>{actionNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActionNotice(null)}
+            className="cursor-pointer rounded px-2 py-1 text-xs font-semibold text-success-700 hover:bg-success-100"
+          >
+            {t.common.close}
+          </button>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statAvailable}</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{availableCount}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statInUse}</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{inUseCount}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statMaintenance}</p>
-          <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{maintenanceCount}</p>
-        </div>
-      </div>
+      )}
 
       {apiError && <ErrorBanner message={apiError} onDismiss={() => setApiError(null)} />}
 
-      {/* Filter and Search */}
-      <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row">
-        <form onSubmit={(e) => { e.preventDefault(); fetchVehicles(1); }} className="flex w-full gap-2 sm:w-96">
-          <div className="relative flex-1">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-              <Icon name="search" className="size-4 text-slate-400" />
-            </span>
-            <input
-              type="text"
-              placeholder={t.adminPages.vehicles.searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+      {activeTab === 'fleet' ? (
+        <>
+          {/* Summary strip */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statTotal}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statAvailable}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{availableCount}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statInUse}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{inUseCount}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statMaintenance}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{maintenanceCount}</p>
+            </div>
+          </div>
+
+          {/* Filter and Search */}
+          <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row">
+            <form onSubmit={(e) => { e.preventDefault(); fetchVehicles(1); }} className="flex w-full gap-2 sm:w-96">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                  <Icon name="search" className="size-4 text-slate-400" />
+                </span>
+                <input
+                  type="text"
+                  placeholder={t.adminPages.vehicles.searchPlaceholder}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                />
+              </div>
+              <button type="submit" className="button-primary shrink-0 px-3 text-xs">
+                {t.adminPages.vehicles.searchBtn}
+              </button>
+            </form>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.hubLabel}</span>
+                <select
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                >
+                  <option value="">{t.adminPages.vehicles.allHubsOption}</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} ({loc.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statusLabel}</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                >
+                  <option value="">{t.adminPages.vehicles.allStatusesOption}</option>
+                  <option value="AVAILABLE">{translateStatus(locale, 'AVAILABLE')}</option>
+                  <option value="RESERVED">{translateStatus(locale, 'RESERVED')}</option>
+                  <option value="IN_USE">{translateStatus(locale, 'IN_USE')}</option>
+                  <option value="MAINTENANCE">{translateStatus(locale, 'MAINTENANCE')}</option>
+                  <option value="INACTIVE">{translateStatus(locale, 'INACTIVE')}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={vehicles}
+            isLoading={isLoading}
+            emptyMessage={t.adminPages.vehicles.emptyMessage}
+          />
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalRecords={totalRecords}
+            onPageChange={(p) => fetchVehicles(p)}
+          />
+        </>
+      ) : (
+        <>
+          {/* Relocations summary strip */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.relocationMetricTotal}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{relocationTotalRecords}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.relocationMetricInTransit}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{relocationInTransitCount}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.relocationMetricScheduled}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{relocationScheduledCount}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.relocationMetricCompleted}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{relocationCompletedCount}</p>
+            </div>
+          </div>
+
+          {/* Relocation filters */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.relocationFilterHubLabel}</span>
+                <select
+                  value={relocationLocationFilter}
+                  onChange={(e) => setRelocationLocationFilter(e.target.value)}
+                  className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                >
+                  <option value="">{t.adminPages.vehicles.relocationAllHubs}</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} ({loc.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.relocationFilterStatusLabel}</span>
+                <select
+                  value={relocationStatusFilter}
+                  onChange={(e) => setRelocationStatusFilter(e.target.value)}
+                  className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
+                >
+                  <option value="">{t.adminPages.vehicles.relocationAllStatuses}</option>
+                  <option value="SCHEDULED">{translateStatus(locale, 'SCHEDULED')}</option>
+                  <option value="IN_TRANSIT">{translateStatus(locale, 'IN_TRANSIT')}</option>
+                  <option value="COMPLETED">{translateStatus(locale, 'COMPLETED')}</option>
+                  <option value="CANCELLED">{translateStatus(locale, 'CANCELLED')}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {relocations.length === 0 && !isRelocationsLoading ? (
+            <div className="rounded-xl border border-slate-200 bg-white px-6 py-12 text-center">
+              <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400">
+                <Icon name="route" className="size-5" />
+              </div>
+              <p className="text-sm font-semibold text-slate-900">{t.adminPages.vehicles.relocationEmptyTitle}</p>
+              <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">{t.adminPages.vehicles.relocationEmptyDesc}</p>
+            </div>
+          ) : (
+            <DataTable
+              columns={relocationColumns}
+              data={relocations}
+              isLoading={isRelocationsLoading}
+              emptyMessage={t.adminPages.vehicles.relocationEmptyTitle}
             />
-          </div>
-          <button type="submit" className="button-primary shrink-0 px-3 text-xs">
-            {t.adminPages.vehicles.searchBtn}
-          </button>
-        </form>
+          )}
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.hubLabel}</span>
-            <select
-              value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-              className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
-            >
-              <option value="">{t.adminPages.vehicles.allHubsOption}</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.name} ({loc.code})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statusLabel}</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
-            >
-              <option value="">{t.adminPages.vehicles.allStatusesOption}</option>
-              <option value="AVAILABLE">{translateStatus(locale, 'AVAILABLE')}</option>
-              <option value="RESERVED">{translateStatus(locale, 'RESERVED')}</option>
-              <option value="IN_USE">{translateStatus(locale, 'IN_USE')}</option>
-              <option value="MAINTENANCE">{translateStatus(locale, 'MAINTENANCE')}</option>
-              <option value="INACTIVE">{translateStatus(locale, 'INACTIVE')}</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <DataTable
-        columns={columns}
-        data={vehicles}
-        isLoading={isLoading}
-        emptyMessage={t.adminPages.vehicles.emptyMessage}
-      />
-
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        totalRecords={totalRecords}
-        onPageChange={(p) => fetchVehicles(p)}
-      />
+          <Pagination
+            page={relocationPage}
+            totalPages={relocationTotalPages}
+            totalRecords={relocationTotalRecords}
+            onPageChange={(p) => fetchRelocations(p)}
+          />
+        </>
+      )}
 
       {/* Add / Edit Modal */}
       <Modal
@@ -872,6 +1487,228 @@ function AdminVehiclesContent() {
           </div>
         </form>
       </Modal>
+
+      {/* Create Vehicle Relocation Modal */}
+      <Modal
+        isOpen={isRelocateModalOpen}
+        onClose={() => setIsRelocateModalOpen(false)}
+        title={t.adminPages.vehicles.relocateModalTitle}
+        description={t.adminPages.vehicles.relocateModalDesc}
+        maxWidth="lg"
+      >
+        {relocateError && (
+          <ErrorBanner message={relocateError} className="mb-4" onDismiss={() => setRelocateError(null)} />
+        )}
+
+        <form onSubmit={handleCreateRelocationSubmit} className="space-y-4">
+          <FormField label={t.adminPages.vehicles.relocateVehicleLabel} required>
+            <select
+              required
+              value={relocateVehicleId}
+              onChange={(e) => {
+                const vid = e.target.value;
+                setRelocateVehicleId(vid);
+                const found = relocatePoolVehicles.find((item) => item.id === vid);
+                if (found?.currentDriver?.id) {
+                  setRelocateDriverId(found.currentDriver.id);
+                }
+              }}
+            >
+              <option value="">{t.adminPages.vehicles.relocateSelectVehicleOption}</option>
+              {relocatePoolVehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.plateNumber} — {v.brand} {v.model} ({v.currentOperationalLocation?.name || v.homeLocation?.name || '—'})
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label={t.adminPages.vehicles.relocateFromHubLabel}>
+              <input
+                type="text"
+                readOnly
+                value={
+                  selectedRelocateVehicle
+                    ? `${selectedRelocateVehicle.currentOperationalLocation?.name || selectedRelocateVehicle.homeLocation?.name || '—'} (${selectedRelocateVehicle.currentOperationalLocation?.code || selectedRelocateVehicle.homeLocation?.code || '—'})`
+                    : '—'
+                }
+                className="bg-slate-50 text-slate-600"
+              />
+            </FormField>
+
+            <FormField label={t.adminPages.vehicles.relocateToHubLabel} required>
+              <select
+                required
+                value={relocateToLocationId}
+                onChange={(e) => setRelocateToLocationId(e.target.value)}
+              >
+                <option value="">{t.adminPages.vehicles.relocateSelectToHubOption}</option>
+                {locations
+                  .filter((loc) => loc.id !== selectedOriginHubId)
+                  .map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} ({loc.code})
+                    </option>
+                  ))}
+              </select>
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label={t.adminPages.vehicles.relocateDriverLabel} required={relocateStartImmediately}>
+              <select
+                required={relocateStartImmediately}
+                value={relocateDriverId}
+                onChange={(e) => setRelocateDriverId(e.target.value)}
+              >
+                <option value="">{t.adminPages.vehicles.relocateDriverOptionalOption}</option>
+                {availableDrivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.user.name} ({d.licenseNumber})
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label={t.adminPages.vehicles.relocateScheduledAtLabel} required>
+              <input
+                type="datetime-local"
+                required
+                value={relocateScheduledAt}
+                onChange={(e) => setRelocateScheduledAt(e.target.value)}
+              />
+            </FormField>
+          </div>
+
+          <FormField label={t.adminPages.vehicles.relocateNotesLabel}>
+            <textarea
+              rows={2}
+              placeholder={t.adminPages.vehicles.relocateNotesPlaceholder}
+              value={relocateNotes}
+              onChange={(e) => setRelocateNotes(e.target.value)}
+            />
+          </FormField>
+
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={relocateStartImmediately}
+              onChange={(e) => setRelocateStartImmediately(e.target.checked)}
+              className="mt-0.5 size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span>{t.adminPages.vehicles.relocateStartImmediatelyLabel}</span>
+          </label>
+
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-3">
+            <button
+              type="button"
+              disabled={isCreatingRelocation}
+              onClick={() => setIsRelocateModalOpen(false)}
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {t.common.cancel}
+            </button>
+            <button
+              type="submit"
+              disabled={isCreatingRelocation || !relocateVehicleId || !relocateToLocationId}
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              {isCreatingRelocation && <Spinner size="sm" className="text-white" />}
+              {t.adminPages.vehicles.relocateSubmitBtn}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Start Relocation Modal */}
+      <Modal
+        isOpen={Boolean(startingRelocation)}
+        onClose={() => setStartingRelocation(null)}
+        title={format(t.adminPages.vehicles.startModalTitle, { code: startingRelocation?.relocationCode || '' })}
+        description={
+          startingRelocation
+            ? format(t.adminPages.vehicles.startModalDesc, {
+                plate: startingRelocation.vehicle.plateNumber,
+                route: `${startingRelocation.fromLocation.name} → ${startingRelocation.toLocation.name}`,
+              })
+            : ''
+        }
+        maxWidth="sm"
+      >
+        {startRelocationError && (
+          <ErrorBanner message={startRelocationError} className="mb-4" onDismiss={() => setStartRelocationError(null)} />
+        )}
+
+        <form onSubmit={handleStartRelocationSubmit} className="space-y-4">
+          <FormField label={t.adminPages.vehicles.selectDriverLabel} required>
+            <select
+              required
+              value={startRelocationDriverId}
+              onChange={(e) => setStartRelocationDriverId(e.target.value)}
+            >
+              <option value="">{t.adminPages.vehicles.chooseDriverOption}</option>
+              {availableDrivers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.user.name} ({d.licenseNumber})
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-3">
+            <button
+              type="button"
+              disabled={isStartingRelocation}
+              onClick={() => setStartingRelocation(null)}
+              className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {t.common.cancel}
+            </button>
+            <button
+              type="submit"
+              disabled={isStartingRelocation || !startRelocationDriverId}
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+            >
+              {isStartingRelocation && <Spinner size="sm" className="text-white" />}
+              {t.adminPages.vehicles.startConfirmBtn}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Complete Relocation Confirm */}
+      <ConfirmDialog
+        isOpen={Boolean(completingRelocation)}
+        onClose={() => setCompletingRelocation(null)}
+        onConfirm={handleCompleteRelocationConfirm}
+        title={t.adminPages.vehicles.completeModalTitle}
+        message={
+          completingRelocation
+            ? format(t.adminPages.vehicles.completeModalMessage, {
+                code: completingRelocation.relocationCode,
+                plate: completingRelocation.vehicle.plateNumber,
+                toHub: `${completingRelocation.toLocation.name} (${completingRelocation.toLocation.code})`,
+              })
+            : ''
+        }
+        confirmLabel={t.adminPages.vehicles.completeConfirmBtn}
+        isLoading={isCompletingRelocation}
+      />
+
+      {/* Cancel Relocation Confirm */}
+      <ConfirmDialog
+        isOpen={Boolean(cancellingRelocation)}
+        onClose={() => setCancellingRelocation(null)}
+        onConfirm={handleCancelRelocationConfirm}
+        title={format(t.adminPages.vehicles.cancelModalTitle, { code: cancellingRelocation?.relocationCode || '' })}
+        message={format(t.adminPages.vehicles.cancelModalMessage, {
+          plate: cancellingRelocation?.vehicle.plateNumber || '',
+        })}
+        confirmLabel={t.adminPages.vehicles.cancelConfirmBtn}
+        isDestructive={true}
+        isLoading={isCancellingRelocation}
+      />
     </div>
   );
 }

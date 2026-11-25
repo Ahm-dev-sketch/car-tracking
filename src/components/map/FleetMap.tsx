@@ -41,6 +41,13 @@ export interface VehicleMarkerData {
   tripDestination?: string | null;
   homeLocation?: { id: string; name: string; code: string } | null;
   currentOperationalLocation?: { id: string; name: string; code: string } | null;
+  activeRelocation?: {
+    id: string;
+    relocationCode: string;
+    status: string;
+    fromLocation: { id: string; name: string; code: string };
+    toLocation: { id: string; name: string; code: string };
+  } | null;
 }
 
 interface FleetMapProps {
@@ -448,7 +455,18 @@ export default function FleetMap({
                         </div>
                       )}
 
-                      {(v.tripOrigin || v.tripDestination) && (
+                      {v.activeRelocation && (
+                        <div className="space-y-1 border-t border-slate-100 pt-1.5 text-[11px]">
+                          <div className="inline-flex items-center gap-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-700">
+                            {t.map.relocationBadge} · {v.activeRelocation.relocationCode}
+                          </div>
+                          <div className="font-semibold text-slate-700">
+                            {v.activeRelocation.fromLocation.name} → {v.activeRelocation.toLocation.name}
+                          </div>
+                        </div>
+                      )}
+
+                      {(v.tripOrigin || v.tripDestination) && !v.activeRelocation && (
                         <div className="space-y-0.5 border-t border-slate-100 pt-1.5 text-[11px] text-slate-600">
                           {v.tripOrigin && <div>{t.map.fromPrefix} {v.tripOrigin}</div>}
                           {v.tripDestination && <div>{t.map.toPrefix} {v.tripDestination}</div>}

@@ -170,6 +170,8 @@ export const en: Dictionary = {
     ACTIVE: 'Active',
     ABORTED: 'Aborted',
     OFFLINE_PENDING: 'Pending Sync (Offline)',
+    SCHEDULED: 'Scheduled',
+    IN_TRANSIT: 'In Relocation Transit',
   },
   vehicleConditions: {
     MAINTENANCE: 'Maintenance',
@@ -234,6 +236,7 @@ export const en: Dictionary = {
     fromPrefix: 'From:',
     toPrefix: 'To:',
     kmh: 'km/h',
+    relocationBadge: 'HUB RELOCATION',
   },
   greeting: {
     loadingTime: 'Loading time...',

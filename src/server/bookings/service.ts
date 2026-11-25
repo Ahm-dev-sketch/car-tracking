@@ -79,6 +79,20 @@ export async function assertVehicleAvailableForWindow(
     );
   }
 
+  if (tx.vehicleRelocation?.findFirst) {
+    const inTransitReloc = await tx.vehicleRelocation.findFirst({
+      where: { vehicleId, status: 'IN_TRANSIT' },
+      select: { id: true, relocationCode: true },
+    });
+    if (inTransitReloc) {
+      throw new ApiError(
+        409,
+        'VEHICLE_IN_RELOCATION',
+        `Vehicle is currently in relocation transit (${inTransitReloc.relocationCode})`
+      );
+    }
+  }
+
   // 3. Time-window intersection check: departure_at < other.expected_return AND expected_return_at > other.departure
   const conflictingStatuses: BookingStatus[] = includePending
     ? [

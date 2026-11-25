@@ -1,4 +1,8 @@
+'use client';
+
 import React from 'react';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateStatus } from '@/lib/i18n';
 import { Icon } from './Icon';
 
 type StatusType =
@@ -125,16 +129,10 @@ export function StatusBadge({
         ? sky
         : amber
       : statusStyles[normalized] || info;
+  const { locale } = useTranslation();
   const isLive = liveStates.has(normalized);
   const isDanger = dangerStates.has(normalized);
-  const label =
-    normalized === 'PENDING_COMPLETION'
-      ? hasNotaDinas
-        ? 'Menunggu Verifikasi Nota'
-        : 'Menunggu Nota Dinas'
-      : normalized === 'PENDING'
-      ? 'Menunggu Admin'
-      : normalized.replace(/_/g, ' ');
+  const label = translateStatus(locale, normalized, hasNotaDinas);
 
   return (
     <span

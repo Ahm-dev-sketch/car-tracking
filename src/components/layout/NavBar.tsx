@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
@@ -12,6 +12,8 @@ import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
 import { onExplicitLogout } from '@/lib/auth-lifecycle';
 import { applyPendingOfflineBadgeDeduction } from '@/lib/user-booking-badge';
 import { getNavigation, isNavigationActive } from './navigation';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 interface NotificationItem {
   id: string;
@@ -36,15 +38,20 @@ function getDarkSnapshot() {
 export function NavBar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { t, format } = useTranslation();
   const role = session?.user?.role;
-  const links = getNavigation(role);
+  const links = getNavigation(role).map((link) => ({
+    ...link,
+    label: (t.nav.links as Record<string, string>)[link.href] ?? link.label,
+    shortLabel: (t.nav.shortLinks as Record<string, string>)[link.href] ?? link.shortLabel,
+  }));
   const dockLinks = role === 'ADMIN' ? links.slice(0, 3) : links;
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [pendingActionCount, setPendingActionCount] = useState(0);
   const unreadCount = notifications.filter((item) => !item.readAt).length;
-  const name = session?.user?.name || session?.user?.email || 'Your account';
+  const name = session?.user?.name || session?.user?.email || t.nav.yourAccount;
   const initials = name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('').toUpperCase();
   const moreActive = role === 'ADMIN' && links.slice(3).some((link) => isNavigationActive(pathname, link.href));
   const hasMoreButton = role === 'ADMIN' || role === 'DRIVER';
@@ -90,8 +97,8 @@ export function NavBar() {
   const badgeText = pendingActionCount > 99 ? '99+' : pendingActionCount;
   const badgeAriaLabel =
     role === 'ADMIN'
-      ? `${pendingActionCount} pesanan butuh aksi`
-      : `${pendingActionCount} booking aktif atau ditolak`;
+      ? format(t.nav.adminActionAria, { count: pendingActionCount })
+      : format(t.nav.userActionAria, { count: pendingActionCount });
 
   useEffect(() => {
     const endpoint =
@@ -176,12 +183,12 @@ export function NavBar() {
     <>
       <header className="app-header">
         <div className="header-island">
-          <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label="KCIC Fleet home">
+          <Link href={links[0].href} className="flex min-h-11 shrink-0 items-center gap-2.5" aria-label={t.nav.brandHomeAria}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/icon-192.png" alt="" width={36} height={36} className="size-9 shrink-0 rounded-lg shadow-xs" />
             <span className="text-lg font-semibold tracking-tight text-slate-900">KCIC <span className="font-bold text-brand-500 dark:text-rose-400">Fleet</span></span>
           </Link>
-          <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Main navigation">
+          <nav className="hidden items-center gap-0.5 lg:flex" aria-label={t.nav.mainNavAria}>
             {links.map((link) => {
               const showBadge = isActionBadgeTarget(link.href) && pendingActionCount > 0;
               return (
@@ -206,23 +213,24 @@ export function NavBar() {
           </nav>
           <div className="flex shrink-0 items-center gap-1.5">
             <GreetingClock variant="navbar" />
-            <button type="button" onClick={toggleTheme} className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:bg-[#334155] dark:hover:text-[#f8fafc]" aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} aria-pressed={isDark}>
+            <LanguageSwitcher compact />
+            <button type="button" onClick={toggleTheme} className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:bg-[#334155] dark:hover:text-[#f8fafc]" aria-label={isDark ? t.nav.themeToLight : t.nav.themeToDark} aria-pressed={isDark}>
               <Icon name={isDark ? 'sun' : 'moon'} className="size-[18px]" />
             </button>
-            <button type="button" onClick={() => setNotificationsOpen(true)} className="relative inline-flex size-9 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:bg-[#334155] dark:hover:text-[#f8fafc]" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`} aria-haspopup="dialog">
+            <button type="button" onClick={() => setNotificationsOpen(true)} className="relative inline-flex size-9 cursor-pointer items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:bg-[#334155] dark:hover:text-[#f8fafc]" aria-label={unreadCount ? format(t.nav.notificationsWithUnreadAria, { count: unreadCount }) : t.nav.notifications} aria-haspopup="dialog">
               <Icon name="bell" className="size-[18px]" />
               {unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-brand-500 text-[9px] font-semibold leading-none tabular-nums text-white ring-2 ring-white dark:ring-[#1e293b]">{unreadCount}</span>}
             </button>
             <span className="mx-0.5 h-6 w-px bg-slate-200 dark:bg-[#334155]" aria-hidden="true" />
-            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 pl-1 pr-2 text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:border-[#475569] dark:hover:bg-[#334155]" aria-label="Open account and navigation" aria-haspopup="dialog" aria-expanded={menuOpen}>
+            <button type="button" onClick={() => setMenuOpen(true)} className="flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 pl-1 pr-2 text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#e2e8f0] dark:hover:border-[#475569] dark:hover:bg-[#334155]" aria-label={t.nav.openWorkspaceAria} aria-haspopup="dialog" aria-expanded={menuOpen}>
               <span className="grid size-7 place-items-center rounded-md border border-slate-200 bg-slate-100 text-[11px] font-semibold tabular-nums text-slate-700 dark:border-[#334155] dark:bg-[#0f172a] dark:text-[#e2e8f0]">{initials}</span>
-              <span className="hidden text-xs font-medium text-slate-600 xl:inline">{role === 'ADMIN' ? 'Admin' : role === 'DRIVER' ? 'Driver' : 'Workspace'}</span>
+              <span className="hidden text-xs font-medium text-slate-600 xl:inline">{role === 'ADMIN' ? t.nav.roles.ADMIN : role === 'DRIVER' ? t.nav.roles.DRIVER : t.nav.roles.USER}</span>
             </button>
           </div>
         </div>
       </header>
 
-      <nav className="mobile-dock" aria-label="Mobile navigation">
+      <nav className="mobile-dock" aria-label={t.nav.mobileNavAria}>
         {dockLinks.map((link) => {
           const isActive = isNavigationActive(pathname, link.href);
           const showBadge = isActionBadgeTarget(link.href) && pendingActionCount > 0;
@@ -257,23 +265,27 @@ export function NavBar() {
             aria-expanded={menuOpen}
             aria-current={moreActive ? 'page' : undefined}
             aria-haspopup="dialog"
-            aria-label="Buka menu navigasi lainnya"
+            aria-label={t.nav.openMoreAria}
           >
             <span className="dock-tab-icon">
               <Icon name="more" className="size-5" />
             </span>
-            <span className="dock-tab-label" aria-hidden="true">More</span>
+            <span className="dock-tab-label" aria-hidden="true">{t.nav.moreMenu}</span>
           </button>
         )}
       </nav>
 
-      <Drawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} title="Your workspace" description="Everything you need for the road ahead.">
+      <Drawer isOpen={menuOpen} onClose={() => setMenuOpen(false)} title={t.nav.yourWorkspaceTitle} description={t.nav.yourWorkspaceDesc}>
         <GreetingClock variant="compact" userName={session?.user?.name} className="w-full justify-between" />
         <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-[#334155] dark:bg-[#111827]">
           <span className="grid size-11 shrink-0 place-items-center rounded-lg border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-700 dark:border-[#334155] dark:bg-[#1e293b] dark:text-[#e2e8f0]">{initials}</span>
-          <div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-900">{name}</p><p className="mt-0.5 text-xs font-medium text-slate-500">{role === 'ADMIN' ? 'Fleet administrator' : role === 'DRIVER' ? 'Driver workspace' : 'Employee workspace'}</p></div>
+          <div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-900">{name}</p><p className="mt-0.5 text-xs font-medium text-slate-500">{role === 'ADMIN' ? t.nav.roleDescAdmin : role === 'DRIVER' ? t.nav.roleDescDriver : t.nav.roleDescUser}</p></div>
         </div>
-        <nav aria-label="Workspace navigation" className="space-y-0.5">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 dark:border-[#334155] dark:bg-[#111827]">
+          <span className="text-xs font-semibold text-slate-700">{t.nav.languageLabel}</span>
+          <LanguageSwitcher compact />
+        </div>
+        <nav aria-label={t.nav.workspaceNavAria} className="space-y-0.5">
           {links.map((link) => {
             const showBadge = isActionBadgeTarget(link.href) && pendingActionCount > 0;
             const active = isNavigationActive(pathname, link.href);
@@ -326,22 +338,22 @@ export function NavBar() {
             }}
             className="inline-flex w-full min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:border-danger-200 hover:bg-danger-50 hover:text-danger-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            <Icon name="logout" className="size-4" />Sign out
+            <Icon name="logout" className="size-4" />{t.nav.signOut}
           </button>
         </div>
       </Drawer>
 
-      <Drawer isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Notifications" description={unreadCount ? `${unreadCount} unread updates from your workspace.` : 'You’re all caught up.'}>
+      <Drawer isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} title={t.nav.notifications} description={unreadCount ? format(t.nav.notificationsUnreadDesc, { count: unreadCount }) : t.nav.notificationsAllCaughtUp}>
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-5 py-12 text-center">
             <span className="grid size-12 place-items-center rounded-full border border-slate-200 bg-white text-slate-400"><Icon name="bell" className="size-5" /></span>
-            <p className="text-sm font-semibold text-slate-900">A little quiet here.</p><p className="max-w-60 text-xs leading-relaxed text-slate-500">Booking and trip updates will appear here.</p>
+            <p className="text-sm font-semibold text-slate-900">{t.nav.notificationsQuietTitle}</p><p className="max-w-60 text-xs leading-relaxed text-slate-500">{t.nav.notificationsQuietDesc}</p>
           </div>
         ) : (
           <ul className="space-y-2">{notifications.map((item) => (
             <li key={item.id}>
               <button type="button" onClick={() => !item.readAt && void markNotificationRead(item.id)} className={`w-full cursor-pointer rounded-xl border p-3.5 text-left transition-colors hover:border-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${!item.readAt ? 'border-brand-200 bg-brand-50/40' : 'border-slate-200 bg-white'}`}>
-                <span className="flex items-start justify-between gap-3"><span className="text-sm font-semibold text-slate-900">{item.title}</span>{!item.readAt && <span className="relative mt-1.5 inline-flex size-2 shrink-0"><span className="inline-flex size-2 rounded-full bg-brand-500 status-ping" /><span className="sr-only">Unread</span></span>}</span>
+                <span className="flex items-start justify-between gap-3"><span className="text-sm font-semibold text-slate-900">{item.title}</span>{!item.readAt && <span className="relative mt-1.5 inline-flex size-2 shrink-0"><span className="inline-flex size-2 rounded-full bg-brand-500 status-ping" /><span className="sr-only">{t.nav.srUnread}</span></span>}</span>
                 <span className="mt-1 block text-xs leading-relaxed text-slate-600">{item.body}</span><RelativeTime date={item.createdAt} className="mt-2 block text-[11px] font-medium text-slate-400" />
               </button>
             </li>

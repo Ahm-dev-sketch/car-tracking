@@ -9,6 +9,8 @@ import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { LocationBadge } from '@/components/ui/LocationBadge';
 import { getVehicleConditionVisual, ConditionVisual } from './condition';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateVehicleCondition } from '@/lib/i18n';
 
 export type { ConditionVisual };
 export { getVehicleConditionVisual };
@@ -139,7 +141,13 @@ function FitBounds({ points, maxZoom }: { points: [number, number][]; maxZoom?: 
   return null;
 }
 
-function createVehicleIcon(status: string, movement: string, isSelected: boolean, accuracyM?: number) {
+function createVehicleIcon(
+  status: string,
+  movement: string,
+  isSelected: boolean,
+  accuracyM?: number,
+  estimatedTooltipText?: string
+) {
   const visual = getVehicleConditionVisual(status, movement);
   const isMoving = movement?.toUpperCase() === 'MOVING';
   const isEstimated = typeof accuracyM === 'number' && accuracyM > 100;
@@ -167,7 +175,7 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
     : 'shadow-[0_1px_3px_rgba(15,23,42,0.3)]';
 
   const badgeHtml = isEstimated
-    ? `<span class="absolute -top-2 -right-3.5 z-20 whitespace-nowrap rounded-full border border-warning-200 bg-warning-50 px-1.5 py-px text-[9px] font-semibold tabular-nums text-warning-700 pointer-events-none" title="Akurasi Estimasi: ±${Math.round(accuracyM as number)}m">±${Math.round(accuracyM as number)}m</span>`
+    ? `<span class="absolute -top-2 -right-3.5 z-20 whitespace-nowrap rounded-full border border-warning-200 bg-warning-50 px-1.5 py-px text-[9px] font-semibold tabular-nums text-warning-700 pointer-events-none" title="${estimatedTooltipText ?? `±${Math.round(accuracyM as number)}m`}">±${Math.round(accuracyM as number)}m</span>`
     : '';
 
   return L.divIcon({
@@ -225,6 +233,8 @@ export default function FleetMap({
   className = 'h-[500px] w-full',
   routePoints,
 }: FleetMapProps) {
+  const { locale, t, format } = useTranslation();
+
   useEffect(() => {
     injectMapChrome();
   }, []);
@@ -270,7 +280,16 @@ export default function FleetMap({
           if (isNaN(v.lat) || isNaN(v.lng)) return null;
           const isSelected = v.vehicleId === selectedVehicleId;
           const visual = getVehicleConditionVisual(v.status, v.movement);
-          const icon = createVehicleIcon(v.status, v.movement, isSelected, v.accuracyM);
+          const conditionLabel = translateVehicleCondition(locale, visual.badgeText);
+          const roundedAccuracy = typeof v.accuracyM === 'number' ? Math.round(v.accuracyM) : 0;
+          const estimatedTooltip = format(t.gps.shortEstimated, { accuracy: roundedAccuracy });
+          const icon = createVehicleIcon(
+            v.status,
+            v.movement,
+            isSelected,
+            v.accuracyM,
+            estimatedTooltip
+          );
           const rawPhone = v.driverPhone ? v.driverPhone.replace(/\D/g, '') : '';
           const waUrl = rawPhone ? `https://wa.me/${rawPhone}` : null;
 
@@ -292,10 +311,10 @@ export default function FleetMap({
                   <Tooltip direction="center" permanent={false} opacity={0.92}>
                     <span className="font-sans text-xs font-medium text-slate-700">
                       {v.accuracyM > 100
-                        ? `Akurasi Estimasi: ±${Math.round(v.accuracyM)} m (Wi-Fi/Seluler)`
+                        ? format(t.gps.tooltipEstimated, { accuracy: roundedAccuracy })
                         : v.accuracyM < 20
-                        ? `Akurasi Tinggi: ±${Math.round(v.accuracyM)} m (Satelit Lock)`
-                        : `Akurasi: ±${Math.round(v.accuracyM)} m`}
+                        ? format(t.gps.tooltipSatellite, { accuracy: roundedAccuracy })
+                        : format(t.gps.tooltipModerate, { accuracy: roundedAccuracy })}
                     </span>
                   </Tooltip>
                 </Circle>
@@ -303,8 +322,8 @@ export default function FleetMap({
 
               {/* Vehicle Marker */}
               <Marker
-                title={`${v.plateNumber} (${visual.badgeText})`}
-                alt={`Vehicle ${v.plateNumber}`}
+                title={`${v.plateNumber} (${conditionLabel})`}
+                alt={format(t.map.vehicleAlt, { plate: v.plateNumber })}
                 position={[v.lat, v.lng]}
                 icon={icon}
                 eventHandlers={{
@@ -315,7 +334,7 @@ export default function FleetMap({
                   <Tooltip direction="top" offset={[0, -20]} permanent opacity={0.95}>
                     <span className="inline-flex items-center gap-1 font-sans text-[10px] font-semibold tabular-nums text-warning-700">
                       <span className="inline-flex shrink-0 text-warning-600" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_ALERT_SVG }} />
-                      Akurasi Estimasi: ±{Math.round(v.accuracyM)} m
+                      {estimatedTooltip}
                     </span>
                   </Tooltip>
                 )}
@@ -353,52 +372,54 @@ export default function FleetMap({
                       )}
 
                       <div className="flex items-center justify-between gap-2 pt-1">
-                        <span className="font-medium text-slate-500">Condition:</span>
+                        <span className="font-medium text-slate-500">{t.map.conditionLabel}</span>
                         <span
                           className="rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide"
                           style={{ backgroundColor: visual.color, borderColor: visual.color, color: '#fff' }}
                         >
-                          {visual.badgeText}
+                          {conditionLabel}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-slate-500">Movement:</span>
+                        <span className="text-slate-500">{t.map.movementLabel}</span>
                         <MovementBadge movement={v.movement} />
                       </div>
 
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-slate-500">Accuracy:</span>
+                        <span className="text-slate-500">{t.map.accuracyLabel}</span>
                         <GPSBadge accuracyM={v.accuracyM} showDetails={true} />
                       </div>
                       {typeof v.accuracyM === 'number' && v.accuracyM > 100 && (
                         <div className="flex items-start gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-1 text-[10px] font-medium text-warning-700">
                           <span className="mt-px inline-flex shrink-0 text-warning-600" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_ALERT_SVG }} />
-                          <span>Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(v.accuracyM)} m)</span>
+                          <span>{format(t.gps.detailEstimated, { accuracy: roundedAccuracy })}</span>
                         </div>
                       )}
                       {typeof v.accuracyM === 'number' && v.accuracyM < 20 && (
                         <div className="flex items-start gap-1.5 rounded-md border border-success-200 bg-success-50 px-1.5 py-1 text-[10px] font-medium text-success-700">
                           <span className="mt-px inline-flex shrink-0 text-success-600" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ICON_CHECK_SVG }} />
-                          <span>Akurasi tinggi (satelit GPS terkunci)</span>
+                          <span>{t.gps.detailHigh}</span>
                         </div>
                       )}
 
                       {typeof v.speedMps === 'number' && (
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-slate-500">Speed:</span>
-                          <span className="font-mono text-[11px] font-semibold tabular-nums text-slate-700">{(v.speedMps * 3.6).toFixed(0)} km/h</span>
+                          <span className="text-slate-500">{t.map.speedLabel}</span>
+                          <span className="font-mono text-[11px] font-semibold tabular-nums text-slate-700">
+                            {(v.speedMps * 3.6).toFixed(0)} {t.map.kmh}
+                          </span>
                         </div>
                       )}
 
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-slate-500">Updated:</span>
+                        <span className="text-slate-500">{t.map.updatedLabel}</span>
                         <RelativeTime date={v.recordedAt} />
                       </div>
 
                       {v.driverName ? (
                         <div className="border-t border-slate-100 pt-2">
-                          <div className="text-[11px] text-slate-500">Assigned Driver:</div>
+                          <div className="text-[11px] text-slate-500">{t.map.assignedDriverLabel}</div>
                           <div className="font-semibold text-slate-800">{v.driverName}</div>
                           {v.driverPhone && v.driverPhone !== 'REDACTED' && (
                             <div className="mt-1">
@@ -409,7 +430,7 @@ export default function FleetMap({
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 hover:underline"
                                 >
-                                  <span>WhatsApp: {v.driverPhone}</span>
+                                  <span>{t.common.whatsapp}: {v.driverPhone}</span>
                                 </a>
                               ) : (
                                 <span className="text-slate-600">{v.driverPhone}</span>
@@ -420,17 +441,17 @@ export default function FleetMap({
                       ) : (
                         <div className="border-t border-slate-100 pt-2 text-[11px] italic text-slate-400">
                           {v.status === 'MAINTENANCE'
-                            ? 'Unit under workshop maintenance'
+                            ? t.map.workshopMaintenance
                             : v.status === 'INACTIVE'
-                            ? 'Unit non-operational'
-                            : 'Standby in operational pool'}
+                            ? t.map.nonOperational
+                            : t.map.standbyPool}
                         </div>
                       )}
 
                       {(v.tripOrigin || v.tripDestination) && (
                         <div className="space-y-0.5 border-t border-slate-100 pt-1.5 text-[11px] text-slate-600">
-                          {v.tripOrigin && <div>From: {v.tripOrigin}</div>}
-                          {v.tripDestination && <div>To: {v.tripDestination}</div>}
+                          {v.tripOrigin && <div>{t.map.fromPrefix} {v.tripOrigin}</div>}
+                          {v.tripDestination && <div>{t.map.toPrefix} {v.tripDestination}</div>}
                         </div>
                       )}
                     </div>

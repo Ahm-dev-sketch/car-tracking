@@ -3,6 +3,7 @@
 import React, { useId, useRef } from 'react';
 import { useDialog } from './Modal';
 import { Icon } from './Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 interface DrawerProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export function Drawer({
   footer,
   width = 'md',
 }: DrawerProps) {
+  const { t } = useTranslation();
   const dialogRef = useDialog(isOpen);
   const titleId = useId();
   const descriptionId = useId();
@@ -64,7 +66,7 @@ export function Drawer({
               type="button"
               onClick={onClose}
               className="-mr-1 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-              aria-label="Close panel"
+              aria-label={t.common.closePanel}
             >
               <Icon name="close" className="size-4" />
             </button>

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 import { Icon } from '@/components/ui/Icon';
 
 export interface LocationStatItem {
@@ -43,6 +44,7 @@ export function LocationCapacityChart({
   selectedLocationId,
   onSelectLocation,
 }: LocationCapacityChartProps) {
+  const { t, format } = useTranslation();
   const [hoveredLocationId, setHoveredLocationId] = useState<string | null>(null);
 
   if (!locations || locations.length === 0) {
@@ -71,10 +73,10 @@ export function LocationCapacityChart({
   const usableHeight = chartHeight - paddingBottom - paddingTop;
 
   const legend = [
-    { label: 'Maks Kapasitas', color: SERIES.maxCapacity },
-    { label: 'Available', color: SERIES.available },
-    { label: 'Sedang Digunakan', color: SERIES.inUse },
-    { label: 'Permintaan Masuk', color: SERIES.requests },
+    { label: t.admin.locationChart.legendMax, color: SERIES.maxCapacity },
+    { label: t.admin.locationChart.legendAvailable, color: SERIES.available },
+    { label: t.admin.locationChart.legendInUse, color: SERIES.inUse },
+    { label: t.admin.locationChart.legendRequests, color: SERIES.requests },
   ];
 
   return (
@@ -86,13 +88,13 @@ export function LocationCapacityChart({
             <span className="flex size-6 items-center justify-center rounded-md bg-brand-50 text-brand-600">
               <Icon name="route" className="size-3.5" />
             </span>
-            <p className="eyebrow">Monitoring Kapasitas & Beban Hub</p>
+            <p className="eyebrow">{t.admin.locationChart.eyebrow}</p>
           </div>
           <h2 id="capacity-chart-heading" className="section-title mt-2">
-            Kapasitas & Penggunaan Armada per Lokasi
+            {t.admin.locationChart.title}
           </h2>
           <p className="mt-1 text-xs font-normal leading-relaxed text-slate-500 sm:text-sm">
-            Pantau batas maksimal penerimaan permintaan, armada yang sedang bertugas, dan unit yang tersedia di setiap stasiun KCIC.
+            {t.admin.locationChart.subtitle}
           </p>
         </div>
 
@@ -114,7 +116,7 @@ export function LocationCapacityChart({
       {/* Location Filter Pills */}
       <div className="space-y-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          Filter Lokasi Operasional:
+          {t.admin.locationChart.filterLocationsLabel}
         </span>
         <div className="flex flex-wrap gap-1.5">
           <button
@@ -127,7 +129,7 @@ export function LocationCapacityChart({
                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
-            Semua Hub <span className="font-mono tabular-nums opacity-70">({locations.length})</span>
+            {t.admin.locationChart.allHubs} <span className="font-mono tabular-nums opacity-70">({locations.length})</span>
           </button>
           {locations.map((loc) => {
             const isSelected = selectedLocationId === loc.locationId;
@@ -158,9 +160,9 @@ export function LocationCapacityChart({
                       ? 'bg-success-50 text-success-700'
                       : 'bg-slate-100 text-slate-500'
                   }`}
-                  title={`${avail} unit siap operasi`}
+                  title={format(t.admin.locationChart.readyTitle, { count: avail })}
                 >
-                  {avail} ready
+                  {format(t.admin.locationChart.readyShort, { count: avail })}
                 </span>
               </button>
             );
@@ -175,7 +177,7 @@ export function LocationCapacityChart({
             viewBox={`0 0 ${locations.length * 110 + 60} ${chartHeight}`}
             className="h-56 w-full select-none"
             role="img"
-            aria-label="Perbandingan kapasitas dan penggunaan armada per lokasi operasional"
+            aria-label={t.admin.locationChart.chartAria}
           >
             {/* Horizontal Grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
@@ -334,7 +336,7 @@ export function LocationCapacityChart({
                   <h3 className="truncate text-sm font-semibold tracking-tight text-slate-900">
                     {loc.name}
                   </h3>
-                  <p className="font-mono text-[11px] font-medium tabular-nums text-slate-400">Hub {loc.code}</p>
+                  <p className="font-mono text-[11px] font-medium tabular-nums text-slate-400">{format(t.admin.locationChart.hubPrefix, { code: loc.code })}</p>
                 </div>
                 <span
                   className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
@@ -343,26 +345,26 @@ export function LocationCapacityChart({
                       : 'border-danger-200 bg-danger-50 text-danger-700'
                   }`}
                 >
-                  {avail > 0 ? `Siap +${avail} Order` : 'Kapasitas Penuh'}
+                  {avail > 0 ? format(t.admin.locationChart.readyOrders, { count: avail }) : t.admin.locationChart.fullCapacity}
                 </span>
               </div>
 
               {/* Capacity progress bar */}
               <div className="mt-4 space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] font-medium">
-                  <span className="text-slate-500">Beban Penggunaan Hub:</span>
-                  <span className="font-mono font-semibold tabular-nums text-slate-900">{utilRate}% Terpakai</span>
+                  <span className="text-slate-500">{t.admin.locationChart.utilizationLabel}</span>
+                  <span className="font-mono font-semibold tabular-nums text-slate-900">{format(t.admin.locationChart.usedPercent, { pct: utilRate })}</span>
                 </div>
                 <div className="flex h-2 w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100">
                   <div
                     style={{ width: `${maxCap > 0 ? (inUse / maxCap) * 100 : 0}%` }}
                     className="h-full bg-warning-600 transition-all"
-                    title={`Sedang digunakan: ${inUse} unit`}
+                    title={format(t.admin.locationChart.tooltipInUse, { count: inUse })}
                   />
                   <div
                     style={{ width: `${maxCap > 0 ? (avail / maxCap) * 100 : 0}%` }}
                     className="h-full bg-success-600 transition-all"
-                    title={`Tersedia: ${avail} unit`}
+                    title={format(t.admin.locationChart.tooltipAvailable, { count: avail })}
                   />
                 </div>
               </div>
@@ -371,37 +373,37 @@ export function LocationCapacityChart({
               <dl className="mt-4 grid grid-cols-2 gap-1.5 text-xs">
                 <div className="rounded-md border border-brand-200 bg-white p-2.5">
                   <dt className="text-[10px] font-semibold uppercase tracking-wider text-brand-600">
-                    Maks Kapasitas
+                    {t.admin.locationChart.metricMax}
                   </dt>
                   <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-slate-900">
-                    {maxCap} <span className="text-[11px] font-medium text-slate-400">unit</span>
+                    {maxCap} <span className="text-[11px] font-medium text-slate-400">{t.common.unit}</span>
                   </dd>
                 </div>
 
                 <div className="rounded-md border border-success-200 bg-white p-2.5">
                   <dt className="text-[10px] font-semibold uppercase tracking-wider text-success-700">
-                    Sedang Available
+                    {t.admin.locationChart.metricAvail}
                   </dt>
                   <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-slate-900">
-                    {avail} <span className="text-[11px] font-medium text-slate-400">unit</span>
+                    {avail} <span className="text-[11px] font-medium text-slate-400">{t.common.unit}</span>
                   </dd>
                 </div>
 
                 <div className="rounded-md border border-warning-200 bg-white p-2.5">
                   <dt className="text-[10px] font-semibold uppercase tracking-wider text-warning-700">
-                    Sedang Digunakan
+                    {t.admin.locationChart.metricInUse}
                   </dt>
                   <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-slate-900">
-                    {inUse} <span className="text-[11px] font-medium text-slate-400">unit</span>
+                    {inUse} <span className="text-[11px] font-medium text-slate-400">{t.common.unit}</span>
                   </dd>
                 </div>
 
                 <div className="rounded-md border border-info-200 bg-white p-2.5">
                   <dt className="text-[10px] font-semibold uppercase tracking-wider text-info-600">
-                    Permintaan Masuk
+                    {t.admin.locationChart.metricRequests}
                   </dt>
                   <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-slate-900">
-                    {reqs} <span className="text-[11px] font-medium text-slate-400">trip</span>
+                    {reqs} <span className="text-[11px] font-medium text-slate-400">{t.common.tripCount.replace('{count} ', '')}</span>
                   </dd>
                 </div>
               </dl>
@@ -413,20 +415,20 @@ export function LocationCapacityChart({
                   onClick={() => onSelectLocation(isSelected ? '' : loc.locationId)}
                   className="cursor-pointer font-medium text-slate-600 underline-offset-4 hover:text-brand-600 hover:underline"
                 >
-                  {isSelected ? 'Batal Filter Hub' : 'Fokus Hub Ini'}
+                  {isSelected ? t.admin.locationChart.clearFilter : t.admin.locationChart.focusHub}
                 </button>
                 <div className="flex gap-1.5">
                   <Link
                     href={`/admin/vehicles?locationId=${loc.locationId}`}
                     className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
                   >
-                    Armada <span className="font-mono tabular-nums">({loc.vehicles})</span>
+                    {t.admin.locationChart.fleetLink} <span className="font-mono tabular-nums">({loc.vehicles})</span>
                   </Link>
                   <Link
                     href={`/admin/bookings?locationId=${loc.locationId}`}
                     className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
                   >
-                    Booking <span className="font-mono tabular-nums">({loc.bookings})</span>
+                    {t.admin.locationChart.bookingsLink} <span className="font-mono tabular-nums">({loc.bookings})</span>
                   </Link>
                 </div>
               </div>

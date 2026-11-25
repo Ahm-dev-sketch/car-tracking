@@ -12,6 +12,7 @@ import { DispatchProgress, formatEta } from './DispatchProgress';
 import { findNearestHub } from '@/lib/operational-locations';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
 import { enqueueOfflineAction } from '@/lib/offline-sync';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 import { looksLikeGoogleMapsUrl, isShortLink, parseGoogleMapsUrl } from '@/lib/google-maps-url';
 
 export interface LocationOption {
@@ -51,6 +52,7 @@ export function BookingModal({
   initialDestinationUrl = null,
 }: BookingModalProps) {
   const router = useRouter();
+  const { locale, t, format } = useTranslation();
 
   // Locations list
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -341,13 +343,13 @@ export function BookingModal({
     if (isOffline) {
       if (isShortLink(value)) {
         setDestinationLinkError(
-          'Tautan Google Maps pendek memerlukan koneksi internet. Tempelkan tautan lengkap (dengan @lat,lng) atau sambungkan ke internet.'
+          t.bookingModal.offlineShortLinkError
         );
         return;
       }
 
       // Text-only full URL while offline: no coords to extract and no server available.
-      setDestinationLinkError('Tautan Google Maps tidak dapat dibaca');
+      setDestinationLinkError(t.bookingModal.offlineTextLinkError);
       return;
     }
 
@@ -366,10 +368,10 @@ export function BookingModal({
         setDestinationLinkError(null);
       } else {
         const json = await res.json().catch(() => null);
-        setDestinationLinkError(json?.error?.message || 'Tautan Google Maps tidak dapat dibaca');
+        setDestinationLinkError(json?.error?.message || t.bookingModal.offlineTextLinkError);
       }
     } catch {
-      setDestinationLinkError('Tidak dapat menghubungi server untuk membaca tautan ini.');
+      setDestinationLinkError(t.bookingModal.serverLinkError);
     } finally {
       setIsResolvingLink(false);
     }
@@ -381,25 +383,25 @@ export function BookingModal({
     setIsSubmitting(true);
 
     if (!operationalLocationId) {
-      setFormError('Lokasi operasional wajib dipilih');
+      setFormError(t.bookingModal.validationLocationRequired);
       setIsSubmitting(false);
       return;
     }
 
     if (!userCoords && geoStatus === 'denied') {
-      setFormError('Akses lokasi (GPS) wajib diaktifkan agar sistem dapat mencocokkan titik jemput dan armada terdekat.');
+      setFormError(t.bookingModal.gpsRequiredSubmit);
       setIsSubmitting(false);
       return;
     }
 
     if (!pickupLocation.trim()) {
-      setFormError('Lokasi penjemputan wajib diisi');
+      setFormError(t.bookingModal.validationPickupRequired);
       setIsSubmitting(false);
       return;
     }
 
     if (!destination.trim()) {
-      setFormError('Tujuan wajib diisi');
+      setFormError(t.bookingModal.validationDestRequired);
       setIsSubmitting(false);
       return;
     }
@@ -410,18 +412,18 @@ export function BookingModal({
 
     if (isDropOff) {
       if (!dropOffDate) {
-        setFormError('Tanggal jemput wajib diisi untuk layanan Drop Off');
+        setFormError(t.bookingModal.validationDropOffDate);
         setIsSubmitting(false);
         return;
       }
       if (!dropOffTime) {
-        setFormError('Jam jemput wajib dipilih untuk layanan Drop Off');
+        setFormError(t.bookingModal.validationDropOffTime);
         setIsSubmitting(false);
         return;
       }
       depDate = new Date(`${dropOffDate}T${dropOffTime}:00`);
       if (isNaN(depDate.getTime())) {
-        setFormError('Format tanggal atau jam jemput tidak valid');
+        setFormError(t.bookingModal.validationInvalidDateTime);
         setIsSubmitting(false);
         return;
       }
@@ -429,7 +431,7 @@ export function BookingModal({
       retDate = new Date(depDate.getTime() + 3 * 60 * 60 * 1000);
     } else {
       if (!departureAt || !expectedReturnAt) {
-        setFormError('Waktu keberangkatan dan waktu kembali wajib diisi');
+        setFormError(t.bookingModal.validationStandbyTimes);
         setIsSubmitting(false);
         return;
       }
@@ -437,19 +439,19 @@ export function BookingModal({
       retDate = new Date(expectedReturnAt);
 
       if (isNaN(depDate.getTime()) || isNaN(retDate.getTime())) {
-        setFormError('Format tanggal keberangkatan atau kembali tidak valid');
+        setFormError(t.bookingModal.validationInvalidStandbyFormat);
         setIsSubmitting(false);
         return;
       }
 
       if (retDate <= depDate) {
-        setFormError('Waktu kembali harus setelah waktu keberangkatan');
+        setFormError(t.bookingModal.validationReturnAfterDep);
         setIsSubmitting(false);
         return;
       }
 
       if (!purpose.trim()) {
-        setFormError('Keterangan / keperluan wajib diisi untuk layanan Standby');
+        setFormError(t.bookingModal.validationPurposeStandby);
         setIsSubmitting(false);
         return;
       }
@@ -460,9 +462,9 @@ export function BookingModal({
         ? overrideVehiclePreferenceId
         : preferredVehicle?.id || undefined;
 
-    const effectivePurpose = purpose.trim() || (isDropOff ? 'Layanan Drop Off' : '');
+    const effectivePurpose = purpose.trim() || (isDropOff ? t.bookingModal.dropOffDefaultPurpose : '');
     const autoNote = isDropOff
-      ? [notes.trim(), `[Layanan Drop Off - Tanggal: ${dropOffDate}, Jam Jemput: ${dropOffTime}]`].filter(Boolean).join(' ')
+      ? [notes.trim(), format(t.bookingModal.dropOffAutoNoteTag, { date: dropOffDate, time: dropOffTime })].filter(Boolean).join(' ')
       : notes.trim() || undefined;
 
     const payload = {
@@ -496,7 +498,7 @@ export function BookingModal({
       };
 
       setOfflineNotice(
-        'Pesanan Anda tersimpan di perangkat ini dan akan dikirim otomatis saat koneksi kembali online.'
+        t.bookingModal.offlineQueuedMessage
       );
       onSuccess?.(optimisticBooking);
       setIsSubmitting(false);
@@ -521,7 +523,7 @@ export function BookingModal({
       const json = await res.json();
 
       if (!res.ok) {
-        setFormError(json.error?.message || 'Gagal mengirim reservasi');
+        setFormError(json.error?.message || t.bookingModal.failedSubmit);
         return;
       }
 
@@ -577,10 +579,10 @@ export function BookingModal({
       'DRIVER_NOTIFIED',
     ].includes(submittedBooking.status);
 
-    const driverName = submittedBooking.driver?.user?.name || submittedBooking.driver?.name || 'Driver KCIC';
+    const driverName = submittedBooking.driver?.user?.name || submittedBooking.driver?.name || t.nav.roles.DRIVER;
     const driverPhone = submittedBooking.driver?.user?.phone;
     const rawDriverPhone = driverPhone && driverPhone !== 'REDACTED' ? driverPhone.replace(/\D/g, '') : null;
-    const etaText = formatEta(submittedBooking.etaSeconds, submittedBooking.etaEstimated);
+    const etaText = formatEta(submittedBooking.etaSeconds, submittedBooking.etaEstimated, locale);
 
     return (
       <Modal
@@ -588,12 +590,12 @@ export function BookingModal({
         onClose={onClose}
         title={
           isAssigned
-            ? 'Pengemudi Dikonfirmasi'
+            ? t.bookingModal.driverFoundModalTitle
             : isPending
-            ? 'Permintaan Pemesanan Terkirim'
-            : 'Mencari Armada'
+            ? t.bookingModal.submittedModalTitle
+            : t.bookingModal.searchingModalTitle
         }
-        description={`Referensi Pemesanan #${submittedBooking.bookingNumber || ''}`}
+        description={format(t.bookingModal.bookingRefDesc, { number: submittedBooking.bookingNumber || '' })}
         maxWidth="lg"
       >
         <div className="space-y-5">
@@ -606,9 +608,9 @@ export function BookingModal({
                     <Icon name="calendar" className="size-5" />
                   </span>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-900">Menunggu Verifikasi & Penugasan Driver</h4>
+                    <h4 className="text-sm font-semibold text-slate-900">{t.bookingModal.pendingTitle}</h4>
                     <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
-                      Pemesanan Anda telah masuk ke portal Biro Umum / Admin Operasional KCIC. Admin akan memvalidasi jadwal serta menugaskan driver dan armada kendaraan.
+                      {t.bookingModal.pendingBody}
                     </p>
                   </div>
                 </div>
@@ -617,9 +619,9 @@ export function BookingModal({
               {/* Route Summary Preview */}
               <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-left text-xs">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <span className="font-medium text-slate-500">Tipe Layanan</span>
+                  <span className="font-medium text-slate-500">{t.bookingModal.serviceTypeLabel}</span>
                   <span className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700">
-                    {submittedBooking.serviceType === 'STANDBY' ? 'Standby Operasional' : 'Drop Off Sekali Jalan'}
+                    {submittedBooking.serviceType === 'STANDBY' ? t.bookingModal.standbyModeLabel : t.bookingModal.dropOffModeLabel}
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -627,7 +629,7 @@ export function BookingModal({
                     &#9679;
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Titik Jemput</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.bookingModal.pickupLabelShort}</span>
                     <p className="truncate font-semibold text-slate-900">{submittedBooking.pickupLocation}</p>
                   </div>
                 </div>
@@ -637,7 +639,7 @@ export function BookingModal({
                     &#9632;
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Tujuan</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.bookingModal.destinationLabelShort}</span>
                     <p className="truncate font-semibold text-slate-900">{submittedBooking.destination}</p>
                   </div>
                 </div>
@@ -645,7 +647,7 @@ export function BookingModal({
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
                 <p>
-                  Anda dapat memantau status persetujuan dan penugasan driver melalui menu <strong className="font-semibold text-slate-900">Pemesanan Saya</strong>. Notifikasi in-app akan dikirim saat driver telah ditugaskan.
+                  {t.bookingModal.pendingNote}
                 </p>
               </div>
 
@@ -655,7 +657,7 @@ export function BookingModal({
                   onClick={onClose}
                   className="min-h-11 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                 >
-                  Tutup
+                  {t.common.close}
                 </button>
                 <button
                   type="button"
@@ -665,7 +667,7 @@ export function BookingModal({
                   }}
                   className="min-h-11 cursor-pointer rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
                 >
-                  Lihat Pemesanan Saya
+                  {t.bookingModal.viewMyBookingsBtn}
                 </button>
               </div>
             </div>
@@ -685,10 +687,10 @@ export function BookingModal({
 
               <div>
                 <h3 className="text-xl font-semibold tracking-tight text-slate-900">
-                  Mencari Pengemudi Terdekat...
+                  {t.bookingModal.searchingHeading}
                 </h3>
                 <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-slate-600">
-                  Sistem auto-dispatch sedang memindai armada standby di hub operasional Anda.
+                  {t.bookingModal.searchingBody}
                 </p>
               </div>
 
@@ -699,8 +701,8 @@ export function BookingModal({
                 </span>
                 <span>
                   {submittedBooking.status === 'DRIVER_NOTIFIED'
-                    ? 'Penawaran terkirim ke pengemudi terdekat, menunggu konfirmasi...'
-                    : 'Menghubungkan ke armada terbaik...'}
+                    ? t.bookingModal.driverNotifiedHint2
+                    : t.bookingModal.searchingConnectingHint}
                 </span>
               </div>
 
@@ -711,7 +713,7 @@ export function BookingModal({
                     &#9679;
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Titik Jemput</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.bookingModal.pickupLabelShort}</span>
                     <p className="truncate font-semibold text-slate-900">{submittedBooking.pickupLocation}</p>
                   </div>
                 </div>
@@ -721,7 +723,7 @@ export function BookingModal({
                     &#9632;
                   </span>
                   <div className="min-w-0 flex-1">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Tujuan</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.bookingModal.destinationLabelShort}</span>
                     <p className="truncate font-semibold text-slate-900">{submittedBooking.destination}</p>
                   </div>
                 </div>
@@ -740,13 +742,13 @@ export function BookingModal({
                       <Icon name="check" className="size-5" />
                     </span>
                     <div>
-                      <h4 className="text-base font-semibold tracking-tight text-slate-900">Driver Ditemukan</h4>
+                      <h4 className="text-base font-semibold tracking-tight text-slate-900">{t.bookingModal.driverFoundHeading}</h4>
                       <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
                         {submittedBooking.status === 'ARRIVED'
-                          ? 'Driver sudah tiba di titik penjemputan Anda!'
+                          ? t.bookingModal.driverArrivedMsg
                           : submittedBooking.status === 'IN_PROGRESS'
-                          ? 'Perjalanan sedang berlangsung.'
-                          : 'Driver sedang menuju titik penjemputan Anda.'}
+                          ? t.bookingModal.driverInProgressMsg
+                          : t.bookingModal.driverEnRouteMsg}
                       </p>
                     </div>
                   </div>
@@ -769,11 +771,13 @@ export function BookingModal({
                       <div className="flex items-center gap-2">
                         <h4 className="text-base font-semibold text-slate-900">{driverName}</h4>
                         <span className="rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
-                          Driver KCIC
+                          {t.nav.roles.DRIVER}
                         </span>
                       </div>
                       <p className="mt-0.5 font-mono text-xs tabular-nums text-slate-500">
-                        {submittedBooking.driver?.licenseNumber ? `SIM: ${submittedBooking.driver.licenseNumber}` : 'Pengemudi Resmi'}
+                        {submittedBooking.driver?.licenseNumber
+                          ? `${t.bookingModal.licensePrefix} ${submittedBooking.driver.licenseNumber}`
+                          : t.bookingModal.officialDriverBadge}
                       </p>
                     </div>
                   </div>
@@ -796,7 +800,11 @@ export function BookingModal({
                   <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3">
                     <a
                       href={`https://wa.me/${rawDriverPhone}?text=${encodeURIComponent(
-                        `Halo Pak/Bu ${driverName}, saya penumpang untuk pemesanan #${submittedBooking.bookingNumber}. Saya menunggu di ${submittedBooking.pickupLocation}.`
+                        format(t.bookingModal.whatsappTemplate, {
+                          driver: driverName,
+                          bookingNumber: submittedBooking.bookingNumber || '',
+                          pickup: submittedBooking.pickupLocation || '',
+                        })
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -805,7 +813,7 @@ export function BookingModal({
                       <svg className="size-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.698.074-2.001-.466-1.503-.623-2.529-2.115-2.607-2.219-.074-.103-.615-.818-.615-1.56 0-.743.391-1.107.531-1.258.14-.15.307-.188.409-.188.103 0 .205.004.296.009.096.005.225-.036.352.27.13.313.444 1.082.483 1.161.039.08.065.173.013.277-.052.103-.079.168-.156.259-.078.09-.163.201-.233.27-.08.077-.163.161-.07.32.093.16.413.682.886 1.103.609.543 1.123.711 1.282.79.16.08.254.07.348-.039.095-.109.406-.473.514-.635.109-.162.217-.135.367-.08.151.054.958.452 1.123.535.165.083.276.124.316.193.04.07.04.405-.104.81z"/>
                       </svg>
-                      <span>Chat WhatsApp</span>
+                      <span>{t.bookingModal.chatWhatsAppBtn}</span>
                     </a>
 
                     <a
@@ -813,7 +821,7 @@ export function BookingModal({
                       className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                     >
                       <Icon name="phone" className="size-4" />
-                      <span>Telepon Driver</span>
+                      <span>{t.bookingModal.callDriverBtn}</span>
                     </a>
                   </div>
                 )}
@@ -822,17 +830,17 @@ export function BookingModal({
               {/* Route Summary */}
               <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-500">Status Penjemputan</span>
+                  <span className="font-medium text-slate-500">{t.bookingModal.pickupStatusLabel}</span>
                   <StatusBadge status={submittedBooking.status} />
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="shrink-0 font-medium text-slate-500">Titik Jemput</span>
+                  <span className="shrink-0 font-medium text-slate-500">{t.bookingModal.pickupLabelShort}</span>
                   <span className="max-w-[220px] truncate text-right font-semibold text-slate-900">
                     {submittedBooking.pickupLocation}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="shrink-0 font-medium text-slate-500">Tujuan</span>
+                  <span className="shrink-0 font-medium text-slate-500">{t.bookingModal.destinationLabelShort}</span>
                   <span className="max-w-[220px] truncate text-right font-semibold text-slate-900">
                     {submittedBooking.destination}
                   </span>
@@ -851,7 +859,7 @@ export function BookingModal({
                     className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
                   >
                     <Icon name="tracking" className="size-5" />
-                    <span>Lacak Posisi Driver di Peta Langsung</span>
+                    <span>{t.bookingModal.trackDriverMapBtn}</span>
                     <Icon name="arrow" className="size-4" />
                   </button>
                 </div>
@@ -869,14 +877,14 @@ export function BookingModal({
               }}
               className="min-h-11 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
-              Lihat Daftar Pemesanan Saya
+              {t.bookingModal.viewMyBookingsListBtn}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="min-h-11 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
-              Tutup
+              {t.common.close}
             </button>
           </div>
         </div>
@@ -890,23 +898,23 @@ export function BookingModal({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title="Driver Tidak Tersedia"
-        description="Auto-dispatch tidak menemukan driver online yang tersedia"
+        title={t.bookingModal.noDriverModalTitle}
+        description={t.bookingModal.noDriverModalDesc}
         maxWidth="lg"
       >
         <div className="space-y-4">
           <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs leading-relaxed text-warning-700">
-            <p className="font-semibold text-warning-700">Semua driver yang memenuhi syarat sedang sibuk atau offline.</p>
+            <p className="font-semibold text-warning-700">{t.bookingModal.noDriverHeadline}</p>
             <p className="mt-1">
-              Permintaan Anda tercatat dengan referensi <span className="font-mono font-semibold tabular-nums">#{noDriverState.booking?.bookingNumber}</span>.
-              Anda dapat memilih kendaraan alternatif yang tersedia di bawah ini, atau menunggu penugasan manual dari admin.
+              {t.bookingModal.noDriverRefPrefix} <span className="font-mono font-semibold tabular-nums">#{noDriverState.booking?.bookingNumber}</span>.{' '}
+              {t.bookingModal.noDriverAltHint}
             </p>
           </div>
 
           {noDriverState.alternatives.length > 0 ? (
             <div className="space-y-2">
               <h4 className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                Kendaraan Alternatif di Lokasi Ini (<span className="tabular-nums">{noDriverState.alternatives.length}</span>)
+                {t.bookingModal.altVehiclesTitle} (<span className="tabular-nums">{noDriverState.alternatives.length}</span>)
               </h4>
               <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
                 {noDriverState.alternatives.map((alt) => (
@@ -918,7 +926,7 @@ export function BookingModal({
                       <span className="font-mono font-semibold tabular-nums text-slate-900">{alt.plateNumber}</span>
                       <p className="text-slate-600">
                         {alt.brand} {alt.model}
-                        {alt.seatingCapacity && ` • ${alt.seatingCapacity} kursi`}
+                        {alt.seatingCapacity && ` • ${alt.seatingCapacity} ${t.common.seats}`}
                       </p>
                     </div>
                     <button
@@ -927,7 +935,7 @@ export function BookingModal({
                       onClick={() => handleBookAlternative(alt)}
                       className="inline-flex min-h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                     >
-                      {isSubmitting ? <Spinner size="sm" /> : 'Pilih Alternatif'}
+                      {isSubmitting ? <Spinner size="sm" /> : t.bookingModal.selectAlternativeBtn}
                     </button>
                   </div>
                 ))}
@@ -935,7 +943,7 @@ export function BookingModal({
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-xs text-slate-500">
-              Tidak ada kendaraan alternatif yang tersedia di lokasi ini.
+              {t.bookingModal.noAltVehicles}
             </div>
           )}
 
@@ -947,7 +955,7 @@ export function BookingModal({
               }}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Kembali ke Formulir
+              {t.bookingModal.backToFormBtn}
             </button>
             <button
               type="button"
@@ -957,7 +965,7 @@ export function BookingModal({
               }}
               className="min-h-9 cursor-pointer rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
             >
-              Ke Pemesanan Saya
+              {t.bookingModal.goToMyBookingsBtn}
             </button>
           </div>
         </div>
@@ -969,8 +977,8 @@ export function BookingModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Reservasi Kendaraan"
-      description="Pilih lokasi operasional dan detail perjalanan untuk penugasan otomatis"
+      title={t.bookingModal.formModalTitle}
+      description={t.bookingModal.formModalDesc}
       maxWidth="2xl"
       footer={
         <>
@@ -979,7 +987,7 @@ export function BookingModal({
             onClick={onClose}
             className="min-h-11 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            Batal
+            {t.common.cancel}
           </button>
           <button
             type="submit"
@@ -988,7 +996,7 @@ export function BookingModal({
             className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-50"
           >
             {isSubmitting && <Spinner size="sm" className="text-white" />}
-            <span>Kirim Reservasi</span>
+            <span>{t.bookingModal.submitReservationBtn}</span>
           </button>
         </>
       }
@@ -1005,7 +1013,7 @@ export function BookingModal({
         <section className="space-y-3.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
             <Icon name="route" className="size-4 shrink-0 text-brand-600" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Rute &amp; Lokasi</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.bookingModal.sectionRoute}</h3>
           </header>
 
           {/* GPS Location Banner (Wajib Bagi User) */}
@@ -1019,22 +1027,22 @@ export function BookingModal({
             {geoStatus === 'locating' ? (
               <div className="flex items-center gap-2.5 font-medium text-warning-700">
                 <Spinner size="sm" />
-                <span>Memeriksa dan mendeteksi titik GPS perangkat Anda...</span>
+                <span>{t.bookingModal.gpsChecking}</span>
               </div>
             ) : geoStatus === 'granted' && userCoords ? (
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 font-semibold text-success-700">
                     <span aria-hidden="true" className="size-2.5 animate-pulse rounded-full bg-success-600 motion-reduce:animate-none" />
-                    Lokasi GPS Terdeteksi (Wajib Aktif)
+                    {t.bookingModal.gpsDetected}
                   </span>
                   <span className="rounded-md border border-success-200 bg-white px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-700">
-                    &plusmn;{userCoords.accuracyM}m akurasi
+                    {format(t.bookingModal.gpsAccuracyTag, { accuracy: userCoords.accuracyM })}
                   </span>
                 </div>
                 <p className="min-w-0 break-words text-[11px] leading-relaxed text-slate-600">
-                  Koordinat: <span className="tabular-nums">{userCoords.lat.toFixed(5)}, {userCoords.lng.toFixed(5)}</span>
-                  {nearestHubName ? ` · Hub terdekat: ${nearestHubName}` : ''}
+                  {t.bookingModal.coordPrefix} <span className="tabular-nums">{userCoords.lat.toFixed(5)}, {userCoords.lng.toFixed(5)}</span>
+                  {nearestHubName ? ` ${format(t.bookingModal.nearestHubSuffix, { hub: nearestHubName })}` : ''}
                 </p>
               </div>
             ) : geoStatus === 'denied' ? (
@@ -1042,42 +1050,42 @@ export function BookingModal({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 font-semibold text-danger-700">
                     <Icon name="alert" className="size-4 text-danger-600" />
-                    <span>Izin Lokasi (GPS) Wajib Diaktifkan</span>
+                    <span>{t.bookingModal.gpsDeniedTitle}</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => requestUserLocation()}
                     className="min-h-9 cursor-pointer rounded-lg bg-brand-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-brand-700"
                   >
-                    Izinkan Lokasi
+                    {t.bookingModal.gpsEnableBtn}
                   </button>
                 </div>
                 <p className="text-[11px] font-medium leading-relaxed text-danger-700">
-                  Lokasi GPS Anda wajib diaktifkan agar sistem auto-dispatch dapat menentukan titik penjemputan dan armada driver terdekat. Silakan izinkan akses lokasi di browser Anda.
+                  {t.bookingModal.gpsDeniedDesc}
                 </p>
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 font-semibold text-warning-700">
                   <Icon name="pin" className="size-4 text-warning-600" />
-                  <span>Lokasi (GPS) Wajib untuk Penjemputan</span>
+                  <span>{t.bookingModal.gpsRequiredTitle}</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => requestUserLocation()}
                   className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                 >
-                  Deteksi GPS
+                  {t.bookingModal.gpsDetectBtn}
                 </button>
               </div>
             )}
           </div>
 
           {/* Operational Location (Required) */}
-          <FormField label="Lokasi Operasional" name="operationalLocation" required>
+          <FormField label={t.bookingModal.hubLabel} name="operationalLocation" required>
             {loadingLocations ? (
               <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
-                <Spinner size="sm" /> Memuat lokasi operasional...
+                <Spinner size="sm" /> {t.bookingModal.loadingLocations}
               </div>
             ) : (
               <select
@@ -1099,7 +1107,7 @@ export function BookingModal({
                 required
               >
                 <option value="" disabled>
-                  Pilih hub operasional...
+                  {t.bookingModal.hubPlaceholder}
                 </option>
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
@@ -1112,7 +1120,7 @@ export function BookingModal({
 
           {/* Pickup & Destination */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FormField label="Lokasi Penjemputan" name="pickupLocation" required>
+            <FormField label={t.bookingModal.pickupLabel} name="pickupLocation" required>
               <div className="min-w-0 space-y-1">
                 <input
                   id="pickupLocation"
@@ -1120,7 +1128,7 @@ export function BookingModal({
                   required
                   value={pickupLocation}
                   onChange={(e) => setPickupLocation(e.target.value)}
-                  placeholder="cth. Gate 2 Halim"
+                  placeholder={t.bookingModal.pickupPlaceholder}
                 />
                 {userCoords && (
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-1 pt-0.5 text-[11px]">
@@ -1130,16 +1138,19 @@ export function BookingModal({
                         const locationText =
                           resolvedAddress ||
                           nearestHubName ||
-                          `Titik GPS (${userCoords.lat.toFixed(5)}, ${userCoords.lng.toFixed(5)})`;
+                          format(t.bookingModal.gpsPinCoordLabel, {
+                            lat: userCoords.lat.toFixed(5),
+                            lng: userCoords.lng.toFixed(5),
+                          });
                         setPickupLocation(locationText);
                       }}
                       className="inline-flex cursor-pointer items-center gap-1 font-medium text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
                     >
                       <Icon name="pin" className="size-3 shrink-0 text-brand-600" />
-                      <span>Gunakan alamat lokasi saya</span>
+                      <span>{t.bookingModal.useMyAddressBtn}</span>
                     </button>
                     {isResolvingAddress ? (
-                      <span className="text-[10px] italic text-slate-400">Mencari alamat...</span>
+                      <span className="text-[10px] italic text-slate-400">{t.bookingModal.resolvingAddress}</span>
                     ) : resolvedAddress ? (
                       <span className="min-w-0 max-w-[280px] truncate text-[10px] font-medium text-slate-600" title={resolvedAddress}>
                         {resolvedAddress}
@@ -1154,7 +1165,7 @@ export function BookingModal({
               </div>
             </FormField>
 
-            <FormField label="Tujuan" name="destination" required>
+            <FormField label={t.bookingModal.destinationLabel} name="destination" required>
               <div className="relative min-w-0">
                 <input
                   id="destination"
@@ -1162,7 +1173,7 @@ export function BookingModal({
                   required
                   value={destination}
                   onChange={(e) => handleDestinationChange(e.target.value)}
-                  placeholder="cth. Kantor Depo Tegalluar"
+                  placeholder={t.bookingModal.destinationPlaceholder}
                   aria-invalid={destinationLinkError ? true : undefined}
                   className="pr-10"
                 />
@@ -1191,13 +1202,13 @@ export function BookingModal({
         <section className="space-y-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
             <Icon name="car" className="size-4 shrink-0 text-brand-600" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Layanan</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.bookingModal.sectionService}</h3>
           </header>
 
           {/* Pilihan Layanan: Drop Off vs Standby */}
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-slate-600">
-              Pilihan Layanan Pemesanan
+              {t.bookingModal.serviceSelectionLabel}
             </label>
             <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1.5">
               <button
@@ -1212,8 +1223,8 @@ export function BookingModal({
               >
                 <Icon name="car" className="size-4 shrink-0" />
                 <div className="text-left">
-                  <div className="font-semibold leading-tight">1. Drop Off</div>
-                  <div className={`text-[10px] leading-tight ${serviceType === 'DROP_OFF' ? 'text-white/80' : 'text-slate-500'}`}>Sekali Jalan (Jam Jemput Saja)</div>
+                  <div className="font-semibold leading-tight">{t.bookingModal.dropOffShortTitle}</div>
+                  <div className={`text-[10px] leading-tight ${serviceType === 'DROP_OFF' ? 'text-white/80' : 'text-slate-500'}`}>{t.bookingModal.dropOffSubtitle}</div>
                 </div>
               </button>
               <button
@@ -1228,8 +1239,8 @@ export function BookingModal({
               >
                 <Icon name="clock" className="size-4 shrink-0" />
                 <div className="text-left">
-                  <div className="font-semibold leading-tight">2. Standby</div>
-                  <div className={`text-[10px] leading-tight ${serviceType === 'STANDBY' ? 'text-white/80' : 'text-slate-500'}`}>Operasional Seharian</div>
+                  <div className="font-semibold leading-tight">{t.bookingModal.standbyShortTitle}</div>
+                  <div className={`text-[10px] leading-tight ${serviceType === 'STANDBY' ? 'text-white/80' : 'text-slate-500'}`}>{t.bookingModal.standbySubtitle}</div>
                 </div>
               </button>
             </div>
@@ -1240,7 +1251,7 @@ export function BookingModal({
         <section className="space-y-3.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
             <Icon name="calendar" className="size-4 shrink-0 text-brand-600" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Jadwal &amp; Penumpang</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.bookingModal.sectionSchedule}</h3>
           </header>
 
           {/* Departure & Return */}
@@ -1249,16 +1260,16 @@ export function BookingModal({
               <div className="flex items-center justify-between border-b border-brand-200 pb-1.5 text-xs">
                 <span className="flex items-center gap-1.5 font-semibold text-brand-700">
                   <Icon name="clock" className="size-3.5 text-brand-600" />
-                  <span>Jadwal Penjemputan Drop Off</span>
+                  <span>{t.bookingModal.dropOffScheduleTitle}</span>
                 </span>
                 <span className="rounded border border-brand-200 bg-white px-2 py-0.5 text-[10px] font-medium text-brand-700">
-                  Sekali Jalan
+                  {t.bookingModal.oneWayBadge}
                 </span>
               </div>
               <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
                 <div className="min-w-0">
                   <label htmlFor="dropOffDate" className="mb-1 block text-[11px] font-medium text-slate-700">
-                    Tanggal Jemput <span className="text-brand-500">*</span>
+                    {t.bookingModal.dropOffDateLabel} <span className="text-brand-500">*</span>
                   </label>
                   <input
                     id="dropOffDate"
@@ -1271,7 +1282,7 @@ export function BookingModal({
                 </div>
                 <div className="min-w-0">
                   <label htmlFor="dropOffTime" className="mb-1 block text-[11px] font-medium text-slate-700">
-                    Jam Jemput <span className="text-brand-500">*</span>
+                    {t.bookingModal.dropOffTimeLabel} <span className="text-brand-500">*</span>
                   </label>
                   <input
                     id="dropOffTime"
@@ -1284,12 +1295,12 @@ export function BookingModal({
                 </div>
               </div>
               <p className="pt-0.5 text-[10px] italic text-slate-500">
-                * Khusus Drop Off, tanggal &amp; jam selesai tidak perlu diisi (hanya jadwal penjemputan).
+                {t.bookingModal.dropOffNote}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <FormField label="Waktu Mulai Standby" name="departureAt" required>
+              <FormField label={t.bookingModal.standbyStartLabel} name="departureAt" required>
                 <input
                   id="departureAt"
                   type="datetime-local"
@@ -1300,7 +1311,7 @@ export function BookingModal({
                 />
               </FormField>
 
-              <FormField label="Waktu Selesai Standby" name="expectedReturnAt" required>
+              <FormField label={t.bookingModal.standbyEndLabel} name="expectedReturnAt" required>
                 <input
                   id="expectedReturnAt"
                   type="datetime-local"
@@ -1315,7 +1326,7 @@ export function BookingModal({
 
           {/* Passenger count & Purpose */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <FormField label="Jumlah Penumpang" name="passengerCount" required>
+            <FormField label={t.bookingModal.passengersLabel} name="passengerCount" required>
               <input
                 id="passengerCount"
                 type="number"
@@ -1330,7 +1341,7 @@ export function BookingModal({
 
             <div className="min-w-0 sm:col-span-2">
               <FormField
-                label={serviceType === 'STANDBY' ? 'Keperluan / Keterangan (Wajib)' : 'Keperluan / Keterangan (Opsional)'}
+                label={serviceType === 'STANDBY' ? t.bookingModal.purposeRequiredLabel : t.bookingModal.purposeOptionalLabel}
                 name="purpose"
                 required={serviceType === 'STANDBY'}
               >
@@ -1342,8 +1353,8 @@ export function BookingModal({
                   onChange={(e) => setPurpose(e.target.value)}
                   placeholder={
                     serviceType === 'STANDBY'
-                      ? 'Wajib diisi, misal: Standby pimpinan / inspeksi rel'
-                      : 'Opsional, misal: Antar staf ke Stasiun Halim'
+                      ? t.bookingModal.purposeStandbyPlaceholder
+                      : t.bookingModal.purposeOptionalPlaceholder
                   }
                 />
               </FormField>
@@ -1355,14 +1366,14 @@ export function BookingModal({
         <section className="space-y-3.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
           <header className="flex items-center gap-2 border-b border-slate-200 pb-2.5">
             <Icon name="bookings" className="size-4 shrink-0 text-brand-600" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kebutuhan Nota Dinas / Layanan</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.bookingModal.sectionVehicleNotes}</h3>
           </header>
 
           {/* Specific Vehicle Preference (Option B - Optional) */}
           <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3.5">
             <div className="flex items-center justify-between gap-2">
               <span className="min-w-0 text-xs font-medium uppercase tracking-wider text-slate-500">
-                Preferensi Kendaraan (Opsional)
+                {t.bookingModal.preferredVehicleLabel}
               </span>
               {preferredVehicle && (
                 <button
@@ -1370,7 +1381,7 @@ export function BookingModal({
                   onClick={() => setPreferredVehicle(null)}
                   className="shrink-0 cursor-pointer text-xs font-semibold text-danger-700 underline-offset-2 hover:underline"
                 >
-                  Hapus Pilihan
+                  {t.bookingModal.clearVehicle}
                 </button>
               )}
             </div>
@@ -1385,26 +1396,26 @@ export function BookingModal({
                     {preferredVehicle.status && <StatusBadge status={preferredVehicle.status} />}
                   </div>
                   <div className="mt-0.5 font-medium text-slate-600">
-                    {preferredVehicle.brand} {preferredVehicle.model} • <span className="tabular-nums">{preferredVehicle.seatingCapacity}</span> kursi
+                    {preferredVehicle.brand} {preferredVehicle.model} • <span className="tabular-nums">{preferredVehicle.seatingCapacity}</span> {t.common.seats}
                     {preferredVehicle.vehicleType && ` • ${preferredVehicle.vehicleType}`}
                   </div>
                 </div>
                 <span className="shrink-0 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
-                  Dipilih
+                  {t.bookingModal.selectedPill}
                 </span>
               </div>
             ) : (
               <div className="space-y-1.5">
                 <input
                   type="text"
-                  placeholder="Cari nomor polisi untuk memilih kendaraan tertentu..."
+                  placeholder={t.bookingModal.searchPlatePlaceholder}
                   value={vehicleSearchQuery}
                   onChange={(e) => setVehicleSearchQuery(e.target.value)}
                   className="min-h-12 w-full min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
                 />
                 {isSearchingVehicles && (
                   <div className="flex items-center gap-1.5 py-1 text-xs font-medium text-slate-600">
-                    <Spinner size="sm" /> Mencari kendaraan...
+                    <Spinner size="sm" /> {t.bookingModal.searchingVehicles}
                   </div>
                 )}
                 {vehicleSearchResults.length > 0 && (
@@ -1423,7 +1434,7 @@ export function BookingModal({
                         <div className="min-w-0">
                           <span className="font-mono font-semibold tabular-nums text-slate-900">{v.plateNumber}</span>
                           <span className="ml-2 text-slate-600">
-                            {v.brand} {v.model} (<span className="tabular-nums">{v.seatingCapacity}</span> kursi)
+                            {v.brand} {v.model} (<span className="tabular-nums">{v.seatingCapacity}</span> {t.common.seats})
                           </span>
                         </div>
                         <StatusBadge status={v.status || 'AVAILABLE'} />
@@ -1432,20 +1443,20 @@ export function BookingModal({
                   </div>
                 )}
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  Biarkan kosong agar auto-dispatch memilih driver &amp; kendaraan tercepat yang tersedia.
+                  {t.bookingModal.autoDispatchHint}
                 </p>
               </div>
             )}
           </div>
 
           {/* Notes */}
-          <FormField label="Catatan (Opsional)" name="notes">
+          <FormField label={t.bookingModal.notesLabel} name="notes">
             <textarea
               id="notes"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Peralatan khusus, kontak, atau instruksi operasional"
+              placeholder={t.bookingModal.notesPlaceholder2}
             />
           </FormField>
         </section>

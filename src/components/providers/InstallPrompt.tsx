@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Icon } from '@/components/ui/Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -133,6 +134,7 @@ export function isIosDismissed(): boolean {
  * Appears on first visit, every re-login, on logout, and after "Later" cooldown.
  */
 export function InstallPrompt() {
+  const { t } = useTranslation();
   const { status } = useSession();
   const prevStatusRef = useRef(status);
   const [promptAvailable, setPromptAvailable] = useState(false);
@@ -221,7 +223,7 @@ export function InstallPrompt() {
   return (
     <aside
       className="install-toast overflow-hidden rounded-2xl border border-slate-200 bg-white"
-      aria-label="Install KCIC Fleet application"
+      aria-label={t.install.ariaLabel}
     >
       {/* KCIC accent rule */}
       <div className="h-0.5 w-full bg-brand-600" aria-hidden="true" />
@@ -238,13 +240,13 @@ export function InstallPrompt() {
             />
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Aplikasi PWA
+                {t.install.eyebrow}
               </p>
               <h2 className="mt-1 text-base font-semibold tracking-tight text-slate-900">
-                Pasang KCIC Fleet
+                {t.install.title}
               </h2>
               <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
-                Akses cepat dari layar utama HP/laptop tanpa buka browser. Offline-ready &amp; notifikasi realtime.
+                {t.install.description}
               </p>
             </div>
           </div>
@@ -252,7 +254,7 @@ export function InstallPrompt() {
             type="button"
             onClick={handleDismissLater}
             className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-            aria-label="Tutup saran install"
+            aria-label={t.install.closeAria}
           >
             <Icon name="close" className="size-4" />
           </button>
@@ -264,7 +266,7 @@ export function InstallPrompt() {
             onClick={handleInstallClick}
             className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            <span>Install Sekarang</span>
+            <span>{t.install.installNow}</span>
             <Icon name="download" className="size-4" />
           </button>
           <button
@@ -272,7 +274,7 @@ export function InstallPrompt() {
             onClick={handleDismissLater}
             className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            Nanti saja
+            {t.install.laterLong}
           </button>
         </div>
       </div>
@@ -285,6 +287,7 @@ export function InstallPrompt() {
  * Reappears after cooldown, reset on login & logout.
  */
 export function IosInstallHint() {
+  const { t } = useTranslation();
   const { status } = useSession();
   const [isIosEligible, setIsIosEligible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -307,7 +310,7 @@ export function IosInstallHint() {
   return (
     <aside
       className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm"
-      aria-label="Add KCIC Fleet to your home screen"
+      aria-label={t.install.iosAria}
     >
       <div className="flex items-start gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -319,11 +322,11 @@ export function IosInstallHint() {
           className="size-9 shrink-0 rounded-lg shadow-xs"
         />
         <div className="leading-relaxed">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Tip instalasi iOS</p>
-          <p className="mt-1 text-sm font-semibold tracking-tight text-slate-900">Pasang di Layar Utama iPhone/iPad</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{t.install.iosEyebrow}</p>
+          <p className="mt-1 text-sm font-semibold tracking-tight text-slate-900">{t.install.iosTitle}</p>
           <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
-            Di browser Safari, ketuk tombol <strong className="font-semibold text-slate-700">Share</strong> (ikon kotak tanda panah ke atas), lalu pilih{' '}
-            <strong className="font-semibold text-slate-700 underline decoration-brand-300 underline-offset-2">Add to Home Screen (Tambah ke Layar Utama)</strong>.
+            {t.install.iosStepPrefix} <strong className="font-semibold text-slate-700">{t.install.iosStepShare}</strong> {t.install.iosStepMid}{' '}
+            <strong className="font-semibold text-slate-700 underline decoration-brand-300 underline-offset-2">{t.install.iosStepAction}</strong>.
           </p>
         </div>
       </div>
@@ -338,7 +341,7 @@ export function IosInstallHint() {
           }
         }}
         className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-        aria-label="Dismiss iOS install tip"
+        aria-label={t.install.iosDismissAria}
       >
         <Icon name="close" className="size-4" />
       </button>

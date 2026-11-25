@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { CallStatus } from '@/hooks/useWebRTCCall';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 interface VoiceCallModalProps {
   callStatus: CallStatus;
@@ -39,6 +40,7 @@ export function VoiceCallModal({
   onEndCall,
   onToggleMute,
 }: VoiceCallModalProps) {
+  const { t } = useTranslation();
   const internalAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioRef = externalAudioRef || internalAudioRef;
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
@@ -139,10 +141,14 @@ export function VoiceCallModal({
 
   if (callStatus === 'idle') return null;
 
+  const lowerErr = errorMessage?.toLowerCase() ?? '';
   const isMissedOrRejected =
-    errorMessage?.toLowerCase().includes('tidak ada jawaban') ||
-    errorMessage?.toLowerCase().includes('tak terjawab') ||
-    errorMessage?.toLowerCase().includes('ditolak');
+    lowerErr.includes('tidak ada jawaban') ||
+    lowerErr.includes('tak terjawab') ||
+    lowerErr.includes('ditolak') ||
+    lowerErr.includes('no answer') ||
+    lowerErr.includes('missed') ||
+    lowerErr.includes('declined');
 
   /* Circular control recipe: shared by mute / speaker / hang-up */
   const controlBase =
@@ -186,7 +192,11 @@ export function VoiceCallModal({
           {/* Partner Name & Role */}
           <h3 className="truncate text-lg font-semibold tracking-tight text-slate-900">{partnerName}</h3>
           <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-            {partnerRole === 'DRIVER' ? 'Pengemudi Armada' : partnerRole === 'ADMIN' ? 'Dispatcher Admin' : 'Penumpang'}
+            {partnerRole === 'DRIVER'
+              ? t.comms.driverSubtitle
+              : partnerRole === 'ADMIN'
+              ? t.comms.adminSubtitle
+              : t.comms.passengerSubtitle}
           </p>
 
           {/* Call Status Label */}
@@ -197,7 +207,7 @@ export function VoiceCallModal({
                   <span className="absolute inset-0 rounded-full bg-slate-400" />
                   <span className="absolute inset-0 rounded-full bg-slate-400 status-ping" />
                 </span>
-                Memanggil...
+                {t.comms.voice.calling}
               </span>
             )}
             {callStatus === 'ringing' && (
@@ -206,14 +216,14 @@ export function VoiceCallModal({
                   <span className="absolute inset-0 rounded-full bg-success-600" />
                   <span className="absolute inset-0 rounded-full bg-success-600 status-ping" />
                 </span>
-                Panggilan Masuk...
+                {t.comms.voice.ringing}
               </span>
             )}
             {callStatus === 'connected' && (
               <div className="space-y-1.5">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-3 py-1 text-xs font-medium text-success-700">
                   <span className="inline-flex size-1.5 shrink-0 rounded-full bg-success-600" aria-hidden="true" />
-                  Tersambung
+                  {t.comms.voice.connected}
                 </span>
                 <p className="font-mono text-base font-semibold tabular-nums text-slate-900">
                   {formatDuration(callDuration)}
@@ -231,7 +241,7 @@ export function VoiceCallModal({
                 {isMissedOrRejected ? (
                   <Icon name="phoneOff" className="size-3.5 shrink-0" />
                 ) : null}
-                <span className="truncate">{errorMessage || 'Panggilan Berakhir'}</span>
+                <span className="truncate">{errorMessage || t.comms.voice.ended}</span>
               </span>
             )}
           </div>
@@ -256,7 +266,7 @@ export function VoiceCallModal({
                   <span className="flex size-14 items-center justify-center rounded-full bg-danger-600 text-white transition-colors group-hover:bg-danger-700">
                     <Icon name="phoneOff" className="size-6" />
                   </span>
-                  <span className="text-[11px] font-semibold text-danger-700">Tolak</span>
+                  <span className="text-[11px] font-semibold text-danger-700">{t.comms.voice.reject}</span>
                 </button>
 
                 <button
@@ -271,7 +281,7 @@ export function VoiceCallModal({
                     />
                     <Icon name="phone" className="relative size-6" />
                   </span>
-                  <span className="text-[11px] font-semibold text-success-700">Terima</span>
+                  <span className="text-[11px] font-semibold text-success-700">{t.comms.voice.accept}</span>
                 </button>
               </>
             ) : (
@@ -283,12 +293,12 @@ export function VoiceCallModal({
                       type="button"
                       onClick={onToggleMute}
                       className="group flex cursor-pointer flex-col items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
-                      title={isMuted ? 'Aktifkan Mikrofon' : 'Bisukan Mikrofon'}
+                      title={isMuted ? t.comms.voice.unmuteTitle : t.comms.voice.muteTitle}
                     >
                       <span className={`${controlBase} ${isMuted ? controlActive : controlIdle}`}>
                         <Icon name={isMuted ? 'micOff' : 'mic'} className="size-5" />
                       </span>
-                      <span className={controlLabel}>{isMuted ? 'Unmute' : 'Mute'}</span>
+                      <span className={controlLabel}>{isMuted ? t.comms.voice.unmute : t.comms.voice.mute}</span>
                     </button>
 
                     <button
@@ -298,15 +308,15 @@ export function VoiceCallModal({
                       title={
                         isSinkIdSupported
                           ? isSpeakerOn
-                            ? 'Matikan Loudspeaker'
-                            : 'Aktifkan Loudspeaker'
-                          : 'Output audio dikelola sistem perangkat'
+                            ? t.comms.voice.speakerOnTitle
+                            : t.comms.voice.speakerOffTitle
+                          : t.comms.voice.speakerUnsupportedTitle
                       }
                     >
                       <span className={`${controlBase} ${isSpeakerOn ? controlActive : controlIdle}`}>
                         <Icon name={isSpeakerOn ? 'speaker' : 'speakerOff'} className="size-5" />
                       </span>
-                      <span className={controlLabel}>{isSpeakerOn ? 'Speaker On' : 'Speaker Off'}</span>
+                      <span className={controlLabel}>{isSpeakerOn ? t.comms.voice.speakerOn : t.comms.voice.speakerOff}</span>
                     </button>
                   </>
                 )}
@@ -319,7 +329,7 @@ export function VoiceCallModal({
                   <span className="flex size-12 items-center justify-center rounded-full border border-danger-200 bg-danger-50 text-danger-600 transition-colors group-hover:border-danger-600 group-hover:bg-danger-600 group-hover:text-white">
                     <Icon name="phoneOff" className="size-5" />
                   </span>
-                  <span className="text-[11px] font-semibold text-danger-700">Akhiri</span>
+                  <span className="text-[11px] font-semibold text-danger-700">{t.comms.voice.endCall}</span>
                 </button>
               </>
             )}

@@ -10,6 +10,7 @@ import { LocationCapacityChart, LocationStatItem } from '@/components/admin/Loca
 import { Icon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 interface AdminStats {
   vehicles: {
@@ -51,6 +52,7 @@ interface ActiveTripPreview {
 }
 
 export default function AdminOverviewPage() {
+  const { locale, t, format } = useTranslation();
   const { data: session, status } = useSession();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [activeTripsList, setActiveTripsList] = useState<ActiveTripPreview[]>([]);
@@ -103,12 +105,12 @@ export default function AdminOverviewPage() {
   const selectedLoc = stats?.byLocation.find((l) => l.locationId === selectedLocationId);
 
   // Filtered active trips
-  const filteredTrips = activeTripsList.filter((t) => {
+  const filteredTrips = activeTripsList.filter((trip) => {
     if (!selectedLocationId) return true;
     return (
-      t.booking?.operationalLocationId === selectedLocationId ||
-      t.vehicle?.currentLocationId === selectedLocationId ||
-      t.vehicle?.homeLocationId === selectedLocationId
+      trip.booking?.operationalLocationId === selectedLocationId ||
+      trip.vehicle?.currentLocationId === selectedLocationId ||
+      trip.vehicle?.homeLocationId === selectedLocationId
     );
   });
 
@@ -135,22 +137,22 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="min-w-0 space-y-6 text-slate-900 sm:space-y-8">
-      <GreetingClock userName={session?.user?.name} roleLabel="Operations Admin" />
+      <GreetingClock userName={session?.user?.name} roleLabel={t.nav.roleDescAdmin} />
 
       <header className="page-intro">
         <div>
-          <p className="eyebrow">KCIC Fleet / Operations overview</p>
-          <h1 className="page-heading mt-2">Fleet at a glance</h1>
+          <p className="eyebrow">{t.adminPages.dashboard.eyebrow}</p>
+          <h1 className="page-heading mt-2">{t.adminPages.dashboard.heading}</h1>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">
-            A clear view of your vehicles, people, and journeys. Ready for the decisions ahead.
+            {t.adminPages.dashboard.subheading}
           </p>
         </div>
         <div className="flex flex-col gap-2 min-[380px]:flex-row sm:flex-wrap sm:justify-end">
           <Link href={`/admin/fleet${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`} className="button-primary">
-            <Icon name="pin" />Live fleet map
+            <Icon name="pin" />{t.adminPages.dashboard.liveMapBtn}
           </Link>
           <Link href={`/admin/bookings${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`} className="button-secondary">
-            <Icon name="calendar" />Manage bookings
+            <Icon name="calendar" />{t.adminPages.dashboard.manageBookingsBtn}
           </Link>
         </div>
       </header>
@@ -163,7 +165,8 @@ export default function AdminOverviewPage() {
               <Icon name="pin" className="size-3" />
             </span>
             <span className="text-xs font-medium text-slate-600">
-              Menampilkan data terfilter untuk Hub: <strong className="font-semibold text-brand-700">{selectedLoc.name} ({selectedLoc.code})</strong>
+              {locale === 'id' ? 'Menampilkan data terfilter untuk Hub:' : 'Showing filtered data for Hub:'}{' '}
+              <strong className="font-semibold text-brand-700">{selectedLoc.name} ({selectedLoc.code})</strong>
             </span>
           </div>
           <button
@@ -171,7 +174,7 @@ export default function AdminOverviewPage() {
             onClick={() => setSelectedLocationId('')}
             className="shrink-0 cursor-pointer self-start rounded-md border border-brand-200 bg-white px-2.5 py-1 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:self-auto"
           >
-            Tampilkan Semua Hub
+            {t.adminPages.dashboard.showAllHubsBtn}
           </button>
         </div>
       )}
@@ -179,36 +182,50 @@ export default function AdminOverviewPage() {
       {/* Bento body */}
       <div className="grid grid-cols-1 gap-4 md:gap-5 lg:grid-cols-12">
         {/* Top strip: KPI tiles */}
-        <section aria-label="Fleet overview metrics" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-12 lg:grid-cols-4">
+        <section aria-label={t.adminPages.dashboard.metricsAria} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-12 lg:grid-cols-4">
           {[
             {
-              label: selectedLoc ? `Kapasitas Maks Hub` : 'Total Armada',
+              label: selectedLoc ? t.adminPages.dashboard.kpiMaxCapLabel : t.adminPages.dashboard.kpiTotalFleetLabel,
               value: maxCapacityCount,
-              caption: selectedLoc ? `Maksimal order simultan di ${selectedLoc.name}` : 'Aset kendaraan terdaftar',
+              caption: selectedLoc
+                ? format(t.adminPages.dashboard.kpiMaxCapCaption, { hub: selectedLoc.name })
+                : t.adminPages.dashboard.kpiTotalFleetCaption,
               icon: 'car' as const,
               iconTone: 'bg-brand-50 text-brand-600',
               live: false,
             },
             {
-              label: selectedLoc ? `Armada Available (${selectedLoc.code})` : 'Available fleet',
+              label: selectedLoc
+                ? format(t.adminPages.dashboard.kpiAvailHubLabel, { code: selectedLoc.code })
+                : t.adminPages.dashboard.kpiAvailLabel,
               value: availableCount,
-              caption: selectedLoc ? `Siap terima booking di ${selectedLoc.name}` : 'Ready for dispatch seluruh hub',
+              caption: selectedLoc
+                ? format(t.adminPages.dashboard.kpiAvailHubCaption, { hub: selectedLoc.name })
+                : t.adminPages.dashboard.kpiAvailCaption,
               icon: 'car' as const,
               iconTone: 'bg-success-50 text-success-700',
               live: true,
             },
             {
-              label: selectedLoc ? `Sedang Digunakan (${selectedLoc.code})` : 'In use fleet',
+              label: selectedLoc
+                ? format(t.adminPages.dashboard.kpiInUseHubLabel, { code: selectedLoc.code })
+                : t.adminPages.dashboard.kpiInUseLabel,
               value: inUseCount,
-              caption: selectedLoc ? `Sedang melayani trip di ${selectedLoc.name}` : 'Unit dalam perjalanan aktif',
+              caption: selectedLoc
+                ? format(t.adminPages.dashboard.kpiInUseHubCaption, { hub: selectedLoc.name })
+                : t.adminPages.dashboard.kpiInUseCaption,
               icon: 'route' as const,
               iconTone: 'bg-warning-50 text-warning-700',
               live: false,
             },
             {
-              label: selectedLoc ? `Trips / Booking (${selectedLoc.code})` : 'Active trips',
+              label: selectedLoc
+                ? format(t.adminPages.dashboard.kpiTripsHubLabel, { code: selectedLoc.code })
+                : t.adminPages.dashboard.kpiActiveTripsLabel,
               value: activeTripsCount,
-              caption: selectedLoc ? `Order aktif di ${selectedLoc.name}` : 'Assigned / en route seluruh hub',
+              caption: selectedLoc
+                ? format(t.adminPages.dashboard.kpiTripsHubCaption, { hub: selectedLoc.name })
+                : t.adminPages.dashboard.kpiActiveTripsCaption,
               icon: 'route' as const,
               iconTone: 'bg-info-100 text-info-600',
               live: true,
@@ -224,7 +241,7 @@ export default function AdminOverviewPage() {
               <div className="mt-4 flex items-baseline gap-2">
                 {metric.live && <span className="relative inline-flex size-1.5 shrink-0 rounded-full bg-success-600 status-ping" aria-hidden="true" />}
                 <div className="metric-value text-3xl font-semibold tabular-nums text-slate-900">
-                  {isLoading ? <Spinner size="md" /> : (metric.value ?? '—')}
+                  {isLoading ? <Spinner size="md" /> : (metric.value ?? t.common.noDataDash)}
                 </div>
               </div>
               <p className="mt-2 text-xs leading-relaxed text-slate-500">{metric.caption}</p>
@@ -249,28 +266,28 @@ export default function AdminOverviewPage() {
           <MotionBentoCard index={6} className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="eyebrow">The operational picture</p>
-                <h2 id="fleet-health-heading" className="section-title mt-2">Fleet health & dispatch</h2>
+                <p className="eyebrow">{t.adminPages.dashboard.healthEyebrow}</p>
+                <h2 id="fleet-health-heading" className="section-title mt-2">{t.adminPages.dashboard.healthTitle}</h2>
               </div>
-              <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Icon name="clock" className="size-3.5" />Refreshes every 20 seconds</p>
+              <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Icon name="clock" className="size-3.5" />{t.adminPages.dashboard.refreshesEvery20s}</p>
             </div>
             <dl className="mt-5 grid grid-cols-2 gap-x-5 sm:grid-cols-3 xl:grid-cols-5 xl:gap-x-8">
               {[
-                { label: 'Total fleet', value: stats?.vehicles.total, caption: 'Registered assets', attention: false },
-                { label: 'Reserved', value: stats?.vehicles.reserved, caption: 'Assigned to a booking', attention: false },
-                { label: 'In use', value: stats?.vehicles.inUse, caption: 'On an active trip', attention: false },
-                { label: 'Maintenance', value: stats?.vehicles.maintenance, caption: 'Service workshop', attention: false },
-                { label: 'Inactive', value: stats?.vehicles.inactive, caption: 'Decommissioned', attention: false },
-                { label: 'Busy drivers', value: stats?.drivers.busy, caption: 'On a trip', attention: false },
-                { label: 'Offline drivers', value: stats?.drivers.offline, caption: 'On standby', attention: false },
-                { label: 'Searching for a driver', value: stats?.bookings.searching, caption: 'Auto-dispatch', attention: false },
-                { label: 'Unassigned bookings', value: stats?.bookings.unassigned, caption: 'No driver available', attention: false },
-                { label: 'Intervention', value: stats?.bookings.adminIntervention, caption: 'Needs assignment', attention: true },
+                { label: t.adminPages.dashboard.healthTotalFleet, value: stats?.vehicles.total, caption: t.adminPages.dashboard.healthTotalFleetCap, attention: false },
+                { label: t.adminPages.dashboard.healthReserved, value: stats?.vehicles.reserved, caption: t.adminPages.dashboard.healthReservedCap, attention: false },
+                { label: t.adminPages.dashboard.healthInUse, value: stats?.vehicles.inUse, caption: t.adminPages.dashboard.healthInUseCap, attention: false },
+                { label: t.adminPages.dashboard.healthMaintenance, value: stats?.vehicles.maintenance, caption: t.adminPages.dashboard.healthMaintenanceCap, attention: false },
+                { label: t.adminPages.dashboard.healthInactive, value: stats?.vehicles.inactive, caption: t.adminPages.dashboard.healthInactiveCap, attention: false },
+                { label: t.adminPages.dashboard.healthBusyDrivers, value: stats?.drivers.busy, caption: t.adminPages.dashboard.healthBusyDriversCap, attention: false },
+                { label: t.adminPages.dashboard.healthOfflineDrivers, value: stats?.drivers.offline, caption: t.adminPages.dashboard.healthOfflineDriversCap, attention: false },
+                { label: t.adminPages.dashboard.healthSearching, value: stats?.bookings.searching, caption: t.adminPages.dashboard.healthSearchingCap, attention: false },
+                { label: t.adminPages.dashboard.healthUnassigned, value: stats?.bookings.unassigned, caption: t.adminPages.dashboard.healthUnassignedCap, attention: false },
+                { label: t.adminPages.dashboard.healthIntervention, value: stats?.bookings.adminIntervention, caption: t.adminPages.dashboard.healthInterventionCap, attention: true },
               ].map((metric) => (
                 <div key={metric.label} className="min-w-0 border-t border-slate-200 py-4">
                   <dt className={`min-h-10 text-[11px] font-semibold uppercase leading-relaxed tracking-wider ${metric.attention ? 'text-warning-700' : 'text-slate-400'}`}>{metric.label}</dt>
                   <dd className={`mt-1 text-2xl font-semibold tracking-tight tabular-nums ${metric.attention ? 'text-warning-700' : 'text-slate-900'}`}>
-                    {isLoading ? <Spinner size="sm" /> : (metric.value ?? '—')}
+                    {isLoading ? <Spinner size="sm" /> : (metric.value ?? t.common.noDataDash)}
                   </dd>
                   <dd className="mt-1 text-xs text-slate-500">{metric.caption}</dd>
                 </div>
@@ -283,52 +300,58 @@ export default function AdminOverviewPage() {
           <MotionBentoCard index={7} className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="eyebrow">On the road</p>
+                <p className="eyebrow">{t.adminPages.dashboard.onRoadEyebrow}</p>
                 <h2 id="active-trips-heading" className="section-title mt-2 flex items-center gap-2">
-                  Active trips
+                  {t.adminPages.dashboard.activeTripsTitle}
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-medium normal-case tracking-normal tabular-nums text-slate-500">
-                    {filteredTrips.length} shown
+                    {filteredTrips.length} {locale === 'id' ? 'ditampilkan' : 'shown'}
                   </span>
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-500">
                   {selectedLoc
-                    ? `Perjalanan aktif di hub ${selectedLoc.name} (${selectedLoc.code}).`
-                    : 'Vehicles currently underway on live routes across all hubs.'}
+                    ? format(t.adminPages.dashboard.activeTripsDescHub, { hub: `${selectedLoc.name} (${selectedLoc.code})` })
+                    : t.adminPages.dashboard.activeTripsDescAll}
                 </p>
               </div>
               <Link href={`/admin/fleet${selectedLocationId ? `?locationId=${selectedLocationId}` : ''}`} className="button-secondary">
-                Live tracking map<Icon name="arrow" className="size-4" />
+                {t.adminPages.dashboard.liveMapBtn}<Icon name="arrow" className="size-4" />
               </Link>
             </div>
   
             {filteredTrips.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 {isLoading ? (
-                  <div role="status" className="flex items-center gap-3 text-sm font-medium text-slate-500"><Spinner size="md" />Loading active trips...</div>
+                  <div role="status" className="flex items-center gap-3 text-sm font-medium text-slate-500"><Spinner size="md" />{t.adminPages.dashboard.loadingActiveTrips}</div>
                 ) : (
                   <>
                     <span className="mb-1 flex size-12 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-400"><Icon name="route" /></span>
                     <p className="text-sm font-semibold text-slate-900">
-                      {selectedLoc ? `No trips underway at ${selectedLoc.name} right now.` : 'No trips underway right now.'}
+                      {selectedLoc
+                        ? format(t.adminPages.dashboard.noActiveTripsHub, { hub: selectedLoc.name })
+                        : t.adminPages.dashboard.noActiveTripsAll}
                     </p>
-                    <p className="max-w-sm text-xs leading-relaxed text-slate-500">Active journeys will appear here as drivers start their trips.</p>
+                    <p className="max-w-sm text-xs leading-relaxed text-slate-500">{t.adminPages.dashboard.noActiveTripsHint}</p>
                   </>
                 )}
               </div>
             ) : (
               <ul className="mt-5 divide-y divide-slate-100">
-                {filteredTrips.map((t) => (
-                  <li key={t.id} className="flex min-w-0 flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
+                {filteredTrips.map((trip) => (
+                  <li key={trip.id} className="flex min-w-0 flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center sm:gap-6">
                     <div className="flex min-w-0 items-start gap-3">
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning-50 text-warning-700"><Icon name="car" className="size-4" /></span>
                       <div className="min-w-0">
-                        <p className="wrap-anywhere font-mono text-sm font-semibold tracking-wide tabular-nums text-slate-900">{t.vehicle?.plateNumber}</p>
-                        <p className="mt-1 wrap-anywhere text-sm leading-relaxed text-slate-600">{t.booking ? `${t.booking.pickupLocation} → ${t.booking.destination}` : 'Ad-hoc trip'}</p>
+                        <p className="wrap-anywhere font-mono text-sm font-semibold tracking-wide tabular-nums text-slate-900">{trip.vehicle?.plateNumber}</p>
+                        <p className="mt-1 wrap-anywhere text-sm leading-relaxed text-slate-600">{trip.booking ? `${trip.booking.pickupLocation} → ${trip.booking.destination}` : t.adminPages.dashboard.adHocLabel}</p>
                       </div>
                     </div>
                     <div className="min-w-0 pl-12 sm:max-w-[45%] sm:pl-0 sm:text-right">
-                      <p className="wrap-anywhere text-sm font-medium text-slate-700">Driver: {t.driver?.user?.name || 'Assigned driver'}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-500">Started <RelativeTime date={t.startedAt} /></p>
+                      <p className="wrap-anywhere text-sm font-medium text-slate-700">
+                        {format(t.adminPages.dashboard.driverPrefix, {
+                          name: trip.driver?.user?.name || t.adminPages.dashboard.defaultAssignedDriver,
+                        })}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.adminPages.dashboard.startedPrefix}<RelativeTime date={trip.startedAt} /></p>
                     </div>
                   </li>
                 ))}
@@ -341,20 +364,22 @@ export default function AdminOverviewPage() {
           <MotionBentoCard index={8} className="min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="eyebrow">Across your network</p>
-                <h2 id="locations-heading" className="section-title mt-2">Operational locations</h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">Fleet distribution and active workload at each base.</p>
+                <p className="eyebrow">{t.adminPages.dashboard.networkEyebrow}</p>
+                <h2 id="locations-heading" className="section-title mt-2">{t.adminPages.dashboard.locationsTitle}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">{t.adminPages.dashboard.locationsDesc}</p>
               </div>
-              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-slate-500">{stats?.byLocation.length || 0} operational hubs</span>
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-slate-500">
+                {stats?.byLocation.length || 0} {locale === 'id' ? 'hub operasional' : 'operational hubs'}
+              </span>
             </div>
   
             {isLoading ? (
-              <div role="status" className="flex items-center justify-center gap-3 py-12 text-sm font-medium text-slate-500"><Spinner size="md" />Loading operational locations...</div>
+              <div role="status" className="flex items-center justify-center gap-3 py-12 text-sm font-medium text-slate-500"><Spinner size="md" />{t.adminPages.dashboard.loadingLocations}</div>
             ) : !stats || stats.byLocation.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-5 py-10 text-center">
                 <Icon name="pin" className="mx-auto mb-3 size-5 text-slate-400" />
-                <p className="text-sm font-semibold text-slate-900">No operational locations configured.</p>
-                <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Your base-by-base fleet overview will appear here when locations are available.</p>
+                <p className="text-sm font-semibold text-slate-900">{t.adminPages.dashboard.noLocationsTitle}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{t.adminPages.dashboard.noLocationsDesc}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -375,22 +400,22 @@ export default function AdminOverviewPage() {
                       </div>
                       <dl className="my-3 grid grid-cols-3 gap-1.5">
                         <div className="rounded-md border border-slate-200 bg-white p-2 text-center">
-                          <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">Maks</dt>
+                          <dt className="text-[9px] font-semibold uppercase tracking-wider text-slate-400">{t.adminPages.dashboard.shortMax}</dt>
                           <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-slate-900">{loc.vehicles}</dd>
                         </div>
                         <div className="rounded-md border border-success-200 bg-white p-2 text-center">
-                          <dt className="text-[9px] font-semibold uppercase tracking-wider text-success-700">Avail</dt>
+                          <dt className="text-[9px] font-semibold uppercase tracking-wider text-success-700">{t.adminPages.dashboard.shortAvail}</dt>
                           <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-success-700">{avail}</dd>
                         </div>
                         <div className="rounded-md border border-warning-200 bg-white p-2 text-center">
-                          <dt className="text-[9px] font-semibold uppercase tracking-wider text-warning-700">In use</dt>
+                          <dt className="text-[9px] font-semibold uppercase tracking-wider text-warning-700">{t.adminPages.dashboard.shortInUse}</dt>
                           <dd className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-warning-700">{inUse}</dd>
                         </div>
                       </dl>
                       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-slate-200/80 pt-2.5">
-                        <Link href={`/admin/vehicles?locationId=${loc.locationId}`} className="inline-flex items-center gap-1 rounded-md px-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">Vehicles<Icon name="arrow" className="size-3" /></Link>
-                        <Link href={`/admin/bookings?locationId=${loc.locationId}`} className="inline-flex items-center gap-1 rounded-md px-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">Bookings<Icon name="arrow" className="size-3" /></Link>
-                        <Link href={`/admin/fleet?locationId=${loc.locationId}`} className="inline-flex items-center gap-1 rounded-md px-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">Map<Icon name="arrow" className="size-3" /></Link>
+                        <Link href={`/admin/vehicles?locationId=${loc.locationId}`} className="inline-flex items-center gap-1 rounded-md px-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">{t.adminPages.dashboard.vehiclesLink}<Icon name="arrow" className="size-3" /></Link>
+                        <Link href={`/admin/bookings?locationId=${loc.locationId}`} className="inline-flex items-center gap-1 rounded-md px-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">{t.adminPages.dashboard.bookingsLink}<Icon name="arrow" className="size-3" /></Link>
+                        <Link href={`/admin/fleet?locationId=${loc.locationId}`} className="inline-flex items-center gap-1 rounded-md px-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900">{t.adminPages.dashboard.mapLink}<Icon name="arrow" className="size-3" /></Link>
                       </div>
                     </article>
                   );

@@ -3,8 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { getOfflineQueueCount, processOfflineQueue } from '@/lib/offline-sync';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 export function NetworkStatus() {
+  const { t, format } = useTranslation();
   const [isOnline, setIsOnline] = useState(true);
   const [hasChanged, setHasChanged] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -73,8 +75,8 @@ export function NetworkStatus() {
   }
 
   const message = !isOnline
-    ? (pending ? `Mode Offline • ${pendingCount} data menunggu dikirim` : 'Connection lost — updates paused')
-    : (pending ? `Menyinkronkan ${pendingCount} data tertunda ke server...` : 'Back online');
+    ? (pending ? format(t.network.offlineQueued, { count: pendingCount }) : t.network.connectionLost)
+    : (pending ? format(t.network.syncingProgress, { count: pendingCount }) : t.network.backOnline);
 
   const tone = !isOnline
     ? 'border-warning-200 bg-warning-50 text-warning-700'
@@ -106,7 +108,7 @@ export function NetworkStatus() {
             onClick={() => void processOfflineQueue().catch(() => {})}
             className="flex min-h-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-success-600 px-3 font-semibold text-white transition-colors hover:bg-success-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
-            Sync Sekarang
+            {t.network.syncNow}
           </button>
         )}
 
@@ -118,7 +120,7 @@ export function NetworkStatus() {
               ? 'text-warning-700/60 hover:bg-warning-100 hover:text-warning-700'
               : 'text-success-700/60 hover:bg-success-100 hover:text-success-700'
           }`}
-          aria-label="Dismiss network notice"
+          aria-label={t.network.dismissAria}
         >
           <Icon name="close" className="size-3.5" />
         </button>

@@ -4,8 +4,10 @@ import { useEffect } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { Icon } from '@/components/ui/Icon';
 import { looksLikeGoogleMapsUrl } from '@/lib/google-maps-url';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 export default function ShareTargetPage() {
+  const { t } = useTranslation();
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -41,7 +43,7 @@ export default function ShareTargetPage() {
         <div className="h-px w-full bg-slate-200" />
 
         <Spinner size="lg" className="text-brand-600" />
-        <p className="text-sm font-medium text-slate-600">Opening…</p>
+        <p className="text-sm font-medium text-slate-600">{t.meta.shareOpening}</p>
       </div>
     </div>
   );

@@ -1,30 +1,30 @@
+'use client';
+
 import React from 'react';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateMovement } from '@/lib/i18n';
 import { Icon } from './Icon';
 
 type MovementType = 'MOVING' | 'STOPPED' | 'GPS_LOST' | 'OFFLINE' | string;
 
 type Tone = 'success' | 'slate' | 'warning' | 'danger';
 
-const movementStyles: Record<string, { tone: Tone; dot: string; label: string }> = {
+const movementStyles: Record<string, { tone: Tone; dot: string }> = {
   MOVING: {
     tone: 'success',
     dot: 'bg-success-600',
-    label: 'Moving',
   },
   STOPPED: {
     tone: 'slate',
     dot: 'bg-slate-400',
-    label: 'Stopped',
   },
   GPS_LOST: {
     tone: 'warning',
     dot: 'bg-warning-600',
-    label: 'GPS Lost',
   },
   OFFLINE: {
     tone: 'danger',
     dot: 'bg-danger-600',
-    label: 'Offline',
   },
 };
 
@@ -39,9 +39,11 @@ const toneStyles: Record<Tone, string> = {
 const liveStates = new Set(['MOVING']);
 
 export function MovementBadge({ movement, className = '' }: { movement?: MovementType | null; className?: string }) {
+  const { locale } = useTranslation();
   const norm = movement ? movement.toUpperCase() : 'OFFLINE';
   const conf = movementStyles[norm] || movementStyles.OFFLINE;
   const isLive = liveStates.has(norm);
+  const label = translateMovement(locale, norm);
 
   return (
     <span
@@ -55,7 +57,7 @@ export function MovementBadge({ movement, className = '' }: { movement?: Movemen
           className={`relative inline-flex size-1.5 shrink-0 rounded-full ${conf.dot} ${isLive ? 'status-ping' : ''}`}
         />
       )}
-      {conf.label}
+      {label}
     </span>
   );
 }

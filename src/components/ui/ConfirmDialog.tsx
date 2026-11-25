@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 import { Modal } from './Modal';
 import { Spinner } from './Spinner';
 import { Icon } from './Icon';
@@ -23,11 +24,15 @@ export function ConfirmDialog({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   isDestructive = false,
   isLoading = false,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+  const resolvedConfirmLabel = confirmLabel ?? t.common.confirm;
+  const resolvedCancelLabel = cancelLabel ?? t.common.cancel;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -43,7 +48,7 @@ export function ConfirmDialog({
             disabled={isLoading}
             className="button-secondary inline-flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
           >
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             type="button"
@@ -57,7 +62,7 @@ export function ConfirmDialog({
             }`}
           >
             {isLoading && <Spinner size="sm" className="text-white" />}
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </button>
         </>
       }

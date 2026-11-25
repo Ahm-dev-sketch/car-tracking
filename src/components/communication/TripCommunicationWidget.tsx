@@ -6,6 +6,7 @@ import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { VoiceCallModal } from '@/components/call/VoiceCallModal';
 import { useWebRTCCall, CallLogEntry } from '@/hooks/useWebRTCCall';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 interface TripCommunicationWidgetProps {
   bookingId?: string | null;
@@ -30,6 +31,7 @@ export function TripCommunicationWidget({
   partnerRole = 'Driver',
   variant = 'buttons',
 }: TripCommunicationWidgetProps) {
+  const { t, format } = useTranslation();
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   const channelId = bookingId ? `booking-${bookingId}` : tripId ? `trip-${tripId}` : 'general';
@@ -62,11 +64,11 @@ export function TripCommunicationWidget({
         const mins = Math.floor(entry.durationSeconds / 60);
         const secs = entry.durationSeconds % 60;
         const durStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        text = `Panggilan Suara Berakhir (${durStr})`;
+        text = format(t.comms.callLogCompleted, { duration: durStr });
       } else if (entry.type === 'MISSED') {
-        text = 'Panggilan suara tak terjawab (30 detik)';
+        text = t.comms.callLogMissed;
       } else {
-        text = 'Panggilan Ditolak';
+        text = t.comms.callLogRejected;
       }
 
       try {
@@ -90,7 +92,7 @@ export function TripCommunicationWidget({
         sendMessage(text, partner);
       }
     },
-    [bookingId, tripId, partnerId, sendMessage]
+    [bookingId, tripId, partnerId, sendMessage, format, t.comms.callLogCompleted, t.comms.callLogMissed, t.comms.callLogRejected]
   );
 
   // WebRTC Call Hook & Audio Ref
@@ -160,7 +162,7 @@ export function TripCommunicationWidget({
             className="relative inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
             <Icon name="message" className="size-4 text-brand-600" />
-            <span>Chat In-App</span>
+            <span>{t.comms.inAppChat}</span>
             {unreadCount > 0 && (
               <span className={`${countBadge} bg-brand-600 text-white`}>
                 {unreadCount}
@@ -176,7 +178,7 @@ export function TripCommunicationWidget({
               className="relative inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
               <Icon name="phone" className="size-4" />
-              <span>Telepon In-App</span>
+              <span>{t.comms.inAppCall}</span>
               {missedCallsCount > 0 && (
                 <span className={`${countBadge} bg-danger-600 text-white`}>
                   {missedCallsCount}
@@ -194,7 +196,7 @@ export function TripCommunicationWidget({
             <button
               type="button"
               onClick={handleStartCall}
-              title={`Telepon ${partnerName}`}
+              title={format(t.comms.callTooltip, { name: partnerName })}
               className="relative flex size-12 cursor-pointer items-center justify-center rounded-full bg-slate-900 text-white transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
               <Icon name="phone" className="size-5" />
@@ -208,7 +210,7 @@ export function TripCommunicationWidget({
           <button
             type="button"
             onClick={handleOpenChat}
-            title={`Chat dengan ${partnerName}`}
+            title={format(t.comms.chatTooltip, { name: partnerName })}
             className="relative flex size-12 cursor-pointer items-center justify-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
           >
             <Icon name="message" className="size-5" />
@@ -229,8 +231,8 @@ export function TripCommunicationWidget({
               <Icon name="message" className="size-4" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-slate-900">Komunikasi Armada</p>
-              <p className="truncate text-[11px] font-medium text-slate-500">Terhubung dengan {partnerName}</p>
+              <p className="truncate text-xs font-semibold text-slate-900">{t.comms.fleetComms}</p>
+              <p className="truncate text-[11px] font-medium text-slate-500">{format(t.comms.connectedWith, { name: partnerName })}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -239,7 +241,7 @@ export function TripCommunicationWidget({
               onClick={handleOpenChat}
               className="relative inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
             >
-              <span>Chat</span>
+              <span>{t.comms.chatBtn}</span>
               {unreadCount > 0 && (
                 <span className={`${countBadge} bg-brand-600 text-white`}>
                   {unreadCount}
@@ -253,7 +255,7 @@ export function TripCommunicationWidget({
                 className="relative inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
               >
                 <Icon name="phone" className="size-3.5" />
-                <span>Panggil</span>
+                <span>{t.comms.callBtn}</span>
                 {missedCallsCount > 0 && (
                   <span className={`${countBadge} bg-danger-600 text-white`}>
                     {missedCallsCount}

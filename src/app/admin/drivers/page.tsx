@@ -12,6 +12,8 @@ import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateStatus } from '@/lib/i18n';
 
 interface OperationalLocation {
   id: string;
@@ -43,6 +45,7 @@ interface DriverItem {
 }
 
 function AdminDriversContent() {
+  const { locale, t, format } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -151,10 +154,10 @@ function AdminDriversContent() {
         }
       } else if (!isSilent) {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to load drivers');
+        setApiError(err.error?.message || t.adminPages.drivers.failedLoad);
       }
     } catch {
-      if (!isSilent) setApiError('Network error loading drivers');
+      if (!isSilent) setApiError(t.adminPages.drivers.networkLoadError);
     } finally {
       if (!isSilent) setIsLoading(false);
     }
@@ -211,10 +214,10 @@ function AdminDriversContent() {
         fetchDrivers(1);
       } else {
         const err = await res.json();
-        setAddError(err.error?.message || 'Failed to create driver');
+        setAddError(err.error?.message || t.adminPages.drivers.failedCreate);
       }
     } catch {
-      setAddError('Network error creating driver');
+      setAddError(t.common.networkError);
     } finally {
       setIsSubmittingAdd(false);
     }
@@ -241,10 +244,10 @@ function AdminDriversContent() {
         fetchDrivers(page);
       } else {
         const err = await res.json();
-        setEditError(err.error?.message || 'Failed to update driver');
+        setEditError(err.error?.message || t.adminPages.drivers.failedUpdate);
       }
     } catch {
-      setEditError('Network error updating driver');
+      setEditError(t.common.networkError);
     } finally {
       setIsSubmittingEdit(false);
     }
@@ -293,10 +296,10 @@ function AdminDriversContent() {
         fetchDrivers(page);
       } else {
         const err = await res.json();
-        setAssignError(err.error?.message || 'Failed to assign vehicle');
+        setAssignError(err.error?.message || t.adminPages.drivers.failedAssign);
       }
     } catch {
-      setAssignError('Network error assigning vehicle');
+      setAssignError(t.common.networkError);
     } finally {
       setIsAssigning(false);
     }
@@ -318,10 +321,10 @@ function AdminDriversContent() {
         fetchDrivers(page);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to unassign vehicle');
+        setApiError(err.error?.message || t.adminPages.drivers.failedUnassign);
       }
     } catch {
-      setApiError('Network error unassigning vehicle');
+      setApiError(t.adminPages.drivers.networkUnassignError);
     } finally {
       setIsUnassigning(false);
     }
@@ -341,10 +344,10 @@ function AdminDriversContent() {
         fetchDrivers(page);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to deactivate driver');
+        setApiError(err.error?.message || t.adminPages.drivers.failedDeactivate);
       }
     } catch {
-      setApiError('Network error deactivating driver');
+      setApiError(t.adminPages.drivers.networkDeactivateError);
     } finally {
       setIsDeactivating(false);
     }
@@ -352,7 +355,7 @@ function AdminDriversContent() {
 
   const columns: Column<DriverItem>[] = [
     {
-      header: 'Driver Name',
+      header: t.adminPages.drivers.colName,
       cell: (d) => (
         <div>
           <span className="font-medium text-slate-900">{d.user.name}</span>
@@ -361,15 +364,15 @@ function AdminDriversContent() {
       ),
     },
     {
-      header: 'Phone',
+      header: t.adminPages.drivers.colPhone,
       cell: (d) => <span className="font-mono text-xs tabular-nums text-slate-700">{d.user.phone}</span>,
     },
     {
-      header: 'License #',
+      header: t.adminPages.drivers.colLicense,
       cell: (d) => <span className="font-mono text-xs font-semibold tabular-nums text-slate-900">{d.licenseNumber}</span>,
     },
     {
-      header: 'Vehicle Assigned',
+      header: t.adminPages.drivers.colVehicleAssigned,
       cell: (d) =>
         d.currentVehicle ? (
           <div>
@@ -397,15 +400,15 @@ function AdminDriversContent() {
             </div>
           </div>
         ) : (
-          <span className="text-xs italic text-slate-400">Unassigned</span>
+          <span className="text-xs italic text-slate-400">{t.adminPages.drivers.unassignedLabel}</span>
         ),
     },
     {
-      header: 'Status',
+      header: t.adminPages.drivers.colStatus,
       cell: (d) => <StatusBadge status={d.status} />,
     },
     {
-      header: 'Actions',
+      header: t.adminPages.drivers.colActions,
       cell: (d) => (
         <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           {d.currentVehicle ? (
@@ -414,7 +417,7 @@ function AdminDriversContent() {
               onClick={() => setUnassigningDriver(d)}
               className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Unassign
+              {t.adminPages.drivers.unassignBtn}
             </button>
           ) : (
             <button
@@ -422,7 +425,7 @@ function AdminDriversContent() {
               onClick={() => handleOpenAssign(d)}
               className="cursor-pointer rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
             >
-              Assign
+              {t.adminPages.drivers.assignBtn}
             </button>
           )}
 
@@ -436,7 +439,7 @@ function AdminDriversContent() {
             }}
             className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
-            Edit
+            {t.adminPages.drivers.editBtn}
           </button>
 
           {d.user.isActive && (
@@ -445,7 +448,7 @@ function AdminDriversContent() {
               onClick={() => setDeactivatingDriver(d)}
               className="cursor-pointer rounded-lg border border-danger-200 bg-white px-2.5 py-1 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
             >
-              Deactivate
+              {t.adminPages.drivers.deactivateBtn}
             </button>
           )}
         </div>
@@ -461,8 +464,8 @@ function AdminDriversContent() {
     <div className="space-y-6">
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Drivers Directory</h1>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">Manage drivers, licenses, and duty assignments</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.adminPages.drivers.heading}</h1>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.adminPages.drivers.description}</p>
         </div>
         <button
           type="button"
@@ -473,26 +476,26 @@ function AdminDriversContent() {
           className="button-primary inline-flex cursor-pointer items-center gap-1.5 self-start sm:self-auto"
         >
           <Icon name="plus" className="size-4" />
-          <span>Add Driver</span>
+          <span>{t.adminPages.drivers.addDriverBtn}</span>
         </button>
       </div>
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total Driver</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.drivers.statTotal}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Tersedia</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.drivers.statAvailable}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{availableCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Bertugas</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.drivers.statOnTrip}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{onTripCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Offline</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.drivers.statOffline}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-500">{offlineCount}</p>
         </div>
       </div>
@@ -508,26 +511,26 @@ function AdminDriversContent() {
             </span>
             <input
               type="text"
-              placeholder="Search driver name, license, email..."
+              placeholder={t.adminPages.drivers.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             />
           </div>
           <button type="submit" className="button-primary shrink-0 px-3 text-xs">
-            Search
+            {t.adminPages.drivers.searchBtn}
           </button>
         </form>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Hub</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.drivers.hubLabel}</span>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Hubs</option>
+              <option value="">{t.adminPages.drivers.allHubsOption}</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -537,16 +540,16 @@ function AdminDriversContent() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Status</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.drivers.statusLabel}</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Statuses</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="ON_TRIP">On Trip</option>
-              <option value="OFFLINE">Offline</option>
+              <option value="">{t.adminPages.drivers.allStatusesOption}</option>
+              <option value="AVAILABLE">{translateStatus(locale, 'AVAILABLE')}</option>
+              <option value="ON_TRIP">{translateStatus(locale, 'ON_TRIP')}</option>
+              <option value="OFFLINE">{translateStatus(locale, 'OFFLINE')}</option>
             </select>
           </div>
         </div>
@@ -556,7 +559,7 @@ function AdminDriversContent() {
         columns={columns}
         data={drivers}
         isLoading={isLoading}
-        emptyMessage="No drivers found"
+        emptyMessage={t.adminPages.drivers.emptyMessage}
       />
 
       <Pagination
@@ -570,38 +573,38 @@ function AdminDriversContent() {
       <Modal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        title="Add New Driver"
+        title={t.adminPages.drivers.addModalTitle}
         maxWidth="md"
       >
         {addError && <ErrorBanner message={addError} className="mb-4" onDismiss={() => setAddError(null)} />}
 
         <form onSubmit={handleCreateDriver} className="space-y-4">
-          <FormField label="Full Name" required>
+          <FormField label={t.adminPages.drivers.fullNameLabel} required>
             <input
               type="text"
               required
-              placeholder="John Doe"
+              placeholder={t.adminPages.drivers.namePlaceholder}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </FormField>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Email Address" required>
+            <FormField label={t.adminPages.drivers.emailLabel} required>
               <input
                 type="email"
                 required
-                placeholder="driver@company.com"
+                placeholder={t.adminPages.drivers.emailPlaceholder}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </FormField>
 
-            <FormField label="Phone Number" required>
+            <FormField label={t.adminPages.drivers.phoneLabel} required>
               <input
                 type="tel"
                 required
-                placeholder="081234567890"
+                placeholder={t.adminPages.drivers.phonePlaceholder}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="tabular-nums"
@@ -610,18 +613,18 @@ function AdminDriversContent() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Driver License #" required>
+            <FormField label={t.adminPages.drivers.licenseLabel} required>
               <input
                 type="text"
                 required
-                placeholder="SIM-A-123456"
+                placeholder={t.adminPages.drivers.licensePlaceholder}
                 value={licenseNumber}
                 onChange={(e) => setLicenseNumber(e.target.value.toUpperCase())}
                 className="font-mono uppercase tabular-nums"
               />
             </FormField>
 
-            <FormField label="Initial Password" required hint="Min 8 characters">
+            <FormField label={t.adminPages.drivers.passwordLabel} required hint={t.adminPages.drivers.passwordHint}>
               <input
                 type="password"
                 required
@@ -639,7 +642,7 @@ function AdminDriversContent() {
               onClick={() => setIsAddOpen(false)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -647,7 +650,7 @@ function AdminDriversContent() {
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isSubmittingAdd && <Spinner size="sm" className="text-white" />}
-              Create Driver
+              {t.adminPages.drivers.createDriverBtn}
             </button>
           </div>
         </form>
@@ -657,13 +660,13 @@ function AdminDriversContent() {
       <Modal
         isOpen={Boolean(editingDriver)}
         onClose={() => setEditingDriver(null)}
-        title={editingDriver ? `Edit Driver: ${editingDriver.user.name}` : ''}
+        title={editingDriver ? format(t.adminPages.drivers.editModalTitle, { name: editingDriver.user.name }) : ''}
         maxWidth="sm"
       >
         {editError && <ErrorBanner message={editError} className="mb-4" onDismiss={() => setEditError(null)} />}
 
         <form onSubmit={handleEditDriver} className="space-y-4">
-          <FormField label="Driver License #" required>
+          <FormField label={t.adminPages.drivers.licenseLabel} required>
             <input
               type="text"
               required
@@ -673,13 +676,13 @@ function AdminDriversContent() {
             />
           </FormField>
 
-          <FormField label="Duty Status" required>
+          <FormField label={t.adminPages.drivers.dutyStatusLabel} required>
             <select
               value={editStatus}
               onChange={(e) => setEditStatus(e.target.value)}
             >
-              <option value="OFFLINE">OFFLINE</option>
-              <option value="AVAILABLE">AVAILABLE (Requires assigned vehicle)</option>
+              <option value="OFFLINE">{t.adminPages.drivers.offlineOption}</option>
+              <option value="AVAILABLE">{t.adminPages.drivers.availableOption}</option>
             </select>
           </FormField>
 
@@ -690,7 +693,7 @@ function AdminDriversContent() {
               onClick={() => setEditingDriver(null)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -698,7 +701,7 @@ function AdminDriversContent() {
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isSubmittingEdit && <Spinner size="sm" className="text-white" />}
-              Save Changes
+              {t.adminPages.drivers.saveChangesBtn}
             </button>
           </div>
         </form>
@@ -708,14 +711,14 @@ function AdminDriversContent() {
       <Modal
         isOpen={Boolean(assigningDriver)}
         onClose={() => setAssigningDriver(null)}
-        title="Assign Vehicle to Driver"
+        title={t.adminPages.drivers.assignModalTitle}
         description={assigningDriver ? `${assigningDriver.user.name} (${assigningDriver.user.phone})` : ''}
         maxWidth="md"
       >
         {assignError && <ErrorBanner message={assignError} className="mb-4" onDismiss={() => setAssignError(null)} />}
 
         <form onSubmit={handleAssignVehicle} className="space-y-4">
-          <FormField label="Lokasi / Pool Armada">
+          <FormField label={t.adminPages.drivers.poolFilterLabel}>
             <select
               value={assignLocationFilter}
               onChange={(e) => {
@@ -725,7 +728,7 @@ function AdminDriversContent() {
                 setSelectedVehicleId('');
               }}
             >
-              <option value="">-- Semua Lokasi Pool --</option>
+              <option value="">{t.adminPages.drivers.allPoolsOption}</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -734,15 +737,15 @@ function AdminDriversContent() {
             </select>
           </FormField>
 
-          <FormField label="Available Vehicles" required>
+          <FormField label={t.adminPages.drivers.availableVehiclesLabel} required>
             {isLoadingVehicles ? (
               <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
                 <Spinner size="sm" className="text-slate-600" />
-                <span>Memuat kendaraan pool...</span>
+                <span>{t.adminPages.drivers.loadingPoolVehicles}</span>
               </div>
             ) : availableVehicles.length === 0 ? (
               <div className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-xs leading-relaxed text-warning-700">
-                Tidak ada kendaraan AVAILABLE {assignLocationFilter ? 'di lokasi pool ini' : ''}. Silakan pilih lokasi pool lain.
+                {assignLocationFilter ? t.adminPages.drivers.noPoolVehiclesLoc : t.adminPages.drivers.noPoolVehiclesAny}
               </div>
             ) : (
               <select
@@ -750,7 +753,7 @@ function AdminDriversContent() {
                 value={selectedVehicleId}
                 onChange={(e) => setSelectedVehicleId(e.target.value)}
               >
-                <option value="">-- Pilih Kendaraan ({availableVehicles.length} tersedia) --</option>
+                <option value="">{format(t.adminPages.drivers.chooseVehicleOption, { count: availableVehicles.length })}</option>
                 {availableVehicles.map((v) => {
                   const hub = v.currentOperationalLocation?.name || v.homeLocation?.name;
                   return (
@@ -770,7 +773,7 @@ function AdminDriversContent() {
               onClick={() => setAssigningDriver(null)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -778,7 +781,7 @@ function AdminDriversContent() {
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isAssigning && <Spinner size="sm" className="text-white" />}
-              Assign Vehicle
+              {t.adminPages.drivers.assignVehicleBtn}
             </button>
           </div>
         </form>
@@ -789,9 +792,9 @@ function AdminDriversContent() {
         isOpen={Boolean(unassigningDriver)}
         onClose={() => setUnassigningDriver(null)}
         onConfirm={handleUnassignVehicle}
-        title="Unassign Vehicle"
-        message={`Are you sure you want to unassign vehicle ${unassigningDriver?.currentVehicle?.plateNumber} from ${unassigningDriver?.user.name}?`}
-        confirmLabel="Unassign"
+        title={t.adminPages.drivers.unassignModalTitle}
+        message={format(t.adminPages.drivers.unassignModalMessage, { name: unassigningDriver?.user.name || '' })}
+        confirmLabel={t.adminPages.drivers.unassignConfirmBtn}
         isDestructive={false}
         isLoading={isUnassigning}
       />
@@ -801,9 +804,9 @@ function AdminDriversContent() {
         isOpen={Boolean(deactivatingDriver)}
         onClose={() => setDeactivatingDriver(null)}
         onConfirm={handleDeactivateDriver}
-        title="Deactivate Driver"
-        message={`Are you sure you want to deactivate ${deactivatingDriver?.user.name}? They will no longer be able to log in or operate fleet vehicles.`}
-        confirmLabel="Deactivate"
+        title={t.adminPages.drivers.deactivateModalTitle}
+        message={format(t.adminPages.drivers.deactivateModalMessage, { name: deactivatingDriver?.user.name || '' })}
+        confirmLabel={t.adminPages.drivers.deactivateConfirmBtn}
         isDestructive={true}
         isLoading={isDeactivating}
       />
@@ -812,12 +815,13 @@ function AdminDriversContent() {
 }
 
 export default function AdminDriversPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <div className="py-24 text-center text-xs text-slate-500">
           <Spinner size="md" className="mb-2" />
-          <p>Loading drivers directory...</p>
+          <p>{t.adminPages.drivers.loadingSuspense}</p>
         </div>
       }
     >

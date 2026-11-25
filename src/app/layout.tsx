@@ -9,6 +9,8 @@ import { ServiceWorkerRegister } from '@/components/providers/ServiceWorkerRegis
 import { LaunchSplash } from '@/components/providers/LaunchSplash';
 import { MotionProvider } from '@/components/providers/MotionProvider';
 import { SmoothScrollProvider } from '@/components/providers/SmoothScrollProvider';
+import { LanguageProvider } from '@/components/providers/LanguageProvider';
+import { getServerLocale } from '@/lib/i18n/server';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -66,14 +68,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getServerLocale();
+
   return (
     <html
-      lang="en"
+      lang={locale}
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
@@ -91,15 +95,17 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-dvh flex flex-col text-slate-900 font-sans">
-        <LaunchSplash />
-        <ServiceWorkerRegister />
-        <AuthProvider>
-          <NetworkStatus />
-          <InstallPrompt />
-          <MotionProvider>
-            <SmoothScrollProvider>{children}</SmoothScrollProvider>
-          </MotionProvider>
-        </AuthProvider>
+        <LanguageProvider initialLocale={locale}>
+          <LaunchSplash />
+          <ServiceWorkerRegister />
+          <AuthProvider>
+            <NetworkStatus />
+            <InstallPrompt />
+            <MotionProvider>
+              <SmoothScrollProvider>{children}</SmoothScrollProvider>
+            </MotionProvider>
+          </AuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

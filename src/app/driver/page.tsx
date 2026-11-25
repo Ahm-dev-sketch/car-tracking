@@ -20,6 +20,8 @@ import { GreetingClock } from '@/components/ui/GreetingClock';
 import { fetchJson } from '@/lib/fetch-json';
 import { saveSnapshot, getSnapshot, enqueueOfflineAction, processOfflineQueue } from '@/lib/offline-sync';
 import { TripCommunicationWidget } from '@/components/communication/TripCommunicationWidget';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateStatus } from '@/lib/i18n';
 
 interface ActiveTrip {
   id: string;
@@ -132,6 +134,7 @@ function isOfflineError(error: unknown): boolean {
 }
 
 function TripRoute({ pickup, destination }: { pickup: string; destination: string }) {
+  const { t } = useTranslation();
   return (
     <div className="relative space-y-4 py-1 pl-7">
       <span
@@ -143,7 +146,7 @@ function TripRoute({ pickup, destination }: { pickup: string; destination: strin
           aria-hidden="true"
           className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-slate-300 dark:bg-slate-500 ring-2 ring-white dark:ring-[#1e293b]"
         />
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Pickup</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{t.driverPages.console.pickupLabel}</p>
         <p className="mt-1 wrap-anywhere text-sm font-medium leading-snug text-slate-600">{pickup}</p>
       </div>
       <div className="relative min-w-0">
@@ -151,7 +154,7 @@ function TripRoute({ pickup, destination }: { pickup: string; destination: strin
           aria-hidden="true"
           className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-brand-600 ring-2 ring-white dark:ring-[#1e293b]"
         />
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Destination</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{t.driverPages.console.destinationLabel}</p>
         <p className="mt-1 wrap-anywhere text-base font-semibold leading-snug tracking-tight text-slate-900">
           {destination}
         </p>
@@ -161,6 +164,10 @@ function TripRoute({ pickup, destination }: { pickup: string; destination: strin
 }
 
 export default function DriverDashboardPage() {
+  const { locale, t, format } = useTranslation();
+  const dateLocale = locale === 'id' ? 'id-ID' : 'en-US';
+  const tRef = useRef(t);
+  tRef.current = t;
   const { data: session, status } = useSession();
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [assignedBookings, setAssignedBookings] = useState<AssignedBooking[]>([]);
@@ -210,7 +217,7 @@ export default function DriverDashboardPage() {
   const dashboardRequest = useRef(0);
   const vehicleSearchRequest = useRef(0);
   const isStartingTrip = startPhase !== null;
-  const startLabel = startPhase === 'gps' ? 'Getting GPS…' : 'Starting trip…';
+  const startLabel = startPhase === 'gps' ? t.driverPages.console.startPhaseGps : t.driverPages.console.startPhaseStarting;
 
   // Elapsed trip duration ticker
   const [elapsedDuration, setElapsedDuration] = useState('');
@@ -271,7 +278,7 @@ export default function DriverDashboardPage() {
       }
       // Apply 20s backoff to avoid continuous request loops if server is encountering issues
       uploadBackoffUntil.current = Date.now() + 20000;
-      setTelemetryWarning(error instanceof Error ? error.message : 'Location upload paused. Retrying in 20s.');
+      setTelemetryWarning(error instanceof Error ? error.message : tRef.current.driverPages.console.locationUploadPaused);
       throw error;
     }
   }, [activeTrip, status]);
@@ -341,7 +348,7 @@ export default function DriverDashboardPage() {
       pts.push({
         lat: booking.pickupLat,
         lng: booking.pickupLng,
-        label: 'Jemput: ' + booking.pickupLocation,
+        label: `${tRef.current.driverPages.console.pickupLabel}: ${booking.pickupLocation}`,
         type: 'pickup',
       });
     }
@@ -356,12 +363,12 @@ export default function DriverDashboardPage() {
       pts.push({
         lat: destLat,
         lng: destLng,
-        label: 'Tujuan: ' + booking.destination,
+        label: `${tRef.current.driverPages.console.destinationLabel}: ${booking.destination}`,
         type: 'destination',
       });
     }
     return pts;
-  }, [activeTrip, assignedBookings]);
+  }, [activeTrip, assignedBookings, locale]);
 
   // Fetch driver offers (polling fallback)
   const fetchOffers = useCallback(async () => {
@@ -621,7 +628,7 @@ export default function DriverDashboardPage() {
   const handleToggleOnline = async () => {
     if (actionInFlight.current || activeTrip) return;
     if (!isOnline && !selectedVehicle && !activeSession?.vehicle) {
-      setActionError('Pilih mobil yang Anda gunakan dari pool terlebih dahulu.');
+      setActionError(tRef.current.driverPages.console.pickVehicleFirst);
       document.getElementById('vehicle-selection')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
@@ -679,7 +686,7 @@ export default function DriverDashboardPage() {
       }
     } catch (error) {
       console.error('[Driver Session Error] handleToggleOnline:', error);
-      setActionError(error instanceof Error ? error.message : 'Unable to change online status.');
+      setActionError(error instanceof Error ? error.message : tRef.current.driverPages.console.unableChangeOnline);
       await loadDashboardData();
     } finally {
       actionInFlight.current = false;
@@ -690,7 +697,7 @@ export default function DriverDashboardPage() {
   // Accept offer
   const handleAcceptOffer = async (offerId: string) => {
     if (actionInFlight.current) {
-      setActionError('Another action is in progress. Please wait.');
+      setActionError(tRef.current.driverPages.console.actionInProgress);
       return;
     }
     actionInFlight.current = true;
@@ -707,9 +714,9 @@ export default function DriverDashboardPage() {
           offerId,
         });
         setOffers((prev) => prev.filter((o) => o.id !== offerId));
-        setActionError('Penawaran diterima offline — akan disinkronkan.');
+        setActionError(tRef.current.driverPages.console.offerAcceptedOffline);
       } else {
-        setActionError(error instanceof Error ? error.message : 'Unable to accept offer.');
+        setActionError(error instanceof Error ? error.message : tRef.current.driverPages.console.unableAcceptOffer);
       }
     } finally {
       await loadDashboardData();
@@ -720,7 +727,7 @@ export default function DriverDashboardPage() {
   // Reject offer
   const handleRejectOffer = async (offerId: string) => {
     if (actionInFlight.current) {
-      setActionError('Another action is in progress. Please wait.');
+      setActionError(tRef.current.driverPages.console.actionInProgress);
       return;
     }
     actionInFlight.current = true;
@@ -730,7 +737,7 @@ export default function DriverDashboardPage() {
       await fetchJson(`/api/driver/offers/${offerId}/reject`, { method: 'POST' });
       setOffers((prev) => prev.filter((o) => o.id !== offerId));
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Unable to reject offer.');
+      setActionError(error instanceof Error ? error.message : tRef.current.driverPages.console.unableRejectOffer);
     } finally {
       await loadDashboardData();
       actionInFlight.current = false;
@@ -758,12 +765,12 @@ export default function DriverDashboardPage() {
         const available = json.data.filter((vehicle) => ['AVAILABLE', 'RESERVED'].includes(vehicle.status));
         setMatchingVehicles(available);
         if (available.length === 0) {
-          setStartError(locId ? 'No available vehicle matches this plate at the selected hub.' : 'No available vehicle matches this plate.');
+          setStartError(locId ? tRef.current.driverPages.console.noMatchingPlateHub : tRef.current.driverPages.console.noMatchingPlate);
         }
       }
     } catch (error) {
       if (version === vehicleSearchRequest.current) {
-        setStartError(error instanceof Error ? error.message : 'Unable to search vehicles.');
+        setStartError(error instanceof Error ? error.message : tRef.current.driverPages.console.unableSearchVehicles);
       }
     }
   };
@@ -837,9 +844,9 @@ export default function DriverDashboardPage() {
           tempTripId,
           tripId: tempTripId,
         });
-        setActionError('Trip dimulai offline — akan disinkronkan saat online.');
+        setActionError(tRef.current.driverPages.console.tripStartedOffline);
       } else {
-        const message = error instanceof Error ? error.message : 'Unable to start trip. Please try again.';
+        const message = error instanceof Error ? error.message : tRef.current.driverPages.console.unableStartTrip;
         setStartError(message);
         setActionError(message);
         // A lost HTTP response does not prove a mutation failed. Reconcile before retry.
@@ -864,7 +871,7 @@ export default function DriverDashboardPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS' }),
       } : { method: 'POST' });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Unable to advance trip.');
+      setActionError(error instanceof Error ? error.message : tRef.current.driverPages.console.unableAdvanceTrip);
     } finally {
       await loadDashboardData();
       actionInFlight.current = false;
@@ -941,7 +948,7 @@ export default function DriverDashboardPage() {
           pendingSync: true,
         });
       } else {
-        setActionError(error instanceof Error ? error.message : 'Unable to end trip.');
+        setActionError(error instanceof Error ? error.message : tRef.current.driverPages.console.unableEndTrip);
         void loadDashboardData();
       }
     } finally {
@@ -957,14 +964,14 @@ export default function DriverDashboardPage() {
 
   return (
     <div className="min-w-0 space-y-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-900 lg:space-y-4">
-      <GreetingClock userName={session?.user?.name} roleLabel="Driver" />
+      <GreetingClock userName={session?.user?.name} roleLabel={t.nav.roles.DRIVER} />
 
       <header className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">KCIC Fleet / Driver workspace</p>
-          <h1 className="page-heading mt-2">Your driving day.</h1>
+          <p className="eyebrow">{t.driverPages.console.eyebrow}</p>
+          <h1 className="page-heading mt-2">{t.driverPages.console.heading}</h1>
           <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
-            Your availability, assigned journeys, and live trip details, in one place.
+            {t.driverPages.console.description}
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -979,14 +986,14 @@ export default function DriverDashboardPage() {
             } min-h-12 w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto`}
           >
             {isTogglingOnline ? <Spinner size="sm" /> : <Icon name={isOnline ? 'check' : 'signal'} />}
-            {isOnline ? 'Online (Go offline)' : 'Go online'}
+            {isOnline ? t.driverPages.console.onlineGoOfflineBtn : t.driverPages.console.goOnlineBtn}
           </button>
           <p className="text-xs font-medium leading-relaxed text-slate-500">
             {activeTrip
-              ? 'Finish your trip before changing availability.'
+              ? t.driverPages.console.finishBeforeOfflineHint
               : isOnline
-              ? 'Location sharing is on.'
-              : 'Share your location to receive offers.'}
+              ? t.driverPages.console.sharingOnHint
+              : t.driverPages.console.sharingOffHint}
           </p>
         </div>
       </header>
@@ -1009,7 +1016,7 @@ export default function DriverDashboardPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold tracking-tight text-slate-900">
-                    {isSignalLostOrStale ? 'GPS signal interrupted' : 'Tracking active'}
+                    {isSignalLostOrStale ? t.driverPages.console.gpsInterrupted : t.driverPages.console.trackingActive}
                   </span>
                   <span
                     className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
@@ -1018,21 +1025,25 @@ export default function DriverDashboardPage() {
                         : 'border-success-200 bg-success-50 text-success-700'
                     }`}
                   >
-                    {isSignalLostOrStale ? 'Signal lost / paused' : 'Broadcasting live'}
+                    {isSignalLostOrStale ? t.driverPages.console.signalLostPaused : t.driverPages.console.broadcastingLive}
                   </span>
                   {currentBookingStatus && (
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                      Status: {currentBookingStatus.replace(/_/g, ' ').toLowerCase()}
+                      Status: {translateStatus(locale, currentBookingStatus)}
                     </span>
                   )}
                 </div>
                 {isSignalLostOrStale ? (
                   <p className="mt-1 max-w-xl text-xs font-medium leading-relaxed text-warning-700">
-                    Location updates pause when this tab is backgrounded or screen locks — reopen to resume
+                    {locale === 'id'
+                      ? 'Pembaruan lokasi dijeda saat tab berada di latar belakang atau layar terkunci — buka kembali untuk melanjutkan'
+                      : 'Location updates pause when this tab is backgrounded or screen locks — reopen to resume'}
                   </p>
                 ) : (
                   <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
-                    Transmitting telemetry every {activeTrip ? tripIntervalSec : idleIntervalSec} seconds
+                    {locale === 'id'
+                      ? `Mengirim telemetri setiap ${activeTrip ? tripIntervalSec : idleIntervalSec} detik`
+                      : `Transmitting telemetry every ${activeTrip ? tripIntervalSec : idleIntervalSec} seconds`}
                   </p>
                 )}
               </div>
@@ -1060,7 +1071,7 @@ export default function DriverDashboardPage() {
                         : 'bg-danger-600'
                     }`}
                   />
-                  {confidenceScore > 0 ? `${confidenceScore}% Akurat` : signalStatus}
+                  {confidenceScore > 0 ? format(t.driverPages.console.accuracyPct, { pct: confidenceScore }) : signalStatus}
                 </span>
 
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 dark:border-[#334155] dark:bg-[#111827] dark:text-[#cbd5e1]">
@@ -1068,23 +1079,25 @@ export default function DriverDashboardPage() {
                     name={locationSource === 'wifi_cell_triangulation' ? 'wifi' : 'satellite'}
                     className="size-3 text-slate-400"
                   />
-                  <span>{locationSource === 'wifi_cell_triangulation' ? 'Wi-Fi/Cell' : 'GPS Presisi'}</span>
+                  <span>{locationSource === 'wifi_cell_triangulation' ? t.driverPages.console.wifiCellSource : t.driverPages.console.preciseGpsSource}</span>
                 </span>
 
                 {jumpyDiscardCount > 0 && (
                   <span
                     className="inline-flex items-center gap-1.5 rounded-full border border-info-200 bg-info-50 px-2 py-1 text-[11px] font-medium text-info-700"
-                    title="Titik jumpy akibat sinyal dipantulkan telah dibersihkan otomatis"
+                    title={t.driverPages.console.jumpyTitle}
                   >
                     <Icon name="shield" className="size-3" />
-                    <span className="tabular-nums">{jumpyDiscardCount} jumpy difilter</span>
+                    <span className="tabular-nums">
+                      {jumpyDiscardCount} {locale === 'id' ? 'jumpy difilter' : 'jumpy filtered'}
+                    </span>
                   </span>
                 )}
               </div>
 
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-1">
                 <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Duration
+                  {t.driverPages.console.durationLabel}
                 </span>
                 <span className="font-mono text-sm font-semibold tabular-nums text-slate-900">
                   {elapsedDuration || '00:00:00'}
@@ -1093,10 +1106,10 @@ export default function DriverDashboardPage() {
 
               <div className="rounded-lg border border-slate-200 bg-white px-3 py-1">
                 <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Last update
+                  {t.driverPages.console.lastUpdateLabel}
                 </span>
                 <span className="text-xs font-medium text-slate-600">
-                  {lastUpdated ? <RelativeTime date={lastUpdated} /> : 'Waiting...'}
+                  {lastUpdated ? <RelativeTime date={lastUpdated} /> : t.driverPages.console.waitingLabel}
                 </span>
               </div>
 
@@ -1108,7 +1121,7 @@ export default function DriverDashboardPage() {
                   disabled={isAdvancingTrip || isEndingTrip}
                   className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Icon name="check" className="size-4" /><span>Mark arrived</span>
+                  <Icon name="check" className="size-4" /><span>{t.driverPages.console.markArrivedBtn}</span>
                 </button>
               )}
 
@@ -1118,7 +1131,7 @@ export default function DriverDashboardPage() {
                 className="hidden min-h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-danger-200 bg-white px-5 text-sm font-semibold text-danger-700 transition-colors hover:border-danger-300 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:inline-flex"
               >
                 <Icon name="close" className="size-4" />
-                {stoppingPickup ? 'Stop pickup trip' : 'End trip'}
+                {stoppingPickup ? t.driverPages.console.stopPickupBtn : t.driverPages.console.endTripBtn}
               </button>
             </div>
           </div>
@@ -1135,11 +1148,11 @@ export default function DriverDashboardPage() {
             </span>
             <div>
               <span className="block text-sm font-semibold tracking-tight text-slate-900">
-                Online and sharing location
+                {t.driverPages.console.onlineAndSharing}
               </span>
               {activeSession?.vehicle && (
                 <p className="mt-0.5 text-xs font-medium text-slate-500">
-                  Vehicle:{' '}
+                  {t.driverPages.history.colVehicle}:{' '}
                   <span className="font-mono font-semibold text-slate-800 tabular-nums">
                     {activeSession.vehicle.plateNumber}
                   </span>{' '}
@@ -1147,7 +1160,7 @@ export default function DriverDashboardPage() {
                 </p>
               )}
               <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
-                Eligible for auto-dispatch offers. Keep this browser tab open.
+                {t.driverPages.console.eligibleHint}
               </p>
             </div>
           </div>
@@ -1160,7 +1173,7 @@ export default function DriverDashboardPage() {
               onClick={handleToggleOnline}
               className="button-secondary"
             >
-              {isTogglingOnline ? <Spinner size="sm" /> : 'Go offline'}
+              {isTogglingOnline ? <Spinner size="sm" /> : t.driverPages.console.goOfflineBtn}
             </button>
           </div>
         </div>
@@ -1185,7 +1198,7 @@ export default function DriverDashboardPage() {
       )}
       {telemetryWarning && (
         <ErrorBanner
-          message={`GPS upload warning: ${telemetryWarning}`}
+          message={`${locale === 'id' ? 'Peringatan unggah GPS' : 'GPS upload warning'}: ${telemetryWarning}`}
           className="rounded-xl! p-4!"
           onDismiss={() => setTelemetryWarning(null)}
         />
@@ -1197,7 +1210,7 @@ export default function DriverDashboardPage() {
           className="flex items-center gap-3 text-sm font-medium text-slate-600"
         >
           <Spinner size="sm" />
-          {startLabel} Please allow location access when prompted.
+          {startLabel} {locale === 'id' ? 'Izinkan akses lokasi saat diminta.' : 'Please allow location access when prompted.'}
         </p>
       )}
 
@@ -1207,24 +1220,23 @@ export default function DriverDashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 font-semibold text-warning-700">
               <Icon name="pin" className="size-4 shrink-0" />
-              <span>Izin Lokasi (GPS) Wajib Diaktifkan</span>
+              <span>{t.driverPages.console.gpsRequiredTitle}</span>
             </div>
             <button
               type="button"
               onClick={() => void getCurrentPosition().catch(() => {})}
               className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-warning-200 bg-white px-3.5 text-xs font-semibold text-warning-700 transition-colors hover:border-warning-600 hover:bg-warning-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
-              Aktifkan Lokasi Sekarang
+              {t.driverPages.console.enableLocationNowBtn}
             </button>
           </div>
           <p className="text-xs font-medium text-warning-700">
-            Browser Anda menolak atau belum memberikan akses GPS. Pengemudi wajib menyalakan lokasi agar
-            dapat menerima penawaran trip dan menyiarkan armada.
+            {t.driverPages.console.gpsDeniedDesc}
           </p>
           <ul className="list-inside list-disc space-y-1 text-xs font-medium text-warning-700">
-            <li>Klik ikon gembok / izin situs di address bar browser.</li>
-            <li>Ubah opsi Lokasi (Location) menjadi &quot;Izinkan&quot; (Allow).</li>
-            <li>Klik tombol &quot;Aktifkan Lokasi Sekarang&quot; di atas atau muat ulang halaman.</li>
+            <li>{t.driverPages.console.gpsStep1}</li>
+            <li>{t.driverPages.console.gpsStep2}</li>
+            <li>{t.driverPages.console.gpsStep3}</li>
           </ul>
         </div>
       )}
@@ -1237,13 +1249,13 @@ export default function DriverDashboardPage() {
               <span className="flex size-7 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
                 <Icon name="bell" className="size-4" />
               </span>
-              Incoming offers
+              {t.driverPages.console.incomingOffersTitle}
               <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-brand-700">
                 {offers.length}
               </span>
             </h2>
             <span className="text-[11px] font-medium text-slate-500">
-              Respond before the 1-minute timer expires
+              {t.driverPages.console.respondTimerHint}
             </span>
           </div>
 
@@ -1263,10 +1275,10 @@ export default function DriverDashboardPage() {
 
       {/* MAIN VIEW: ACTIVE TRIP TELEMETRY */}
       {activeTrip ? (
-        <section className="surface space-y-5 p-4 sm:p-6" aria-label="Active trip">
+        <section className="surface space-y-5 p-4 sm:p-6" aria-label={t.driverPages.console.activeTripAria}>
           <div className="flex flex-col justify-between gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start">
             <div className="min-w-0">
-              <p className="eyebrow">Current journey</p>
+              <p className="eyebrow">{t.driverPages.console.currentJourneyEyebrow}</p>
               <h2 className="mt-2 wrap-anywhere text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
                 {activeTrip.vehicle.brand} {activeTrip.vehicle.model}
               </h2>
@@ -1280,7 +1292,7 @@ export default function DriverDashboardPage() {
               {activeTrip.booking && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-left sm:text-right">
                   <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Booking reference
+                    {t.driverPages.console.bookingRefLabel}
                   </span>
                   <p className="mt-0.5 wrap-anywhere font-mono text-xs font-semibold text-slate-800 tabular-nums">
                     {activeTrip.booking.bookingNumber}
@@ -1297,21 +1309,21 @@ export default function DriverDashboardPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 font-mono text-sm font-semibold tracking-wide text-white">
-                      {(activeTrip.booking.user?.name || 'Penumpang').slice(0, 2).toUpperCase()}
+                      {(activeTrip.booking.user?.name || t.driverPages.console.passengersLabel).slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <h4 className="truncate text-sm font-semibold tracking-tight text-slate-900">
-                          {activeTrip.booking.user?.name || 'Penumpang KCIC'}
+                          {activeTrip.booking.user?.name || t.driverPages.console.passengersLabel}
                         </h4>
                         <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
-                          Penumpang
+                          {t.driverPages.console.passengersLabel}
                         </span>
                       </div>
                       <p className="mt-0.5 text-xs font-medium text-slate-500">
                         {activeTrip.booking.passengerCount
-                          ? `${activeTrip.booking.passengerCount} Penumpang`
-                          : '1 Penumpang'}
+                          ? format(t.driverPages.console.passengersCountLabel, { count: activeTrip.booking.passengerCount })
+                          : t.driverPages.console.onePassengerLabel}
                       </p>
                     </div>
                   </div>
@@ -1322,10 +1334,10 @@ export default function DriverDashboardPage() {
                       bookingId={activeTrip.booking?.id}
                       tripId={activeTrip.id}
                       currentUserId={(session?.user as any)?.id || 'driver-user'}
-                      currentUserName={session?.user?.name || 'Driver KCIC'}
+                      currentUserName={session?.user?.name || t.nav.roles.DRIVER}
                       currentUserRole="DRIVER"
                       partnerId={activeTrip.booking?.user?.id}
-                      partnerName={activeTrip.booking?.user?.name || 'Penumpang'}
+                      partnerName={activeTrip.booking?.user?.name || t.driverPages.console.passengersLabel}
                       partnerRole="USER"
                       variant="buttons"
                     />
@@ -1340,7 +1352,7 @@ export default function DriverDashboardPage() {
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Navigasi &amp; posisi langsung armada
+                    {locale === 'id' ? 'Navigasi & posisi langsung armada' : 'Live fleet navigation & position'}
                   </span>
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
@@ -1352,7 +1364,7 @@ export default function DriverDashboardPage() {
                     rel="noopener noreferrer"
                     className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                   >
-                    <span>Buka Google Maps</span>
+                    <span>{t.driverPages.console.openGoogleMaps}</span>
                     <Icon name="arrowUp" className="size-3.5" />
                   </a>
                 </div>
@@ -1373,10 +1385,10 @@ export default function DriverDashboardPage() {
               <Icon name="route" className="mt-0.5 size-4 shrink-0 text-slate-400" />
               <div>
                 <h3 className="text-sm font-semibold tracking-tight text-slate-900">
-                  Ad-hoc vehicle trip
+                  {t.driverPages.console.adHocTripTitle}
                 </h3>
                 <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
-                  This journey is not linked to a booking. Your live trip telemetry appears below.
+                  {t.driverPages.console.adHocTripDesc}
                 </p>
               </div>
             </div>
@@ -1387,16 +1399,16 @@ export default function DriverDashboardPage() {
             <div className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:flex-row lg:items-center sm:p-5">
               <div>
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Current trip stage
+                  {t.driverPages.console.currentStageLabel}
                 </span>
                 <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-900">
                   {currentBookingStatus === 'DRIVER_EN_ROUTE'
-                    ? 'En route to pickup location'
+                    ? t.driverPages.console.stageEnRoute
                     : currentBookingStatus === 'ARRIVED'
-                    ? 'Arrived at pickup — awaiting passenger boarding'
+                    ? t.driverPages.console.stageArrived
                     : currentBookingStatus === 'IN_PROGRESS'
-                    ? 'Trip in progress to destination'
-                    : currentBookingStatus?.replace(/_/g, ' ').toLowerCase()}
+                    ? t.driverPages.console.stageInProgress
+                    : translateStatus(locale, currentBookingStatus)}
                 </span>
               </div>
 
@@ -1408,7 +1420,7 @@ export default function DriverDashboardPage() {
                     disabled={isAdvancingTrip || isEndingTrip}
                     className="button-primary"
                   >
-                    <Icon name="check" /><span>Arrived at pickup</span>
+                    <Icon name="check" /><span>{t.driverPages.console.arrivedAtPickupBtn}</span>
                   </button>
                 )}
 
@@ -1419,7 +1431,7 @@ export default function DriverDashboardPage() {
                     disabled={isAdvancingTrip || isEndingTrip}
                     className="button-primary"
                   >
-                    <Icon name="arrow" /><span>Passengers boarded — start trip</span>
+                    <Icon name="arrow" /><span>{t.driverPages.console.boardedStartBtn}</span>
                   </button>
                 )}
               </div>
@@ -1431,9 +1443,11 @@ export default function DriverDashboardPage() {
             <div className="flex items-start gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm leading-relaxed text-warning-700 sm:p-5">
               <Icon name="signal" className="mt-0.5 size-4 shrink-0" />
               <div>
-                <span className="block font-semibold">GPS signal paused</span>
+                <span className="block font-semibold">{t.driverPages.console.gpsSignalPausedTitle}</span>
                 <p className="mt-0.5 text-xs font-medium leading-relaxed text-warning-700">
-                  Location updates pause when this tab is backgrounded or screen locks — reopen to resume.
+                  {locale === 'id'
+                    ? 'Pembaruan lokasi dijeda saat tab ini berada di latar belakang atau layar terkunci — buka kembali untuk melanjutkan.'
+                    : 'Location updates pause when this tab is backgrounded or screen locks — reopen to resume.'}
                 </p>
               </div>
             </div>
@@ -1441,12 +1455,12 @@ export default function DriverDashboardPage() {
 
           {/* Realtime telemetry grid */}
           <div>
-            <h3 className="section-title mb-3">Live telemetry</h3>
+            <h3 className="section-title mb-3">{t.driverPages.console.liveTelemetryHeading}</h3>
 
             <div className="grid grid-cols-1 gap-2.5 text-sm min-[380px]:grid-cols-2 lg:grid-cols-4">
               <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Signal
+                  {t.driverPages.console.signalLabel}
                 </span>
                 <div className="mt-1.5 flex items-center gap-2">
                   <span
@@ -1465,7 +1479,7 @@ export default function DriverDashboardPage() {
 
               <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  GPS accuracy
+                  {t.driverPages.console.gpsAccuracyLabel}
                 </span>
                 <div className="mt-1.5">
                   <GPSBadge accuracyM={currentPosition?.accuracyM} signal={signalStatus} />
@@ -1474,7 +1488,7 @@ export default function DriverDashboardPage() {
 
               <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Movement
+                  {t.driverPages.console.movementLabel}
                 </span>
                 <div className="mt-1.5">
                   <MovementBadge movement={movement} />
@@ -1483,7 +1497,7 @@ export default function DriverDashboardPage() {
 
               <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3.5">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Last update
+                  {t.driverPages.console.lastUpdateLabel}
                 </span>
                 <div className="mt-1.5 text-sm font-medium text-slate-600">
                   <RelativeTime date={lastUpdated} />
@@ -1496,16 +1510,16 @@ export default function DriverDashboardPage() {
                 <span>Lat: {currentPosition.lat.toFixed(5)}</span>
                 <span>Lng: {currentPosition.lng.toFixed(5)}</span>
                 <span>
-                  Speed:{' '}
+                  {t.map.speedLabel}{' '}
                   {currentPosition.speedMps !== null
-                    ? `${(currentPosition.speedMps * 3.6).toFixed(1)} km/h`
-                    : '0 km/h'}
+                    ? `${(currentPosition.speedMps * 3.6).toFixed(1)} ${t.map.kmh}`
+                    : `0 ${t.map.kmh}`}
                 </span>
                 <span>
-                  Heading:{' '}
+                  {locale === 'id' ? 'Arah:' : 'Heading:'}{' '}
                   {currentPosition.headingDeg !== null
                     ? `${Math.round(currentPosition.headingDeg)}°`
-                    : '—'}
+                    : t.common.noDataDash}
                 </span>
               </div>
             )}
@@ -1518,7 +1532,7 @@ export default function DriverDashboardPage() {
               className="inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-danger-200 bg-white px-6 text-sm font-semibold text-danger-700 transition-colors hover:border-danger-300 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 sm:w-auto"
             >
               <Icon name="close" className="size-4" />
-              {stoppingPickup ? 'Stop pickup trip' : 'Finish and end trip'}
+              {stoppingPickup ? t.driverPages.console.stopPickupBtn : t.driverPages.console.finishAndEndBtn}
             </button>
           </div>
         </section>
@@ -1526,17 +1540,17 @@ export default function DriverDashboardPage() {
         /* NO ACTIVE TRIP: START TRIP INTERFACE */
         <div className="space-y-3.5 lg:space-y-4">
           {/* Assigned bookings */}
-          <section className="surface space-y-4 p-4 sm:p-5" aria-label="Assigned bookings">
+          <section className="surface space-y-4 p-4 sm:p-5" aria-label={t.driverPages.console.assignedBookingsAria}>
             <div>
-              <p className="eyebrow">Your next pickup</p>
+              <p className="eyebrow">{t.driverPages.console.nextPickupEyebrow}</p>
               <h2 className="section-title mt-2 flex flex-wrap items-center gap-2">
-                Assigned bookings
+                {t.driverPages.console.assignedBookingsHeading}
                 <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-slate-600">
                   {assignedBookings.length}
                 </span>
               </h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-                Start an assigned trip to begin the drive to pickup.
+                {t.driverPages.console.assignedBookingsSub}
               </p>
             </div>
 
@@ -1547,7 +1561,7 @@ export default function DriverDashboardPage() {
                     role="status"
                     className="flex items-center gap-3 text-sm font-medium text-slate-500"
                   >
-                    <Spinner size="md" />Loading your assigned bookings...
+                    <Spinner size="md" />{t.driverPages.console.loadingAssigned}
                   </div>
                 ) : (
                   <>
@@ -1555,10 +1569,10 @@ export default function DriverDashboardPage() {
                       <Icon name="route" />
                     </div>
                     <h3 className="text-sm font-semibold tracking-tight text-slate-900">
-                      Ready for your next assignment.
+                      {t.driverPages.console.readyNextTitle}
                     </h3>
                     <p className="mt-2 max-w-sm text-xs font-medium leading-relaxed text-slate-500">
-                      No active bookings are assigned to you. Go online above to receive dispatch offers.
+                      {t.driverPages.console.readyNextDesc}
                     </p>
                   </>
                 )}
@@ -1581,16 +1595,19 @@ export default function DriverDashboardPage() {
                       <TripRoute pickup={b.pickupLocation} destination={b.destination} />
 
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs font-medium text-slate-600">
-                        Departure:{' '}
+                        {t.userPages.bookings.departureLabel}:{' '}
                         <span className="tabular-nums">
-                          {new Date(b.departureAt).toLocaleDateString([], {
+                          {new Date(b.departureAt).toLocaleDateString(dateLocale, {
                             month: 'short',
                             day: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
                         </span>{' '}
-                        &middot; <span className="tabular-nums">{b.passengerCount}</span> passengers
+                        &middot;{' '}
+                        <span className="tabular-nums">
+                          {format(t.driverPages.console.passengersCountLabel, { count: b.passengerCount })}
+                        </span>
                       </div>
 
                       {b.vehicle && (
@@ -1611,7 +1628,7 @@ export default function DriverDashboardPage() {
                       className="button-primary w-full"
                     >
                       {isStartingTrip ? <Spinner size="sm" /> : <Icon name="arrow" />}
-                      <span>{isStartingTrip ? startLabel : 'Start trip to pickup'}</span>
+                      <span>{isStartingTrip ? startLabel : t.driverPages.console.startTripToPickupBtn}</span>
                     </button>
                     {startError && <ErrorBanner message={startError} />}
                   </div>
@@ -1621,11 +1638,11 @@ export default function DriverDashboardPage() {
           </section>
 
           {/* Ad-hoc vehicle trip start & pool selection */}
-          <section id="vehicle-selection" className="surface space-y-4 p-4 sm:p-5" aria-label="Vehicle selection and trip start">
+          <section id="vehicle-selection" className="surface space-y-4 p-4 sm:p-5" aria-label={t.driverPages.console.vehicleSelectionAria}>
             <div>
-              <h2 className="section-title">Select vehicle from pool</h2>
+              <h2 className="section-title">{t.driverPages.console.selectPoolHeading}</h2>
               <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-                Pick an available vehicle to go online for dispatches or start an ad-hoc trip immediately.
+                {t.driverPages.console.selectPoolSub}
               </p>
             </div>
 
@@ -1635,7 +1652,7 @@ export default function DriverDashboardPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                     <Icon name="pin" className="size-3.5 text-brand-600" />
-                    Filter lokasi hub
+                    {t.driverPages.console.filterHubLabel}
                   </span>
                   {selectedLocationId && (
                     <button
@@ -1646,7 +1663,7 @@ export default function DriverDashboardPage() {
                       }}
                       className="cursor-pointer text-[11px] font-semibold text-brand-700 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                     >
-                      Reset filter
+                      {t.driverPages.console.resetFilterBtn}
                     </button>
                   )}
                 </div>
@@ -1664,7 +1681,7 @@ export default function DriverDashboardPage() {
                         : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                     }`}
                   >
-                    Semua Hub
+                    {t.driverPages.console.allHubsPill}
                   </button>
                   {locations.map((loc) => {
                     const isSelected = selectedLocationId === loc.id;
@@ -1704,14 +1721,18 @@ export default function DriverDashboardPage() {
                   htmlFor="vehicle-plate"
                   className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"
                 >
-                  Search license plate{' '}
-                  {selectedLocationId &&
-                    `(di ${locations.find((l) => l.id === selectedLocationId)?.name || 'hub'})`}
+                  {selectedLocationId
+                    ? format(t.driverPages.console.searchPlateLabel, {
+                        hub: locations.find((l) => l.id === selectedLocationId)?.name || 'hub',
+                      })
+                    : locale === 'id'
+                    ? 'Cari plat nomor'
+                    : 'Search license plate'}
                 </label>
                 <input
                   id="vehicle-plate"
                   type="text"
-                  placeholder="e.g. B 1234 CD or T 2020 AB"
+                  placeholder={t.driverPages.console.searchPlatePlaceholder}
                   value={manualPlate}
                   disabled={isStartingTrip || isTogglingOnline}
                   onChange={(e) => searchVehicle(e.target.value)}
@@ -1723,11 +1744,13 @@ export default function DriverDashboardPage() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                      Available in pool ({poolVehicles.length})
+                      {locale === 'id' ? 'Tersedia di pool' : 'Available in pool'} ({poolVehicles.length})
                     </p>
                     {selectedLocationId && (
                       <span className="text-[11px] font-medium text-slate-500">
-                        Hub: {locations.find((l) => l.id === selectedLocationId)?.name}
+                        {format(t.driverPages.console.hubPrefix, {
+                          name: locations.find((l) => l.id === selectedLocationId)?.name || '',
+                        })}
                       </span>
                     )}
                   </div>
@@ -1759,7 +1782,7 @@ export default function DriverDashboardPage() {
                           </div>
                           <span className="text-xs font-medium text-slate-500">
                             {v.brand} {v.model} &middot;{' '}
-                            <span className="tabular-nums">{v.seatingCapacity}</span> seats
+                            <span className="tabular-nums">{v.seatingCapacity}</span> {t.common.seats}
                           </span>
                         </button>
                       );
@@ -1771,8 +1794,9 @@ export default function DriverDashboardPage() {
               {poolVehicles.length === 0 && !selectedVehicle && !manualPlate && selectedLocationId && (
                 <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center">
                   <p className="text-xs font-medium text-slate-500">
-                    Tidak ada armada AVAILABLE di hub{' '}
-                    {locations.find((l) => l.id === selectedLocationId)?.name || 'ini'}.
+                    {format(t.driverPages.console.noPoolVehicles, {
+                      hub: locations.find((l) => l.id === selectedLocationId)?.name || (locale === 'id' ? 'ini' : 'this hub'),
+                    })}
                   </p>
                   <button
                     type="button"
@@ -1782,7 +1806,7 @@ export default function DriverDashboardPage() {
                     }}
                     className="mt-2 cursor-pointer text-xs font-semibold text-brand-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                   >
-                    Tampilkan armada di semua hub
+                    {t.driverPages.console.showAllHubVehiclesBtn}
                   </button>
                 </div>
               )}
@@ -1842,7 +1866,7 @@ export default function DriverDashboardPage() {
                       </div>
                       <p className="mt-1 text-xs font-medium text-slate-500">
                         {selectedVehicle.brand} {selectedVehicle.model} (
-                        <span className="tabular-nums">{selectedVehicle.seatingCapacity}</span> seats)
+                        <span className="tabular-nums">{selectedVehicle.seatingCapacity}</span> {t.common.seats})
                       </p>
                     </div>
                     <button
@@ -1856,7 +1880,7 @@ export default function DriverDashboardPage() {
                       }}
                       className="inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Change
+                      {t.driverPages.console.changeBtn}
                     </button>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
@@ -1868,7 +1892,7 @@ export default function DriverDashboardPage() {
                         className="button-secondary flex-1"
                       >
                         {isTogglingOnline ? <Spinner size="sm" /> : <Icon name="signal" />}
-                        <span>Go online with this unit</span>
+                        <span>{t.driverPages.console.goOnlineWithUnitBtn}</span>
                       </button>
                     )}
                     <button
@@ -1879,15 +1903,21 @@ export default function DriverDashboardPage() {
                       className="button-primary flex-1"
                     >
                       {isStartingTrip && <Spinner size="sm" />}
-                      <span>{isStartingTrip ? startLabel : `Start trip with ${selectedVehicle.plateNumber}`}</span>
+                      <span>
+                        {isStartingTrip
+                          ? startLabel
+                          : locale === 'id'
+                          ? `Mulai trip dengan ${selectedVehicle.plateNumber}`
+                          : `Start trip with ${selectedVehicle.plateNumber}`}
+                      </span>
                     </button>
                   </div>
                   <p role="status" aria-live="polite" className="text-[11px] font-medium leading-relaxed text-slate-500">
                     {startPhase === 'gps'
-                      ? 'Allow location access in the browser prompt. GPS can take up to 15 seconds.'
+                      ? t.driverPages.console.hintPermission
                       : startPhase === 'request'
-                      ? 'Saving your trip. Please wait without closing this screen.'
-                      : 'GPS permission and HTTPS (or localhost) are required. Keep this screen open while driving.'}
+                      ? t.driverPages.console.hintSaving
+                      : t.driverPages.console.hintKeepOpen}
                   </p>
                 </div>
               )}
@@ -1902,9 +1932,9 @@ export default function DriverDashboardPage() {
         isOpen={showEndConfirm}
         onClose={() => setShowEndConfirm(false)}
         onConfirm={handleEndTrip}
-        title={stoppingPickup ? 'Stop this pickup trip?' : 'Finish and end trip?'}
-        message={stoppingPickup ? 'This will stop tracking and take you offline. The booking stays assigned for retry; it will not be marked completed.' : 'This will finish the trip and take you offline. Any standing vehicle assignment remains reserved for you.'}
-        confirmLabel={stoppingPickup ? 'Stop pickup trip' : 'End trip now'}
+        title={stoppingPickup ? t.driverPages.console.confirmStopTitle : t.driverPages.console.confirmFinishTitle}
+        message={stoppingPickup ? t.driverPages.console.confirmStopDesc : t.driverPages.console.confirmFinishDesc}
+        confirmLabel={stoppingPickup ? t.driverPages.console.confirmStopBtn : t.driverPages.console.confirmFinishBtn}
         isDestructive={true}
         isLoading={isEndingTrip}
       />
@@ -1915,68 +1945,73 @@ export default function DriverDashboardPage() {
           isOpen={Boolean(completedTripSummary)}
           onClose={() => setCompletedTripSummary(null)}
           title={completedTripSummary.pendingSync
-            ? 'Trip selesai (Menunggu Sinkronisasi)'
-            : completedTripSummary.aborted ? 'Pickup trip stopped' : 'Trip completed successfully'}
+            ? t.driverPages.console.summaryOfflineTitle
+            : completedTripSummary.aborted
+            ? t.driverPages.console.summaryAbortedTitle
+            : t.driverPages.console.summaryDoneTitle}
           description={completedTripSummary.pendingSync
-            ? 'Perjalanan selesai offline — akan disinkronkan otomatis saat online'
-            : completedTripSummary.aborted ? 'The booking remains assigned for retry' : 'GPS tracking session finalized'}
+            ? t.driverPages.console.summaryOfflineDesc
+            : completedTripSummary.aborted
+            ? t.driverPages.console.summaryAbortedDesc
+            : t.driverPages.console.summaryDoneDesc}
           footer={
             <button
               type="button"
               onClick={() => setCompletedTripSummary(null)}
               className="button-primary"
             >
-              Done
+              {t.driverPages.console.doneBtn}
             </button>
           }
         >
           <div className="space-y-4 text-sm">
             {completedTripSummary.pendingSync && (
               <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-700">
-                <span className="mb-0.5 block font-semibold">Trip selesai (Menunggu Sinkronisasi)</span>
+                <span className="mb-0.5 block font-semibold">{t.driverPages.console.summaryOfflineTitle}</span>
                 <p className="text-[11px] font-medium leading-relaxed text-warning-700">
-                  Perjalanan selesai offline. Data akan dikirim otomatis saat koneksi kembali.
+                  {t.driverPages.console.summaryOfflineBannerBody}
                 </p>
               </div>
             )}
             <div className="rounded-xl border border-slate-200 bg-white p-4 leading-relaxed">
               <span className="block font-semibold text-slate-900">
-                {completedTripSummary.aborted ? 'Trip stopped, booking not completed' : 'Trip closed'}
+                {completedTripSummary.aborted
+                  ? t.driverPages.console.summaryAbortedNoticeTitle
+                  : t.driverPages.console.summaryClosedTitle}
               </span>
               <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
                 {completedTripSummary.telemetryUploaded
-                  ? 'Trip and online session closed. Valid GPS updates received by the server are retained.'
-                  : 'Trip closed, but some final GPS updates could not be uploaded. Your earlier stored updates are retained.'}
+                  ? t.driverPages.console.summarySyncedNotice
+                  : t.driverPages.console.summaryPartialNotice}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-2.5">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  Duration
+                  {t.driverPages.console.summaryDurationLabel}
                 </span>
                 <span className="font-mono text-sm font-semibold text-slate-900 tabular-nums">
-                  {completedTripSummary.durationMinutes} minutes
+                  {completedTripSummary.durationMinutes} {locale === 'id' ? 'menit' : 'minutes'}
                 </span>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  Distance
+                  {t.driverPages.console.summaryDistanceLabel}
                 </span>
                 <span className="font-mono text-sm font-semibold text-slate-900 tabular-nums">
                   {completedTripSummary.distanceMeters
                     ? `${(completedTripSummary.distanceMeters / 1000).toFixed(2)} km`
-                    : 'Tracked via GPS'}
+                    : t.driverPages.console.summaryGpsTrackedFallback}
                 </span>
               </div>
             </div>
 
             {!completedTripSummary.aborted && (
               <div className="rounded-xl border border-warning-200 bg-warning-50 p-3.5 text-xs text-warning-700">
-                <span className="mb-0.5 block font-semibold">Status: Menunggu Nota Dinas</span>
+                <span className="mb-0.5 block font-semibold">{t.driverPages.console.summaryWaitNotaTitle}</span>
                 <p className="text-[11px] font-medium leading-relaxed text-warning-700">
-                  Perjalanan telah selesai. Booking memasuki tahap verifikasi akhir sebelum diselesaikan
-                  resmi oleh admin KCIC.
+                  {t.driverPages.console.summaryWaitNotaBody}
                 </p>
               </div>
             )}

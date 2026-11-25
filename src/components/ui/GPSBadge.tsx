@@ -1,4 +1,7 @@
+'use client';
+
 import React from 'react';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 import { Icon } from './Icon';
 
 interface GPSBadgeProps {
@@ -28,22 +31,24 @@ export function GPSBadge({
   showDetails = true,
   className = '',
 }: GPSBadgeProps) {
-  let label = 'LOW';
+  const { t, format } = useTranslation();
+
+  let label = t.gps.lowSignal;
   let subtext = '';
   let tone: Tone = 'danger';
   let isEstimated = false;
 
   if (accuracyM !== undefined && accuracyM !== null) {
     if (accuracyM < 20) {
-      label = 'Akurasi Tinggi';
-      subtext = 'Satelit Lock';
+      label = t.gps.accurate;
+      subtext = t.gps.subtextSatellite;
       tone = 'success';
     } else if (accuracyM <= 100) {
-      label = 'Sedang';
+      label = t.gps.moderate;
       tone = 'warning';
     } else {
-      label = 'Akurasi Estimasi';
-      subtext = 'Seluler/Wi-Fi';
+      label = t.gps.low;
+      subtext = t.gps.subtextCellWifi;
       tone = 'warning';
       isEstimated = true;
     }
@@ -63,10 +68,10 @@ export function GPSBadge({
       title={
         roundedM !== null
           ? isEstimated
-            ? `Akurasi Estimasi: ±${roundedM} m (Berdasarkan Triangulasi Seluler/Wi-Fi)`
+            ? format(t.gps.tooltipEstimated, { accuracy: roundedM })
             : subtext
-            ? `Akurasi Tinggi: ±${roundedM} m (${subtext})`
-            : `Akurasi: ±${roundedM} m`
+            ? format(t.gps.tooltipSatellite, { accuracy: roundedM })
+            : format(t.gps.tooltipModerate, { accuracy: roundedM })
           : undefined
       }
     >

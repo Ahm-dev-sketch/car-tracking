@@ -1,10 +1,11 @@
 import React from 'react';
 import { NavBar } from '@/components/layout/NavBar';
+import { SkipLink } from '@/components/layout/SkipLink';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell flex flex-col">
-      <a href="#main-content" className="skip-link">Skip to content</a>
+      <SkipLink />
       <NavBar />
       <main id="main-content" tabIndex={-1} className="app-main">
         {children}

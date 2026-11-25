@@ -9,6 +9,8 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
 import { fetchJson } from '@/lib/fetch-json';
 import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateStatus, translateTransmission, translateVehicleType } from '@/lib/i18n';
 
 interface VehicleLocation {
   id: string;
@@ -38,6 +40,11 @@ interface LocationOption {
 }
 
 function DriverVehicleContent() {
+  const { locale, t, format } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
+  const formatRef = useRef(format);
+  formatRef.current = format;
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -86,7 +93,7 @@ function DriverVehicleContent() {
         }
 
         if (meRes.status !== 'fulfilled' || !meRes.value) {
-          throw new Error('Gagal memverifikasi akun pengemudi. Silakan segarkan halaman.');
+          throw new Error(tRef.current.driverPages.vehicle.verifyError);
         }
 
         const me = meRes.value;
@@ -95,7 +102,7 @@ function DriverVehicleContent() {
 
         if (!meDriver) {
           if (userRole && userRole !== 'DRIVER') {
-            throw new Error(`Akun aktif saat ini (${userRole}) bukan akun Driver. Silakan masuk dengan akun Driver untuk mengelola penugasan armada.`);
+            throw new Error(formatRef.current(tRef.current.driverPages.vehicle.wrongRoleError, { role: userRole }));
           }
           setDriverStatus('OFFLINE');
           setLicenseNumber('SIM-0001');
@@ -114,7 +121,7 @@ function DriverVehicleContent() {
         }
       } catch (cause) {
         console.error('[Driver Data Fetch Error] /driver/vehicle loadDriverVehicle:', cause);
-        setError(cause instanceof Error ? cause.message : 'Failed to load vehicle assignment');
+        setError(cause instanceof Error ? cause.message : tRef.current.driverPages.vehicle.failedLoad);
       } finally {
         setIsLoading(false);
       }
@@ -136,7 +143,7 @@ function DriverVehicleContent() {
       const json = await fetchJson<{ data: VehicleDetails[] }>(`/api/vehicles?${params.toString()}`);
       if (version === searchVersion.current) setSearchResults(json.data || []);
     } catch (cause) {
-      if (version === searchVersion.current) setError(cause instanceof Error ? cause.message : 'Unable to search vehicles.');
+      if (version === searchVersion.current) setError(cause instanceof Error ? cause.message : tRef.current.driverPages.vehicle.failedSearch);
     } finally {
       if (version === searchVersion.current) setIsSearching(false);
     }
@@ -157,10 +164,10 @@ function DriverVehicleContent() {
     <div className="space-y-5">
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">KCIC Fleet / Driver asset</p>
-          <h1 className="page-heading mt-2">My assigned vehicle.</h1>
+          <p className="eyebrow">{t.driverPages.vehicle.eyebrow}</p>
+          <h1 className="page-heading mt-2">{t.driverPages.vehicle.heading}</h1>
           <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
-            Fleet asset currently linked to your driver profile
+            {t.driverPages.vehicle.description}
           </p>
         </div>
       </div>
@@ -170,7 +177,7 @@ function DriverVehicleContent() {
       {isLoading ? (
         <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
-          <p>Loading vehicle information...</p>
+          <p>{t.driverPages.vehicle.loadingInfo}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3 lg:gap-4">
@@ -178,12 +185,12 @@ function DriverVehicleContent() {
           <MotionBentoCard index={0} className="overflow-hidden rounded-xl border border-slate-200 bg-white md:col-span-2">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Vehicle assignment
+                {t.driverPages.vehicle.assignmentHeading}
               </span>
               {currentVehicle ? (
                 <StatusBadge status={currentVehicle.status} />
               ) : (
-                <span className="text-xs font-medium text-slate-400">Not assigned</span>
+                <span className="text-xs font-medium text-slate-400">{t.driverPages.vehicle.notAssigned}</span>
               )}
             </div>
 
@@ -227,31 +234,31 @@ function DriverVehicleContent() {
                 <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
                   <div>
                     <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                      Vehicle type
+                      {t.driverPages.vehicle.vehicleTypeLabel}
                     </span>
-                    <span className="font-medium text-slate-700">{currentVehicle.vehicleType}</span>
+                    <span className="font-medium text-slate-700">{translateVehicleType(locale, currentVehicle.vehicleType)}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                      Capacity
+                      {t.driverPages.vehicle.capacityLabel}
                     </span>
                     <span className="font-medium text-slate-700 tabular-nums">
-                      {currentVehicle.seatingCapacity} seats
+                      {format(t.driverPages.vehicle.seatsCount, { count: currentVehicle.seatingCapacity })}
                     </span>
                   </div>
                   <div>
                     <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                      Transmission
+                      {t.driverPages.vehicle.transmissionLabel}
                     </span>
                     <span className="font-medium text-slate-700">
-                      {currentVehicle.transmission || 'Automatic'}
+                      {translateTransmission(locale, currentVehicle.transmission || 'AUTOMATIC')}
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="px-5 py-12 text-center text-xs font-medium text-slate-600">
-                No permanent vehicle assignment. Search below to inspect available vehicles.
+                {t.driverPages.vehicle.noPermanentHint}
               </div>
             )}
           </MotionBentoCard>
@@ -259,13 +266,13 @@ function DriverVehicleContent() {
           {/* Driver Badge & Info */}
           <MotionBentoCard index={1} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
             <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              Driver credentials
+              {t.driverPages.vehicle.credentialsHeading}
             </span>
 
             <div className="space-y-3">
               <div>
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  Duty status
+                  {t.driverPages.vehicle.dutyStatusLabel}
                 </span>
                 <div className="mt-1">
                   <StatusBadge status={driverStatus} />
@@ -275,7 +282,7 @@ function DriverVehicleContent() {
               {licenseNumber && (
                 <div>
                   <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    Driver license
+                    {t.driverPages.vehicle.licenseLabel}
                   </span>
                   <p className="mt-1 font-mono text-sm font-semibold text-slate-700 tabular-nums">
                     {licenseNumber}
@@ -287,8 +294,7 @@ function DriverVehicleContent() {
             <div className="flex items-start gap-2 border-t border-slate-100 pt-4 text-[11px] leading-relaxed text-slate-500">
               <Icon name="info" className="mt-px size-3.5 shrink-0 text-slate-400" />
               <p>
-                Vehicle assignments are authorized by company fleet dispatchers. Contact dispatch if your
-                assignment requires updates.
+                {t.driverPages.vehicle.policyNote}
               </p>
             </div>
           </MotionBentoCard>
@@ -299,13 +305,13 @@ function DriverVehicleContent() {
       <MotionBentoCard index={2} className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-            Inspect fleet
+            {t.driverPages.vehicle.inspectFleetEyebrow}
           </p>
           <h2 className="mt-1.5 text-base font-semibold tracking-tight text-slate-900">
-            Available vehicles by hub
+            {t.driverPages.vehicle.availableByHubHeading}
           </h2>
           <p className="mt-1 text-xs font-medium text-slate-500">
-            Filter by operational hub and check vehicle availability
+            {t.driverPages.vehicle.availableByHubDesc}
           </p>
         </div>
 
@@ -320,7 +326,7 @@ function DriverVehicleContent() {
                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
-            Semua Hub
+            {t.driverPages.vehicle.allHubs}
           </button>
           {locations.map((loc) => {
             const isSelected = locationFilter === loc.id;
@@ -359,7 +365,7 @@ function DriverVehicleContent() {
             />
             <input
               type="text"
-              placeholder="Search license plate, brand, model..."
+              placeholder={t.driverPages.vehicle.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
@@ -371,7 +377,7 @@ function DriverVehicleContent() {
             onChange={(e) => setLocationFilter(e.target.value)}
             className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
-            <option value="">All Locations</option>
+            <option value="">{t.driverPages.vehicle.allLocationsOption}</option>
             {locations.map((loc) => (
               <option key={loc.id} value={loc.id}>
                 {loc.name} ({loc.code})
@@ -384,10 +390,10 @@ function DriverVehicleContent() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
-            <option value="">All Statuses</option>
-            <option value="AVAILABLE">Available</option>
-            <option value="RESERVED">Reserved</option>
-            <option value="IN_USE">In Use</option>
+            <option value="">{t.driverPages.vehicle.allStatusesOption}</option>
+            <option value="AVAILABLE">{translateStatus(locale, 'AVAILABLE')}</option>
+            <option value="RESERVED">{translateStatus(locale, 'RESERVED')}</option>
+            <option value="IN_USE">{translateStatus(locale, 'IN_USE')}</option>
           </select>
 
           <button
@@ -395,7 +401,7 @@ function DriverVehicleContent() {
             onClick={handleSearch}
             className="button-primary shrink-0"
           >
-            {isSearching ? <Spinner size="sm" /> : 'Filter'}
+            {isSearching ? <Spinner size="sm" /> : t.driverPages.vehicle.filterBtn}
           </button>
         </div>
 
@@ -434,7 +440,7 @@ function DriverVehicleContent() {
                     )}
                   </div>
                   <div className="border-t border-slate-200 pt-1.5 text-[11px] tabular-nums text-slate-400">
-                    {v.seatingCapacity} seats &middot; {v.vehicleType}
+                    {format(t.driverPages.vehicle.seatsCount, { count: v.seatingCapacity })} &middot; {translateVehicleType(locale, v.vehicleType)}
                   </div>
                 </div>
               );
@@ -447,12 +453,13 @@ function DriverVehicleContent() {
 }
 
 export default function DriverVehiclePage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
-          <p>Loading vehicle profile...</p>
+          <p>{t.driverPages.vehicle.loadingSuspense}</p>
         </div>
       }
     >

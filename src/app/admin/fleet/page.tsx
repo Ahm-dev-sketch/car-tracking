@@ -11,6 +11,8 @@ import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Spinner } from '@/components/ui/Spinner';
 import { Icon } from '@/components/ui/Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateVehicleCondition } from '@/lib/i18n';
 import {
   getHubMapCenter,
   getHubCoordinates,
@@ -33,6 +35,7 @@ interface OperationalLocation {
 }
 
 function AdminFleetMapContent() {
+  const { locale, t, format } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -294,20 +297,28 @@ function AdminFleetMapContent() {
     <div className="space-y-4">
       <div className="page-intro">
         <div className="min-w-0">
-          <span className="eyebrow mb-3">Every vehicle, in view</span>
+          <span className="eyebrow mb-3">{t.adminPages.fleet.eyebrow}</span>
           <h1 className="page-heading">
-            {selectedLocation ? `Fleet Map: ${selectedLocation.name} (${selectedLocation.code})` : 'Follow your fleet.'}
+            {selectedLocation
+              ? format(t.adminPages.fleet.headingHub, { name: selectedLocation.name, code: selectedLocation.code })
+              : t.adminPages.fleet.headingAll}
           </h1>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">
             {selectedLocation
-              ? `Operational hub map for ${selectedLocation.name}. Fleet units: ${mergedVehicles.length}, Moving: ${movingCount}`
+              ? locale === 'id'
+                ? `Peta hub operasional ${selectedLocation.name}. Unit armada: ${mergedVehicles.length}, Bergerak: ${movingCount}`
+                : `Operational hub map for ${selectedLocation.name}. Fleet units: ${mergedVehicles.length}, Moving: ${movingCount}`
+              : locale === 'id'
+              ? `Peta GPS langsung seluruh operasi armada (${mergedVehicles.length} terpantau, ${movingCount} bergerak)`
               : `Realtime GPS map of entire corporate vehicle operations (${mergedVehicles.length} reporting, ${movingCount} moving)`}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <div className="flex items-center gap-1.5">
-            <label htmlFor="fleet-hub-filter" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Hub</label>
+            <label htmlFor="fleet-hub-filter" className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {t.adminPages.fleet.hubLabel}
+            </label>
             <select
               id="fleet-hub-filter"
               value={locationFilter}
@@ -317,7 +328,7 @@ function AdminFleetMapContent() {
               }}
               className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Hubs (Seluruh Wilayah)</option>
+              <option value="">{t.adminPages.fleet.allHubsOption}</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -339,7 +350,7 @@ function AdminFleetMapContent() {
                 connectionState === 'open' ? 'bg-success-600 status-ping' : 'bg-slate-400'
               }`}
             />
-            {connectionState === 'open' ? 'LIVE SOCKET' : 'POLLING'}
+            {connectionState === 'open' ? t.adminPages.fleet.liveSocketBadge : t.adminPages.fleet.pollingBadge}
           </span>
         </div>
       </div>
@@ -347,40 +358,40 @@ function AdminFleetMapContent() {
       {/* Radar Condition Status Bar */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white p-2 text-xs sm:p-2.5">
         <div className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-600">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Fleet</span>
-          <span className="font-mono tabular-nums">{conditionStats.total} UNITS</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.adminPages.fleet.fleetStripLabel}</span>
+          <span className="font-mono uppercase tabular-nums">{conditionStats.total} {t.common.units}</span>
         </div>
 
         <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-2.5 py-1 font-medium text-success-700">
           <span className="size-1.5 rounded-full bg-success-600" aria-hidden="true" />
-          <span className="font-mono tabular-nums">AVAILABLE ({conditionStats.available})</span>
+          <span className="font-mono tabular-nums">{format(t.adminPages.fleet.statAvailable, { count: conditionStats.available })}</span>
         </span>
 
         <span className="inline-flex items-center gap-1.5 rounded-full border border-danger-200 bg-danger-50 px-2.5 py-1 font-medium text-danger-700">
           <span className="relative size-1.5 rounded-full bg-danger-600 status-ping" aria-hidden="true" />
-          <span className="font-mono tabular-nums">IN USE / MOVING ({conditionStats.inUse})</span>
+          <span className="font-mono tabular-nums">{format(t.adminPages.fleet.statInUse, { count: conditionStats.inUse })}</span>
         </span>
 
         <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50 px-2.5 py-1 font-medium text-warning-700">
           <span className="size-1.5 rounded-full bg-warning-600" aria-hidden="true" />
-          <span className="font-mono tabular-nums">RESERVED ({conditionStats.reserved})</span>
+          <span className="font-mono tabular-nums">{format(t.adminPages.fleet.statReserved, { count: conditionStats.reserved })}</span>
         </span>
 
         <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-white px-2.5 py-1 font-medium text-warning-700">
           <span className="size-1.5 rounded-full" style={{ backgroundColor: '#ea580c' }} aria-hidden="true" />
-          <span className="font-mono tabular-nums">MAINTENANCE ({conditionStats.maintenance})</span>
+          <span className="font-mono tabular-nums">{format(t.adminPages.fleet.statMaintenance, { count: conditionStats.maintenance })}</span>
         </span>
 
         <span className="inline-flex items-center gap-1.5 rounded-full border border-info-200 bg-info-50 px-2.5 py-1 font-medium text-info-700">
           <span className="size-1.5 rounded-full bg-slate-400" aria-hidden="true" />
-          <span className="font-mono tabular-nums">INACTIVE ({conditionStats.inactive})</span>
+          <span className="font-mono tabular-nums">{format(t.adminPages.fleet.statInactive, { count: conditionStats.inactive })}</span>
         </span>
       </div>
 
       {isLoading ? (
         <div className="flex flex-col items-center rounded-xl border border-slate-200 bg-white py-24 text-center text-sm text-slate-500" role="status">
           <Spinner size="lg" className="mb-2" />
-          <p className="font-medium">Acquiring fleet telemetry...</p>
+          <p className="font-medium">{t.adminPages.fleet.loadingTelemetry}</p>
         </div>
       ) : (
         <div className="tracking-layout">
@@ -399,14 +410,20 @@ function AdminFleetMapContent() {
           <div className="tracking-panel flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             {mergedVehicles.length === 0 ? (
               <div className="py-12 text-center text-xs text-slate-500">
-                <p className="text-sm font-semibold text-slate-700">Tidak ada armada aktif di wilayah ini</p>
-                <p className="mt-1 text-slate-600">Peta wilayah {selectedLocation?.name || 'operasional'} tetap aktif di atas.</p>
+                <p className="text-sm font-semibold text-slate-700">{t.adminPages.fleet.emptyHubTitle}</p>
+                <p className="mt-1 text-slate-600">
+                  {format(t.adminPages.fleet.emptyHubDesc, {
+                    hub: selectedLocation?.name || t.adminPages.fleet.defaultOperationalName,
+                  })}
+                </p>
               </div>
             ) : (
               <div>
                 <div className="mb-3 border-b border-slate-200 pb-3">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Fleet Units <span className="font-mono tabular-nums">({mergedVehicles.length})</span> {selectedLocation ? `— ${selectedLocation.name}` : ''}
+                    {locale === 'id' ? 'Unit Armada' : 'Fleet Units'}{' '}
+                    <span className="font-mono tabular-nums">({mergedVehicles.length})</span>{' '}
+                    {selectedLocation ? `— ${selectedLocation.name}` : ''}
                   </span>
                   <div className="mt-2 flex max-h-48 flex-wrap gap-1.5 overflow-y-auto pr-1">
                     {mergedVehicles.map((v) => {
@@ -477,7 +494,7 @@ function AdminFleetMapContent() {
                       }}
                     >
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                        Radar Condition
+                        {t.adminPages.fleet.radarConditionLabel}
                       </span>
                       <span
                         className="text-xs font-semibold uppercase tracking-wide"
@@ -485,7 +502,10 @@ function AdminFleetMapContent() {
                           color: getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).color,
                         }}
                       >
-                        {getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).badgeText}
+                        {translateVehicleCondition(
+                          locale,
+                          getVehicleConditionVisual(selectedVehicle.status, selectedVehicle.movement).badgeText
+                        )}
                       </span>
                     </div>
                   </div>
@@ -493,7 +513,7 @@ function AdminFleetMapContent() {
                   <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs">
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        Movement
+                        {t.adminPages.fleet.movementLabel}
                       </span>
                       <div className="mt-1">
                         <MovementBadge movement={selectedVehicle.movement} />
@@ -501,7 +521,7 @@ function AdminFleetMapContent() {
                     </div>
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        Accuracy
+                        {t.adminPages.fleet.accuracyLabel}
                       </span>
                       <div className="mt-1">
                         <GPSBadge accuracyM={selectedVehicle.accuracyM} />
@@ -509,7 +529,7 @@ function AdminFleetMapContent() {
                       {typeof selectedVehicle.accuracyM === 'number' && selectedVehicle.accuracyM > 100 && (
                         <div className="mt-1 flex items-start gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-1.5 py-1 text-[10px] font-medium text-warning-700">
                           <Icon name="alert" className="mt-px size-3 shrink-0 text-warning-600" />
-                          <span>Posisi estimasi seluler/Wi-Fi (radius ±{Math.round(selectedVehicle.accuracyM)} m)</span>
+                          <span>{format(t.adminPages.fleet.cellWifiEstimated, { m: Math.round(selectedVehicle.accuracyM) })}</span>
                         </div>
                       )}
                     </div>
@@ -517,7 +537,7 @@ function AdminFleetMapContent() {
 
                   <div className="space-y-0.5 border-t border-slate-100 pt-3 text-xs">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      Telemetry Time
+                      {t.adminPages.fleet.telemetryTimeLabel}
                     </span>
                     <div className="font-mono text-[11px] font-medium tabular-nums text-slate-700">
                       <RelativeTime date={selectedVehicle.recordedAt} />
@@ -527,7 +547,7 @@ function AdminFleetMapContent() {
                   {selectedVehicle.driverName && (
                     <div className="space-y-1.5 border-t border-slate-100 pt-3 text-xs">
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                        Operator
+                        {t.adminPages.fleet.operatorLabel}
                       </span>
                       <div className="font-semibold text-slate-900">{selectedVehicle.driverName}</div>
                       {selectedVehicle.driverPhone && (
@@ -540,7 +560,7 @@ function AdminFleetMapContent() {
                               className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                             >
                               <Icon name="message" className="size-3.5 shrink-0" />
-                              <span className="tabular-nums">WhatsApp {selectedVehicle.driverPhone}</span>
+                              <span className="tabular-nums">{t.common.whatsapp} {selectedVehicle.driverPhone}</span>
                             </a>
                           ) : (
                             <span className="font-mono font-medium tabular-nums text-slate-600">{selectedVehicle.driverPhone}</span>
@@ -554,12 +574,12 @@ function AdminFleetMapContent() {
                     <div className="space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-600">
                       {selectedVehicle.tripOrigin && (
                         <div>
-                          <strong className="font-semibold text-slate-800">Origin:</strong> {selectedVehicle.tripOrigin}
+                          <strong className="font-semibold text-slate-800">{t.adminPages.fleet.originLabel}</strong> {selectedVehicle.tripOrigin}
                         </div>
                       )}
                       {selectedVehicle.tripDestination && (
                         <div>
-                          <strong className="font-semibold text-slate-800">Destination:</strong> {selectedVehicle.tripDestination}
+                          <strong className="font-semibold text-slate-800">{t.adminPages.fleet.destinationLabel}</strong> {selectedVehicle.tripDestination}
                         </div>
                       )}
                     </div>
@@ -567,7 +587,7 @@ function AdminFleetMapContent() {
                 </div>
               ) : (
                 <div className="py-6 text-center text-xs font-medium text-slate-600">
-                  Select a marker on the map to inspect unit details.
+                  {t.adminPages.fleet.selectMarkerHint}
                 </div>
               )}
             </div>
@@ -580,12 +600,13 @@ function AdminFleetMapContent() {
 }
 
 export default function AdminFleetMapPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <div className="flex flex-col items-center rounded-xl border border-slate-200 bg-white py-24 text-center text-xs text-slate-500" role="status">
           <Spinner size="md" className="mb-2" />
-          <p className="font-medium">Loading fleet command...</p>
+          <p className="font-medium">{t.adminPages.fleet.loadingSuspense}</p>
         </div>
       }
     >

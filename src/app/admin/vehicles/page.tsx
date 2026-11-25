@@ -12,6 +12,8 @@ import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateStatus, translateTransmission, translateVehicleType } from '@/lib/i18n';
 
 interface OperationalLocation {
   id: string;
@@ -59,6 +61,7 @@ interface DriverOption {
 }
 
 function AdminVehiclesContent() {
+  const { locale, t, format } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -153,10 +156,10 @@ function AdminVehiclesContent() {
         }
       } else if (!isSilent) {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to load vehicles');
+        setApiError(err.error?.message || t.adminPages.vehicles.failedLoad);
       }
     } catch {
-      if (!isSilent) setApiError('Network error loading vehicles');
+      if (!isSilent) setApiError(t.adminPages.vehicles.networkLoadError);
     } finally {
       if (!isSilent) setIsLoading(false);
     }
@@ -229,14 +232,14 @@ function AdminVehiclesContent() {
     // Validate size client-side (Max 5MB)
     const MAX_SIZE = 5 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      setUploadError('Ukuran file melebihi batas maksimal 5MB.');
+      setUploadError(t.adminPages.vehicles.fileTooLargeError);
       return;
     }
 
     // Validate type client-side
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
     if (!allowed.includes(file.type)) {
-      setUploadError('Format gambar harus JPG, PNG, atau WebP.');
+      setUploadError(t.adminPages.vehicles.invalidFormatError);
       return;
     }
 
@@ -254,7 +257,7 @@ function AdminVehiclesContent() {
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error?.message || 'Gagal mengupload gambar.');
+        throw new Error(errJson.error?.message || t.adminPages.vehicles.uploadFailedError);
       }
 
       const json = await res.json();
@@ -262,7 +265,7 @@ function AdminVehiclesContent() {
         setFormImageUrl(json.data.url);
       }
     } catch (err: any) {
-      setUploadError(err.message || 'Gagal mengupload gambar.');
+      setUploadError(err.message || t.adminPages.vehicles.uploadFailedError);
     } finally {
       setIsUploadingImage(false);
     }
@@ -301,10 +304,10 @@ function AdminVehiclesContent() {
         fetchVehicles(page);
       } else {
         const err = await res.json();
-        setFormError(err.error?.message || 'Failed to save vehicle');
+        setFormError(err.error?.message || t.common.genericError);
       }
     } catch {
-      setFormError('Network error saving vehicle');
+      setFormError(t.common.networkError);
     } finally {
       setFormSubmitting(false);
     }
@@ -322,10 +325,10 @@ function AdminVehiclesContent() {
         fetchVehicles(page);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to deactivate vehicle');
+        setApiError(err.error?.message || t.adminPages.vehicles.failedDeactivate);
       }
     } catch {
-      setApiError('Network error deactivating vehicle');
+      setApiError(t.adminPages.vehicles.networkDeactivateError);
     } finally {
       setIsDeactivating(false);
     }
@@ -362,10 +365,10 @@ function AdminVehiclesContent() {
         fetchVehicles(page);
       } else {
         const err = await res.json();
-        setAssignError(err.error?.message || 'Failed to assign driver');
+        setAssignError(err.error?.message || t.common.genericError);
       }
     } catch {
-      setAssignError('Network error assigning driver');
+      setAssignError(t.common.networkError);
     } finally {
       setIsAssigning(false);
     }
@@ -373,12 +376,12 @@ function AdminVehiclesContent() {
 
   const columns: Column<VehicleItem>[] = [
     {
-      header: 'Plate Number',
+      header: t.adminPages.vehicles.colPlate,
       accessorKey: 'plateNumber',
       cell: (v) => <span className="font-mono font-semibold tabular-nums text-slate-900">{v.plateNumber}</span>,
     },
     {
-      header: 'Vehicle',
+      header: t.adminPages.vehicles.colVehicle,
       cell: (v) => (
         <div className="flex items-center gap-2.5">
           {v.imageUrl && (
@@ -393,13 +396,15 @@ function AdminVehiclesContent() {
           )}
           <div>
             <span className="font-medium text-slate-900">{v.brand} {v.model}</span>
-            <span className="block text-xs text-slate-500">{v.vehicleType} • <span className="tabular-nums">{v.seatingCapacity}</span> seats</span>
+            <span className="block text-xs text-slate-500">
+              {translateVehicleType(locale, v.vehicleType)} • <span className="tabular-nums">{format(t.adminPages.vehicles.seatsCount, { count: v.seatingCapacity })}</span>
+            </span>
           </div>
         </div>
       ),
     },
     {
-      header: 'Operational Hub',
+      header: t.adminPages.vehicles.colHub,
       cell: (v) => (
         <div className="flex flex-wrap items-center gap-1">
           {v.homeLocation && (
@@ -417,13 +422,13 @@ function AdminVehiclesContent() {
             />
           )}
           {!v.homeLocation && !v.currentOperationalLocation && (
-            <span className="text-xs italic text-slate-400">—</span>
+            <span className="text-xs italic text-slate-400">{t.common.noDataDash}</span>
           )}
         </div>
       ),
     },
     {
-      header: 'Assigned Driver',
+      header: t.adminPages.vehicles.colAssignedDriver,
       cell: (v) =>
         v.currentDriver ? (
           <div>
@@ -431,15 +436,15 @@ function AdminVehiclesContent() {
             <span className="block font-mono text-[11px] tabular-nums text-slate-500">{v.currentDriver.licenseNumber}</span>
           </div>
         ) : (
-          <span className="text-xs italic text-slate-400">Unassigned</span>
+          <span className="text-xs italic text-slate-400">{t.adminPages.vehicles.unassignedLabel}</span>
         ),
     },
     {
-      header: 'Status',
+      header: t.adminPages.vehicles.colStatus,
       cell: (v) => <StatusBadge status={v.status} />,
     },
     {
-      header: 'Actions',
+      header: t.adminPages.vehicles.colActions,
       cell: (v) => (
         <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
@@ -447,14 +452,14 @@ function AdminVehiclesContent() {
             onClick={() => handleOpenAssign(v)}
             className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
-            Assign
+            {t.adminPages.vehicles.assignBtn}
           </button>
           <button
             type="button"
             onClick={() => handleOpenEdit(v)}
             className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
-            Edit
+            {t.adminPages.vehicles.editBtn}
           </button>
           {v.status !== 'INACTIVE' && (
             <button
@@ -462,7 +467,7 @@ function AdminVehiclesContent() {
               onClick={() => setDeactivatingVehicle(v)}
               className="cursor-pointer rounded-lg border border-danger-200 bg-white px-2.5 py-1 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
             >
-              Deactivate
+              {t.adminPages.vehicles.deactivateBtn}
             </button>
           )}
         </div>
@@ -478,8 +483,8 @@ function AdminVehiclesContent() {
     <div className="space-y-6">
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Vehicle Inventory</h1>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">Manage fleet vehicles, specifications, and driver assignments</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.adminPages.vehicles.heading}</h1>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.adminPages.vehicles.description}</p>
         </div>
         <button
           type="button"
@@ -487,26 +492,26 @@ function AdminVehiclesContent() {
           className="button-primary inline-flex cursor-pointer items-center gap-1.5 self-start sm:self-auto"
         >
           <Icon name="plus" className="size-4" />
-          <span>Add Vehicle</span>
+          <span>{t.adminPages.vehicles.addVehicleBtn}</span>
         </button>
       </div>
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total Armada</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statTotal}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Tersedia</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statAvailable}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{availableCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Digunakan</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statInUse}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{inUseCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Perawatan</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statMaintenance}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{maintenanceCount}</p>
         </div>
       </div>
@@ -522,26 +527,26 @@ function AdminVehiclesContent() {
             </span>
             <input
               type="text"
-              placeholder="Search plate, brand, model..."
+              placeholder={t.adminPages.vehicles.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             />
           </div>
           <button type="submit" className="button-primary shrink-0 px-3 text-xs">
-            Search
+            {t.adminPages.vehicles.searchBtn}
           </button>
         </form>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Hub</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.hubLabel}</span>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Hubs</option>
+              <option value="">{t.adminPages.vehicles.allHubsOption}</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -551,18 +556,18 @@ function AdminVehiclesContent() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Status</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.vehicles.statusLabel}</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Statuses</option>
-              <option value="AVAILABLE">Available</option>
-              <option value="RESERVED">Reserved</option>
-              <option value="IN_USE">In Use</option>
-              <option value="MAINTENANCE">Maintenance</option>
-              <option value="INACTIVE">Inactive</option>
+              <option value="">{t.adminPages.vehicles.allStatusesOption}</option>
+              <option value="AVAILABLE">{translateStatus(locale, 'AVAILABLE')}</option>
+              <option value="RESERVED">{translateStatus(locale, 'RESERVED')}</option>
+              <option value="IN_USE">{translateStatus(locale, 'IN_USE')}</option>
+              <option value="MAINTENANCE">{translateStatus(locale, 'MAINTENANCE')}</option>
+              <option value="INACTIVE">{translateStatus(locale, 'INACTIVE')}</option>
             </select>
           </div>
         </div>
@@ -572,7 +577,7 @@ function AdminVehiclesContent() {
         columns={columns}
         data={vehicles}
         isLoading={isLoading}
-        emptyMessage="No vehicles found"
+        emptyMessage={t.adminPages.vehicles.emptyMessage}
       />
 
       <Pagination
@@ -586,54 +591,54 @@ function AdminVehiclesContent() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingVehicle ? `Edit Vehicle: ${editingVehicle.plateNumber}` : 'Add New Vehicle'}
+        title={editingVehicle ? format(t.adminPages.vehicles.editModalTitle, { plate: editingVehicle.plateNumber }) : t.adminPages.vehicles.addModalTitle}
         maxWidth="lg"
       >
         {formError && <ErrorBanner message={formError} className="mb-4" onDismiss={() => setFormError(null)} />}
 
         <form onSubmit={handleFormSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Plate Number" required>
+            <FormField label={t.adminPages.vehicles.plateLabel} required>
               <input
                 type="text"
                 required
-                placeholder="B 1234 ABC"
+                placeholder={t.adminPages.vehicles.platePlaceholder}
                 value={formPlate}
                 onChange={(e) => setFormPlate(e.target.value.toUpperCase())}
                 className="font-mono uppercase tabular-nums"
               />
             </FormField>
 
-            <FormField label="Vehicle Type" required>
+            <FormField label={t.adminPages.vehicles.vehicleTypeLabel} required>
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value)}
               >
-                <option value="SEDAN">SEDAN</option>
-                <option value="SUV">SUV</option>
-                <option value="MPV">MPV</option>
-                <option value="VAN">VAN</option>
-                <option value="TRUCK">TRUCK</option>
+                <option value="SEDAN">{translateVehicleType(locale, 'SEDAN')}</option>
+                <option value="SUV">{translateVehicleType(locale, 'SUV')}</option>
+                <option value="MPV">{translateVehicleType(locale, 'MPV')}</option>
+                <option value="VAN">{translateVehicleType(locale, 'VAN')}</option>
+                <option value="TRUCK">{translateVehicleType(locale, 'TRUCK')}</option>
               </select>
             </FormField>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Brand" required>
+            <FormField label={t.adminPages.vehicles.brandLabel} required>
               <input
                 type="text"
                 required
-                placeholder="Toyota"
+                placeholder={t.adminPages.vehicles.brandPlaceholder}
                 value={formBrand}
                 onChange={(e) => setFormBrand(e.target.value)}
               />
             </FormField>
 
-            <FormField label="Model" required>
+            <FormField label={t.adminPages.vehicles.modelLabel} required>
               <input
                 type="text"
                 required
-                placeholder="Innova Zenix"
+                placeholder={t.adminPages.vehicles.modelPlaceholder}
                 value={formModel}
                 onChange={(e) => setFormModel(e.target.value)}
               />
@@ -641,13 +646,13 @@ function AdminVehiclesContent() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Operational Hub" required>
+            <FormField label={t.adminPages.vehicles.hubFieldLabel} required>
               <select
                 value={formLocationId}
                 onChange={(e) => setFormLocationId(e.target.value)}
                 required
               >
-                <option value="">-- Pilih Hub Operasional KCIC --</option>
+                <option value="">{t.adminPages.vehicles.selectHubOption}</option>
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name} ({loc.code})
@@ -656,22 +661,22 @@ function AdminVehiclesContent() {
               </select>
             </FormField>
 
-            <FormField label="Status" required>
+            <FormField label={t.adminPages.vehicles.statusLabel} required>
               <select
                 value={formStatus}
                 onChange={(e) => setFormStatus(e.target.value)}
               >
-                <option value="AVAILABLE">AVAILABLE (Aktif di Pool)</option>
-                <option value="RESERVED">RESERVED</option>
-                <option value="IN_USE">IN_USE</option>
-                <option value="MAINTENANCE">MAINTENANCE (Perawatan)</option>
-                <option value="INACTIVE">INACTIVE (Nonaktif)</option>
+                <option value="AVAILABLE">{t.adminPages.vehicles.availablePoolOption}</option>
+                <option value="RESERVED">{translateStatus(locale, 'RESERVED')}</option>
+                <option value="IN_USE">{translateStatus(locale, 'IN_USE')}</option>
+                <option value="MAINTENANCE">{t.adminPages.vehicles.maintenanceOption}</option>
+                <option value="INACTIVE">{t.adminPages.vehicles.inactiveOption}</option>
               </select>
             </FormField>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Seats" required>
+            <FormField label={t.adminPages.vehicles.seatsLabel} required>
               <input
                 type="number"
                 min="1"
@@ -683,21 +688,21 @@ function AdminVehiclesContent() {
               />
             </FormField>
 
-            <FormField label="Transmission">
+            <FormField label={t.adminPages.vehicles.transmissionLabel}>
               <select
                 value={formTransmission}
                 onChange={(e) => setFormTransmission(e.target.value)}
               >
-                <option value="AUTOMATIC">AUTOMATIC</option>
-                <option value="MANUAL">MANUAL</option>
+                <option value="AUTOMATIC">{translateTransmission(locale, 'AUTOMATIC')}</option>
+                <option value="MANUAL">{translateTransmission(locale, 'MANUAL')}</option>
               </select>
             </FormField>
           </div>
 
           <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-medium text-slate-700">Vehicle Photo</label>
-              <span className="text-[11px] text-slate-400">Max 5MB (JPG, PNG, WebP)</span>
+              <label className="text-xs font-medium text-slate-700">{t.adminPages.vehicles.photoLabel}</label>
+              <span className="text-[11px] text-slate-400">{t.adminPages.vehicles.photoHint}</span>
             </div>
 
             {uploadError && (
@@ -707,7 +712,7 @@ function AdminVehiclesContent() {
                   type="button"
                   onClick={() => setUploadError(null)}
                   className="cursor-pointer rounded p-0.5 text-danger-600 transition-colors hover:bg-danger-100"
-                  aria-label="Tutup pesan galat"
+                  aria-label={t.adminPages.vehicles.dismissErrorAria}
                 >
                   <Icon name="close" className="size-3.5" />
                 </button>
@@ -727,7 +732,7 @@ function AdminVehiclesContent() {
                 <div className="h-12 w-16 flex-shrink-0 overflow-hidden rounded border border-slate-200 bg-slate-100">
                   <img
                     src={formImageUrl}
-                    alt="Vehicle preview"
+                    alt={t.adminPages.vehicles.photoLabel}
                     className="h-full w-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="48" fill="%23d4d4d8" viewBox="0 0 24 24"><path fill="%2371717a" d="M5 7 7 3h10l2 4 2 3v8h-3v-2H6v2H3v-8l2-3Z"/></svg>';
@@ -743,7 +748,7 @@ function AdminVehiclesContent() {
                       onClick={() => fileInputRef.current?.click()}
                       className="cursor-pointer rounded border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                     >
-                      {isUploadingImage ? 'Uploading...' : 'Change Photo'}
+                      {isUploadingImage ? t.adminPages.vehicles.uploadingBtn : t.adminPages.vehicles.changePhotoBtn}
                     </button>
                     <button
                       type="button"
@@ -751,7 +756,7 @@ function AdminVehiclesContent() {
                       onClick={() => setFormImageUrl('')}
                       className="cursor-pointer rounded border border-danger-200 bg-white px-2 py-0.5 text-[11px] font-medium text-danger-700 transition-colors hover:bg-danger-50 disabled:opacity-50"
                     >
-                      Remove
+                      {t.adminPages.vehicles.removePhotoBtn}
                     </button>
                   </div>
                 </div>
@@ -766,12 +771,12 @@ function AdminVehiclesContent() {
                 {isUploadingImage ? (
                   <>
                     <Spinner size="sm" />
-                    <span>Uploading photo...</span>
+                    <span>{t.adminPages.vehicles.uploadingPhotoHint}</span>
                   </>
                 ) : (
                   <>
                     <Icon name="download" className="size-4 text-slate-500" />
-                    <span className="font-medium">Upload Vehicle Photo (Max 5MB)</span>
+                    <span className="font-medium">{t.adminPages.vehicles.uploadPhotoCta}</span>
                   </>
                 )}
               </button>
@@ -780,7 +785,7 @@ function AdminVehiclesContent() {
             <div className="pt-1">
               <input
                 type="text"
-                placeholder="Or paste image URL (https://... or /uploads/...)"
+                placeholder={t.adminPages.vehicles.pasteUrlPlaceholder}
                 value={formImageUrl}
                 onChange={(e) => setFormImageUrl(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
@@ -795,7 +800,7 @@ function AdminVehiclesContent() {
               onClick={() => setIsModalOpen(false)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -803,7 +808,7 @@ function AdminVehiclesContent() {
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {formSubmitting && <Spinner size="sm" className="text-white" />}
-              {editingVehicle ? 'Update Vehicle' : 'Create Vehicle'}
+              {editingVehicle ? t.adminPages.vehicles.updateVehicleBtn : t.adminPages.vehicles.createVehicleBtn}
             </button>
           </div>
         </form>
@@ -814,9 +819,9 @@ function AdminVehiclesContent() {
         isOpen={Boolean(deactivatingVehicle)}
         onClose={() => setDeactivatingVehicle(null)}
         onConfirm={handleDeactivateConfirm}
-        title="Deactivate Vehicle"
-        message={`Are you sure you want to deactivate vehicle ${deactivatingVehicle?.plateNumber}? It will no longer be available for trip reservations.`}
-        confirmLabel="Deactivate"
+        title={t.adminPages.vehicles.deactivateModalTitle}
+        message={format(t.adminPages.vehicles.deactivateModalMessage, { plate: deactivatingVehicle?.plateNumber || '' })}
+        confirmLabel={t.adminPages.vehicles.deactivateConfirmBtn}
         isDestructive={true}
         isLoading={isDeactivating}
       />
@@ -825,20 +830,20 @@ function AdminVehiclesContent() {
       <Modal
         isOpen={Boolean(assigningVehicle)}
         onClose={() => setAssigningVehicle(null)}
-        title="Assign Driver"
-        description={assigningVehicle ? `Assign driver to ${assigningVehicle.plateNumber}` : ''}
+        title={t.adminPages.vehicles.assignModalTitle}
+        description={assigningVehicle ? format(t.adminPages.vehicles.assignModalDesc, { plate: assigningVehicle.plateNumber }) : ''}
         maxWidth="sm"
       >
         {assignError && <ErrorBanner message={assignError} className="mb-4" onDismiss={() => setAssignError(null)} />}
 
         <form onSubmit={handleAssignSubmit} className="space-y-4">
-          <FormField label="Select Driver" required>
+          <FormField label={t.adminPages.vehicles.selectDriverLabel} required>
             <select
               required
               value={selectedDriverId}
               onChange={(e) => setSelectedDriverId(e.target.value)}
             >
-              <option value="">-- Choose Driver --</option>
+              <option value="">{t.adminPages.vehicles.chooseDriverOption}</option>
               {availableDrivers.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.user.name} ({d.licenseNumber})
@@ -854,7 +859,7 @@ function AdminVehiclesContent() {
               onClick={() => setAssigningVehicle(null)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -862,7 +867,7 @@ function AdminVehiclesContent() {
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isAssigning && <Spinner size="sm" className="text-white" />}
-              Assign Driver
+              {t.adminPages.vehicles.assignDriverBtn}
             </button>
           </div>
         </form>
@@ -872,12 +877,13 @@ function AdminVehiclesContent() {
 }
 
 export default function AdminVehiclesPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <div className="py-24 text-center text-xs text-slate-500">
           <Spinner size="md" className="mb-2" />
-          <p>Loading vehicle inventory...</p>
+          <p>{t.adminPages.vehicles.loadingSuspense}</p>
         </div>
       }
     >

@@ -15,6 +15,8 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 import { Icon } from '@/components/ui/Icon';
 import { ExportReportModal } from '@/components/admin/ExportReportModal';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateServiceType, translateStatus } from '@/lib/i18n';
 import {
   saveSnapshot,
   getSnapshot,
@@ -102,6 +104,7 @@ function AdminBookingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { status } = useSession();
+  const { locale, t, format } = useTranslation();
 
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -230,7 +233,7 @@ function AdminBookingsContent() {
         window.dispatchEvent(new Event('bookings:changed'));
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to load bookings');
+        setApiError(err.error?.message || t.adminPages.bookings.failedLoad);
       }
     } catch {
       const cached = await getSnapshot<AdminBooking[]>('admin_bookings');
@@ -239,9 +242,9 @@ function AdminBookingsContent() {
         setTotalRecords(cached.length);
         setTotalPages(1);
         setPage(1);
-        setApiError('Menampilkan data terakhir (offline)');
+        setApiError(t.common.offlineFallback);
       } else {
-        setApiError('Network error loading bookings');
+        setApiError(t.adminPages.bookings.networkLoadError);
       }
     } finally {
       setIsLoading(false);
@@ -358,7 +361,7 @@ function AdminBookingsContent() {
     }
 
     if (!candidatesLoaded && !driversLoaded && !vehiclesLoaded) {
-      setInterventionError('Menampilkan data terakhir (offline)');
+      setInterventionError(t.common.offlineFallback);
     }
 
     setLoadingCandidates(false);
@@ -407,7 +410,7 @@ function AdminBookingsContent() {
         bookingId,
       });
       applyOptimisticAssign();
-      setSuccessMessage('Penugasan disimpan offline — Menunggu Sync');
+      setSuccessMessage(t.adminPages.bookings.offlineSavedQueue);
       setInterventionBooking(null);
       setAssigningCandidateId(null);
       return;
@@ -430,7 +433,7 @@ function AdminBookingsContent() {
         fetchBookings(page);
       } else {
         const err = await res.json();
-        setInterventionError(err.error?.message || 'Gagal menugaskan driver');
+        setInterventionError(err.error?.message || t.adminPages.bookings.failedAssign);
       }
     } catch {
       await enqueueOfflineAction('ADMIN_ASSIGN_BOOKING', {
@@ -440,7 +443,7 @@ function AdminBookingsContent() {
         bookingId,
       });
       applyOptimisticAssign();
-      setSuccessMessage('Penugasan disimpan offline — Menunggu Sync');
+      setSuccessMessage(t.adminPages.bookings.offlineSavedQueue);
       setInterventionBooking(null);
     } finally {
       setAssigningCandidateId(null);
@@ -450,7 +453,7 @@ function AdminBookingsContent() {
   const handleRejectPendingBooking = async () => {
     if (!rejectingPendingBooking) return;
     if (!rejectPendingReason.trim()) {
-      setRejectPendingError('Alasan penolakan pesanan wajib diisi');
+      setRejectPendingError(t.adminPages.bookings.rejectPendingRequired);
       return;
     }
 
@@ -470,10 +473,10 @@ function AdminBookingsContent() {
         fetchBookings(page);
       } else {
         const err = await res.json();
-        setRejectPendingError(err.error?.message || 'Gagal menolak pesanan');
+        setRejectPendingError(err.error?.message || t.adminPages.bookings.failedRejectOrder);
       }
     } catch {
-      setRejectPendingError('Terjadi kesalahan jaringan saat menolak pesanan');
+      setRejectPendingError(t.adminPages.bookings.networkRejectOrder);
     } finally {
       setIsRejectingPending(false);
     }
@@ -493,10 +496,10 @@ function AdminBookingsContent() {
         fetchBookings(page);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to cancel booking');
+        setApiError(err.error?.message || t.adminPages.bookings.failedCancel);
       }
     } catch {
-      setApiError('Network error cancelling booking');
+      setApiError(t.adminPages.bookings.networkCancel);
     } finally {
       setIsCancelling(false);
     }
@@ -511,7 +514,7 @@ function AdminBookingsContent() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setApiError(json.error?.message || 'Gagal menyetujui penyelesaian booking');
+        setApiError(json.error?.message || t.adminPages.bookings.failedApproveCompletion);
         return;
       }
       const updated = json.data;
@@ -522,10 +525,12 @@ function AdminBookingsContent() {
         setSelectedBooking((prev) => (prev ? { ...prev, ...updated } : null));
       }
       setSuccessMessage(
-        `Penyelesaian pemesanan #${updated.bookingNumber || bookingId} berhasil disetujui (COMPLETED).`
+        format(t.adminPages.bookings.approveCompletionSuccess, {
+          number: updated.bookingNumber || bookingId,
+        })
       );
     } catch {
-      setApiError('Terjadi kesalahan jaringan saat menyetujui penyelesaian');
+      setApiError(t.adminPages.bookings.networkApproveCompletion);
     } finally {
       setApprovingBookingId(null);
     }
@@ -534,7 +539,7 @@ function AdminBookingsContent() {
   const handleRejectCompletion = async () => {
     if (!rejectingBooking) return;
     if (!rejectReason.trim()) {
-      setRejectError('Alasan penolakan nota dinas wajib diisi');
+      setRejectError(t.adminPages.bookings.rejectNotaRequired);
       return;
     }
     setIsRejecting(true);
@@ -547,7 +552,7 @@ function AdminBookingsContent() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setRejectError(json.error?.message || 'Gagal menolak nota dinas');
+        setRejectError(json.error?.message || t.adminPages.bookings.failedRejectNota);
         return;
       }
       const updated = json.data;
@@ -558,12 +563,14 @@ function AdminBookingsContent() {
         setSelectedBooking((prev) => (prev ? { ...prev, ...updated } : null));
       }
       setSuccessMessage(
-        `Nota dinas untuk pemesanan #${rejectingBooking.bookingNumber} berhasil ditolak. Pemesan telah dinotifikasi untuk mengunggah dokumen revisi.`
+        format(t.adminPages.bookings.rejectNotaSuccess, {
+          number: rejectingBooking.bookingNumber,
+        })
       );
       setRejectingBooking(null);
       setRejectReason('');
     } catch {
-      setRejectError('Terjadi kesalahan jaringan saat menolak nota dinas');
+      setRejectError(t.adminPages.bookings.networkRejectNota);
     } finally {
       setIsRejecting(false);
     }
@@ -571,7 +578,7 @@ function AdminBookingsContent() {
 
   const columns: Column<AdminBooking>[] = [
     {
-      header: 'Booking #',
+      header: t.adminPages.bookings.colBookingNumber,
       accessorKey: 'bookingNumber',
       cell: (b) => (
         <div>
@@ -584,7 +591,7 @@ function AdminBookingsContent() {
                   : 'border-brand-200 bg-brand-50 text-brand-700'
               }`}
             >
-              {b.serviceType === 'STANDBY' ? 'Standby' : 'Drop Off'}
+              {translateServiceType(locale, b.serviceType, true)}
             </span>
             {b.operationalLocation && (
               <LocationBadge
@@ -598,7 +605,7 @@ function AdminBookingsContent() {
       ),
     },
     {
-      header: 'Route',
+      header: t.adminPages.bookings.colRoute,
       cell: (b) => (
         <div className="max-w-[200px]">
           <div className="truncate font-medium text-slate-900">{b.pickupLocation}</div>
@@ -610,7 +617,7 @@ function AdminBookingsContent() {
       ),
     },
     {
-      header: 'Departure',
+      header: t.adminPages.bookings.colDeparture,
       cell: (b) => (
         <div className="text-xs tabular-nums">
           <div className="font-medium text-slate-900">
@@ -629,7 +636,7 @@ function AdminBookingsContent() {
       ),
     },
     {
-      header: 'Employee',
+      header: t.adminPages.bookings.colEmployee,
       cell: (b) => (
         <div className="text-xs">
           <div className="font-medium text-slate-900">{b.user?.name}</div>
@@ -638,7 +645,7 @@ function AdminBookingsContent() {
       ),
     },
     {
-      header: 'Vehicle & Driver',
+      header: t.adminPages.bookings.colVehicleDriver,
       cell: (b) => (
         <div className="space-y-1 text-xs">
           {b.vehicle ? (
@@ -664,38 +671,38 @@ function AdminBookingsContent() {
               </div>
             </div>
           ) : (
-            <span className="italic text-slate-400">No Vehicle</span>
+            <span className="italic text-slate-400">{t.adminPages.bookings.noVehicle}</span>
           )}
           {b.driver ? (
             <div className="max-w-[120px] truncate text-[11px] text-slate-600">
-              Driver: {b.driver.user.name}
+              {format(t.adminPages.bookings.driverPrefix, { name: b.driver.user.name })}
             </div>
           ) : (
-            <div className="text-[11px] italic text-slate-400">No Driver</div>
+            <div className="text-[11px] italic text-slate-400">{t.adminPages.bookings.noDriver}</div>
           )}
         </div>
       ),
     },
     {
-      header: 'Status',
+      header: t.adminPages.bookings.colStatus,
       cell: (b) => (
         <div className="space-y-1">
           <StatusBadge status={b.status} hasNotaDinas={Boolean(b.notaDinasUrl)} />
           {b.status === 'PENDING_COMPLETION' && b.rejectedReason && (
             <div className="inline-flex items-center gap-1 rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-danger-700">
-              Nota Ditolak
+              {t.adminPages.bookings.notaRejectedTag}
             </div>
           )}
           {b.etaSeconds !== undefined && b.etaSeconds !== null && (
             <div className="text-[10px] tabular-nums text-slate-500">
-              ETA: {formatEta(b.etaSeconds, b.etaEstimated)}
+              {t.adminPages.bookings.etaPrefix} {formatEta(b.etaSeconds, b.etaEstimated)}
             </div>
           )}
         </div>
       ),
     },
     {
-      header: 'Actions',
+      header: t.adminPages.bookings.colActions,
       cell: (b) => {
         const isIntervention = b.status === 'ADMIN_INTERVENTION' || b.status === 'PENDING';
         const canCancel = [
@@ -716,7 +723,7 @@ function AdminBookingsContent() {
                 onClick={() => handleOpenIntervention(b)}
                 className="cursor-pointer rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
               >
-                Tugaskan Driver
+                {t.adminPages.bookings.assignDriverBtn}
               </button>
             )}
             {b.status === 'PENDING' && (
@@ -729,14 +736,14 @@ function AdminBookingsContent() {
                 }}
                 className="cursor-pointer rounded-lg border border-danger-200 bg-white px-2.5 py-1 text-xs font-semibold text-danger-700 transition-colors hover:bg-danger-50"
               >
-                Tolak
+                {t.adminPages.bookings.rejectBtn}
               </button>
             )}
             {b.status === 'PENDING_COMPLETION' && (
               b.rejectedReason ? (
                 <div className="flex items-center gap-1.5">
                   <span className="rounded-lg border border-danger-200 bg-danger-50 px-2 py-1 text-[11px] font-medium text-danger-700">
-                    Menunggu Revisi Pemesan
+                    {t.adminPages.bookings.awaitingUserRevision}
                   </span>
                   <button
                     type="button"
@@ -747,7 +754,7 @@ function AdminBookingsContent() {
                     }}
                     className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    Edit Alasan
+                    {t.adminPages.bookings.editReasonBtn}
                   </button>
                 </div>
               ) : b.notaDinasUrl ? (
@@ -759,7 +766,7 @@ function AdminBookingsContent() {
                     className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
                   >
                     {approvingBookingId === b.id && <Spinner size="sm" className="text-white" />}
-                    <span>Approve Selesai</span>
+                    <span>{t.adminPages.bookings.approveDoneBtn}</span>
                   </button>
                   <button
                     type="button"
@@ -771,12 +778,12 @@ function AdminBookingsContent() {
                     className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-danger-200 bg-white px-2.5 py-1 text-xs font-semibold text-danger-700 transition-colors hover:bg-danger-50"
                   >
                     <Icon name="close" className="size-3.5" />
-                    <span>Tolak Nota Dinas</span>
+                    <span>{t.adminPages.bookings.rejectNotaBtn}</span>
                   </button>
                 </>
               ) : (
-                <span className="rounded-lg border border-warning-200 bg-warning-50 px-2.5 py-1 text-[11px] font-medium text-warning-700" title="Dokumen Nota Dinas belum diunggah oleh pemesan atau pengemudi">
-                  Menunggu Nota Dinas
+                <span className="rounded-lg border border-warning-200 bg-warning-50 px-2.5 py-1 text-[11px] font-medium text-warning-700" title={t.adminPages.bookings.waitingNotaTitle}>
+                  {t.adminPages.bookings.waitingNotaTag}
                 </span>
               )
             )}
@@ -785,7 +792,7 @@ function AdminBookingsContent() {
               onClick={() => setSelectedBooking(b)}
               className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Details
+              {t.adminPages.bookings.detailsBtn}
             </button>
             {canCancel && (
               <button
@@ -793,7 +800,7 @@ function AdminBookingsContent() {
                 onClick={() => setCancellingBooking(b)}
                 className="cursor-pointer rounded-lg border border-transparent px-2.5 py-1 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
               >
-                Cancel
+                {t.adminPages.bookings.cancelBtn}
               </button>
             )}
           </div>
@@ -821,9 +828,9 @@ function AdminBookingsContent() {
       {/* Header */}
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Reservations &amp; Dispatch</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.adminPages.bookings.heading}</h1>
           <p className="mt-1 text-xs leading-relaxed text-slate-500">
-            Monitor auto-dispatch states, operational locations, and admin intervention escalations
+            {t.adminPages.bookings.description}
           </p>
         </div>
         <button
@@ -832,30 +839,32 @@ function AdminBookingsContent() {
           className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 self-start rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 sm:self-auto"
         >
           <Icon name="download" className="size-4" />
-          <span>Download Laporan Excel</span>
+          <span>{t.adminPages.bookings.exportExcelBtn}</span>
         </button>
       </div>
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total Rekaman</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.statTotal}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Perlu Tindakan</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.statNeedAction}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{pendingCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Armada Aktif</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.statActiveFleet}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{activeCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Siap Verifikasi</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.statReadyVerify}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{completionReadyCount}</p>
           {completionAwaitingUploadCount > 0 && (
             <p className="mt-1 text-[10px] font-medium tabular-nums leading-relaxed text-slate-400">
-              {completionAwaitingUploadCount} menunggu upload
+              {format(t.adminPages.bookings.statWaitingUpload, {
+                count: completionAwaitingUploadCount,
+              })}
             </p>
           )}
         </div>
@@ -874,7 +883,7 @@ function AdminBookingsContent() {
             type="button"
             onClick={() => setSuccessMessage(null)}
             className="cursor-pointer rounded p-1 text-success-700 transition-colors hover:bg-success-100"
-            aria-label="Tutup notifikasi"
+            aria-label={t.adminPages.bookings.dismissToastAria}
           >
             <Icon name="close" className="size-4" />
           </button>
@@ -894,7 +903,7 @@ function AdminBookingsContent() {
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            All
+            {t.adminPages.bookings.pillAll}
           </button>
           <button
             type="button"
@@ -906,7 +915,7 @@ function AdminBookingsContent() {
             }`}
           >
             <Icon name="alert" className="size-3.5 shrink-0" />
-            <span>Intervention Required</span>
+            <span>{t.adminPages.bookings.pillIntervention}</span>
           </button>
           <button
             type="button"
@@ -917,7 +926,7 @@ function AdminBookingsContent() {
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            Searching
+            {t.adminPages.bookings.pillSearching}
           </button>
           <button
             type="button"
@@ -928,7 +937,7 @@ function AdminBookingsContent() {
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            In Progress
+            {t.adminPages.bookings.pillInProgress}
           </button>
           <button
             type="button"
@@ -939,20 +948,20 @@ function AdminBookingsContent() {
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
-            Menunggu Nota Dinas
+            {t.adminPages.bookings.pillPendingNota}
           </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Operational Hub filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Hub</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.hubFilterLabel}</span>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Hubs</option>
+              <option value="">{t.adminPages.bookings.allHubsOption}</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -963,25 +972,25 @@ function AdminBookingsContent() {
 
           {/* Status dropdown */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Status</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.statusFilterLabel}</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Statuses</option>
-              <option value="SEARCHING_DRIVER">Searching Driver</option>
-              <option value="DRIVER_NOTIFIED">Driver Notified</option>
-              <option value="DRIVER_ASSIGNED">Driver Assigned</option>
-              <option value="DRIVER_EN_ROUTE">Driver En Route</option>
-              <option value="ARRIVED">Arrived</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="PENDING_COMPLETION">Menunggu Nota Dinas</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
-              <option value="ADMIN_INTERVENTION">Admin Intervention</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="PENDING">Legacy Pending</option>
+              <option value="">{t.adminPages.bookings.allStatusesOption}</option>
+              <option value="SEARCHING_DRIVER">{translateStatus(locale, 'SEARCHING_DRIVER')}</option>
+              <option value="DRIVER_NOTIFIED">{translateStatus(locale, 'DRIVER_NOTIFIED')}</option>
+              <option value="DRIVER_ASSIGNED">{translateStatus(locale, 'DRIVER_ASSIGNED')}</option>
+              <option value="DRIVER_EN_ROUTE">{translateStatus(locale, 'DRIVER_EN_ROUTE')}</option>
+              <option value="ARRIVED">{translateStatus(locale, 'ARRIVED')}</option>
+              <option value="IN_PROGRESS">{translateStatus(locale, 'IN_PROGRESS')}</option>
+              <option value="PENDING_COMPLETION">{translateStatus(locale, 'PENDING_COMPLETION')}</option>
+              <option value="COMPLETED">{translateStatus(locale, 'COMPLETED')}</option>
+              <option value="NO_DRIVER_AVAILABLE">{translateStatus(locale, 'NO_DRIVER_AVAILABLE')}</option>
+              <option value="ADMIN_INTERVENTION">{translateStatus(locale, 'ADMIN_INTERVENTION')}</option>
+              <option value="CANCELLED">{translateStatus(locale, 'CANCELLED')}</option>
+              <option value="PENDING">{t.adminPages.bookings.legacyPendingOption}</option>
             </select>
           </div>
         </div>
@@ -993,7 +1002,7 @@ function AdminBookingsContent() {
         data={bookings}
         isLoading={isLoading}
         onRowClick={(b) => setSelectedBooking(b)}
-        emptyMessage="No reservations found"
+        emptyMessage={t.adminPages.bookings.emptyMessage}
       />
 
       {/* Pagination */}
@@ -1008,10 +1017,13 @@ function AdminBookingsContent() {
       <Drawer
         isOpen={Boolean(selectedBooking)}
         onClose={() => setSelectedBooking(null)}
-        title={selectedBooking ? `Reservation #${selectedBooking.bookingNumber}` : 'Booking'}
+        title={selectedBooking ? format(t.adminPages.bookings.drawerTitle, { number: selectedBooking.bookingNumber }) : t.adminPages.bookings.drawerFallbackTitle}
         description={
           selectedBooking
-            ? `Requested by ${selectedBooking.user?.name} (${selectedBooking.user?.email})`
+            ? format(t.adminPages.bookings.drawerRequestedBy, {
+                user: selectedBooking.user?.name,
+                email: selectedBooking.user?.email,
+              })
             : ''
         }
         footer={
@@ -1022,7 +1034,7 @@ function AdminBookingsContent() {
                   selectedBooking.rejectedReason ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-1.5 text-xs font-medium text-danger-700">
-                        Nota Ditolak (Menunggu Dokumen Revisi)
+                        {t.adminPages.bookings.notaRejectedRevisionTag}
                       </span>
                       <button
                         type="button"
@@ -1033,7 +1045,7 @@ function AdminBookingsContent() {
                         }}
                         className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                       >
-                        Ubah Alasan
+                        {t.adminPages.bookings.editReasonBtn}
                       </button>
                     </div>
                   ) : selectedBooking.notaDinasUrl ? (
@@ -1049,7 +1061,7 @@ function AdminBookingsContent() {
                         ) : (
                           <Icon name="check" className="size-3.5" />
                         )}
-                        <span>Approve &amp; Selesaikan</span>
+                        <span>{t.adminPages.bookings.approveCompleteBtn}</span>
                       </button>
                       <button
                         type="button"
@@ -1061,13 +1073,13 @@ function AdminBookingsContent() {
                         className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-danger-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-danger-700"
                       >
                         <Icon name="close" className="size-3.5" />
-                        <span>Tolak Nota Dinas</span>
+                        <span>{t.adminPages.bookings.rejectNotaBtn}</span>
                       </button>
                     </>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="rounded-lg border border-warning-200 bg-warning-50 px-3 py-1.5 text-xs font-medium text-warning-700">
-                        Nota Dinas Belum Diunggah
+                        {t.adminPages.bookings.notaNotUploadedTag}
                       </span>
                     </div>
                   )
@@ -1084,7 +1096,7 @@ function AdminBookingsContent() {
                       }}
                       className="min-h-9 cursor-pointer rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
                     >
-                      Tugaskan Driver
+                      {t.adminPages.bookings.assignDriverBtn}
                     </button>
                     {selectedBooking.status === 'PENDING' && (
                       <button
@@ -1098,7 +1110,7 @@ function AdminBookingsContent() {
                         }}
                         className="min-h-9 cursor-pointer rounded-lg border border-danger-200 bg-white px-3.5 text-xs font-semibold text-danger-700 transition-colors hover:bg-danger-50"
                       >
-                        Tolak Pesanan
+                        {t.adminPages.bookings.rejectOrderBtn}
                       </button>
                     )}
                   </>
@@ -1122,7 +1134,7 @@ function AdminBookingsContent() {
                   }}
                   className="min-h-9 cursor-pointer rounded-lg border border-transparent px-3.5 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
                 >
-                  Cancel Booking
+                  {t.adminPages.bookings.cancelBookingBtn}
                 </button>
               )}
             </div>
@@ -1141,7 +1153,7 @@ function AdminBookingsContent() {
             {/* Service Type & Operational Hub */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Jenis Layanan</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.serviceTypeLabel}</span>
                 <span
                   className={`mt-1 inline-block rounded border px-2 py-0.5 text-[11px] font-semibold ${
                     selectedBooking.serviceType === 'STANDBY'
@@ -1150,13 +1162,13 @@ function AdminBookingsContent() {
                   }`}
                 >
                   {selectedBooking.serviceType === 'STANDBY'
-                    ? 'Standby (Operasional Seharian)'
-                    : 'Drop Off (Sekali Jalan)'}
+                    ? t.adminPages.bookings.standbyFullLabel
+                    : t.adminPages.bookings.dropOffFullLabel}
                 </span>
               </div>
               {selectedBooking.operationalLocation && (
                 <div className="text-right">
-                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Hub Operasional</span>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.hubOperationalLabel}</span>
                   <LocationBadge
                     type="home"
                     name={selectedBooking.operationalLocation.name}
@@ -1171,7 +1183,7 @@ function AdminBookingsContent() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-700">
                   <Icon name="bookings" className="size-4 text-brand-600" />
-                  <span>Verifikasi Dokumen Nota Dinas</span>
+                  <span>{t.adminPages.bookings.verifyNotaTitle}</span>
                 </span>
                 <span
                   className={`rounded border px-2 py-0.5 text-[10px] font-medium ${
@@ -1185,12 +1197,12 @@ function AdminBookingsContent() {
                   }`}
                 >
                   {selectedBooking.rejectedReason
-                    ? 'Ditolak (Perlu Revisi)'
+                    ? t.adminPages.bookings.notaStatusRejected
                     : selectedBooking.notaDinasUrl
                     ? selectedBooking.status === 'PENDING_COMPLETION'
-                      ? 'Terunggah, Menunggu Verifikasi'
-                      : 'Terlampir'
-                    : 'Belum Dilampirkan'}
+                      ? t.adminPages.bookings.notaStatusPendingVerify
+                      : t.adminPages.bookings.notaStatusAttached
+                    : t.adminPages.bookings.notaStatusMissing}
                 </span>
               </div>
 
@@ -1198,13 +1210,13 @@ function AdminBookingsContent() {
                 <div className="space-y-1 rounded-lg border border-danger-200 bg-danger-50 p-2.5 text-xs">
                   <div className="flex items-center gap-1.5 font-semibold text-danger-700">
                     <Icon name="close" className="size-3.5 text-danger-600" />
-                    <span>Nota Dinas Ditolak Admin</span>
+                    <span>{t.adminPages.bookings.notaRejectedAdminHeading}</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-danger-700">
-                    <span className="font-semibold">Alasan:</span> {selectedBooking.rejectedReason}
+                    <span className="font-semibold">{t.adminPages.bookings.reasonPrefix}</span> {selectedBooking.rejectedReason}
                   </p>
                   <p className="text-[10px] italic text-slate-500">
-                    Menunggu pemesan atau driver mengunggah ulang dokumen revisi.
+                    {t.adminPages.bookings.waitingRevisionNote}
                   </p>
                 </div>
               )}
@@ -1212,7 +1224,7 @@ function AdminBookingsContent() {
               {selectedBooking.notaDinasUrl ? (
                 <div className="space-y-1.5 pt-1 text-xs">
                   <p className="truncate text-[11px] text-slate-600">
-                    File: <span className="font-medium text-slate-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
+                    {t.adminPages.bookings.filePrefix} <span className="font-medium text-slate-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
                   </p>
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <a
@@ -1222,13 +1234,13 @@ function AdminBookingsContent() {
                       className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <Icon name="download" className="size-3.5" />
-                      <span>Lihat / Unduh Dokumen</span>
+                      <span>{t.adminPages.bookings.viewDownloadDocBtn}</span>
                     </a>
                     {selectedBooking.status === 'PENDING_COMPLETION' && (
                       selectedBooking.rejectedReason ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded border border-danger-200 bg-danger-50 px-2.5 py-1 text-xs font-medium text-danger-700">
-                            Status: Nota Ditolak
+                            {t.adminPages.bookings.notaRejectedInline}
                           </span>
                           <button
                             type="button"
@@ -1239,7 +1251,7 @@ function AdminBookingsContent() {
                             }}
                             className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                           >
-                            Ubah Alasan
+                            {t.adminPages.bookings.editReasonBtn}
                           </button>
                         </div>
                       ) : (
@@ -1255,7 +1267,7 @@ function AdminBookingsContent() {
                             ) : (
                               <Icon name="check" className="size-3.5" />
                             )}
-                            <span>Approve Selesai</span>
+                            <span>{t.adminPages.bookings.approveDoneBtn}</span>
                           </button>
                           <button
                             type="button"
@@ -1267,7 +1279,7 @@ function AdminBookingsContent() {
                             className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-danger-200 bg-white px-3 py-1 text-xs font-semibold text-danger-700 transition-colors hover:bg-danger-50"
                           >
                             <Icon name="close" className="size-3.5" />
-                            <span>Tolak Nota</span>
+                            <span>{t.adminPages.bookings.rejectNotaShortBtn}</span>
                           </button>
                         </>
                       )
@@ -1278,8 +1290,8 @@ function AdminBookingsContent() {
                 <div className="space-y-2 pt-1 text-xs">
                   <p className="text-[11px] leading-relaxed text-slate-600">
                     {selectedBooking.status === 'PENDING_COMPLETION'
-                      ? 'Trip telah selesai. Menunggu dokumen Nota Dinas diunggah oleh pemesan atau driver untuk diverifikasi.'
-                      : 'Belum ada nota dinas yang dilampirkan pada pesanan ini.'}
+                      ? t.adminPages.bookings.waitingNotaUploadDesc
+                      : t.adminPages.bookings.noNotaAttachedDesc}
                   </p>
                 </div>
               )}
@@ -1288,11 +1300,11 @@ function AdminBookingsContent() {
             {/* Route */}
             <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Pickup</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.pickupLabel}</span>
                 <span className="font-medium text-slate-900">{selectedBooking.pickupLocation}</span>
               </div>
               <div className="border-t border-slate-200 pt-2">
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Destination</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.destinationLabel}</span>
                 <span className="font-medium text-slate-900">{selectedBooking.destination}</span>
               </div>
             </div>
@@ -1300,23 +1312,23 @@ function AdminBookingsContent() {
             {/* Schedule */}
             <div className="grid grid-cols-2 gap-3 border-b border-slate-200 pb-3 text-xs">
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Departure</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.departureLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
                   {new Date(selectedBooking.departureAt).toLocaleString()}
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Return</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.returnLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
                   {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Passengers</span>
-                <span className="font-medium tabular-nums text-slate-900">{selectedBooking.passengerCount} Persons</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.passengersLabel}</span>
+                <span className="font-medium tabular-nums text-slate-900">{format(t.common.personCount, { count: selectedBooking.passengerCount })}</span>
               </div>
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Purpose</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.purposeLabel}</span>
                 <span className="font-medium text-slate-900">{selectedBooking.purpose}</span>
               </div>
             </div>
@@ -1324,7 +1336,7 @@ function AdminBookingsContent() {
             {/* Vehicle & Driver */}
             {selectedBooking.vehicle && (
               <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Assigned Asset</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.assignedAssetLabel}</span>
                 <div className="font-mono font-semibold tabular-nums text-slate-900">{selectedBooking.vehicle.plateNumber}</div>
                 <div className="text-slate-600">
                   {selectedBooking.vehicle.brand} {selectedBooking.vehicle.model}
@@ -1334,9 +1346,9 @@ function AdminBookingsContent() {
 
             {selectedBooking.driver && (
               <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Assigned Driver</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.bookings.assignedDriverLabel}</span>
                 <div className="font-semibold text-slate-900">{selectedBooking.driver.user.name}</div>
-                <div className="tabular-nums text-slate-500">Phone: {selectedBooking.driver.user.phone}</div>
+                <div className="tabular-nums text-slate-500">{t.adminPages.bookings.phonePrefix} {selectedBooking.driver.user.phone}</div>
               </div>
             )}
           </div>
@@ -1348,8 +1360,12 @@ function AdminBookingsContent() {
         <Modal
           isOpen={Boolean(interventionBooking)}
           onClose={() => setInterventionBooking(null)}
-          title="Penugasan Driver & Armada Kendaraan"
-          description={`Penugasan untuk booking #${interventionBooking.bookingNumber} (${interventionBooking.pickupLocation} → ${interventionBooking.destination})`}
+          title={t.adminPages.bookings.assignModalTitle}
+          description={format(t.adminPages.bookings.assignModalDesc, {
+            number: interventionBooking.bookingNumber,
+            pickup: interventionBooking.pickupLocation,
+            dest: interventionBooking.destination,
+          })}
           maxWidth="2xl"
         >
           <div className="space-y-4">
@@ -1360,7 +1376,7 @@ function AdminBookingsContent() {
             {loadingCandidates ? (
               <div className="py-12 text-center text-xs text-slate-500">
                 <Spinner size="md" className="mb-2" />
-                <p>Memuat driver armada dan status GPS...</p>
+                <p>{t.adminPages.bookings.loadingDriversGps}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -1372,12 +1388,12 @@ function AdminBookingsContent() {
                         <span className="absolute inline-flex size-full animate-ping rounded-full bg-success-600 opacity-75 motion-reduce:animate-none" />
                         <span className="relative inline-flex size-2 rounded-full bg-success-600" />
                       </span>
-                      <span>Driver Online (Sinyal GPS Aktif Terdekat - <span className="tabular-nums">{candidates.length}</span>)</span>
+                      <span>{format(t.adminPages.bookings.onlineCandidatesHeader, { count: candidates.length })}</span>
                     </span>
 
                     <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
                       {candidates.map((c) => {
-                        const driverName = c.driverName || c.name || 'Driver';
+                        const driverName = c.driverName || c.name || t.adminPages.bookings.driverFallback;
                         const plate = c.plateNumber || c.vehiclePlateNumber || '—';
                         const cleanPhone = c.phone ? c.phone.replace(/\D/g, '') : '';
                         const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
@@ -1395,7 +1411,7 @@ function AdminBookingsContent() {
                                 {c.phone && <span className="tabular-nums text-slate-500">({c.phone})</span>}
                                 {etaText && (
                                   <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-slate-600">
-                                    ETA: {etaText}
+                                    {t.adminPages.bookings.etaPrefix} {etaText}
                                   </span>
                                 )}
                               </div>
@@ -1407,7 +1423,7 @@ function AdminBookingsContent() {
                                     • {c.vehicleBrand} {c.vehicleModel}
                                   </span>
                                 )}
-                                {c.seatingCapacity && <span>• <span className="tabular-nums">{c.seatingCapacity}</span> seats</span>}
+                                {c.seatingCapacity && <span>• <span className="tabular-nums">{c.seatingCapacity}</span> {t.common.seats}</span>}
                               </div>
                             </div>
 
@@ -1419,7 +1435,7 @@ function AdminBookingsContent() {
                                   rel="noopener noreferrer"
                                   className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                 >
-                                  <span>WhatsApp</span>
+                                  <span>{t.common.whatsapp}</span>
                                 </a>
                               )}
 
@@ -1429,7 +1445,7 @@ function AdminBookingsContent() {
                                 onClick={() => handleManualAssign(c.driverId)}
                                 className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
                               >
-                                {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Tugaskan Driver'}
+                                {isAssigning ? <Spinner size="sm" className="text-white" /> : t.adminPages.bookings.assignDriverBtn}
                               </button>
                             </div>
                           </div>
@@ -1456,9 +1472,9 @@ function AdminBookingsContent() {
                             <Icon name="signal" className="size-5" />
                           </span>
                         </div>
-                        <p className="text-sm font-semibold text-slate-900">Tidak Ada Driver yang Sedang Online</p>
+                        <p className="text-sm font-semibold text-slate-900">{t.adminPages.bookings.noOnlineDriversTitle}</p>
                         <p className="mx-auto max-w-md leading-relaxed text-slate-600">
-                          Sistem hanya menampilkan driver yang sedang <strong className="font-semibold">ONLINE (Standby)</strong>. Driver harus membuka dashboard aplikasi driver dan mengaktifkan status online (<strong className="font-semibold">&apos;Go online&apos;</strong>) agar siap ditugaskan.
+                          {t.adminPages.bookings.noOnlineDriversHint}
                         </p>
                       </div>
                     );
@@ -1473,13 +1489,13 @@ function AdminBookingsContent() {
                       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                         <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-success-700">
                           <span aria-hidden="true" className="size-2 rounded-full bg-success-600" />
-                          <span>Driver Online Standby (<span className="tabular-nums">{onlineStandbyDrivers.length}</span>)</span>
+                          <span>{format(t.adminPages.bookings.onlineStandbyHeader, { count: onlineStandbyDrivers.length })}</span>
                         </span>
 
                         {/* Location filter for pool vehicles */}
                         <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1">
                           <Icon name="pin" className="size-3 text-slate-500" />
-                          <span className="text-[11px] font-medium text-slate-600">Pool Kendaraan:</span>
+                          <span className="text-[11px] font-medium text-slate-600">{t.adminPages.bookings.vehiclePoolLabel}</span>
                           <select
                             value={vehicleLocationFilter}
                             onChange={(e) => {
@@ -1489,7 +1505,7 @@ function AdminBookingsContent() {
                             }}
                             className="cursor-pointer rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-700 focus:border-brand-500 focus:outline-none"
                           >
-                            <option value="">Semua Lokasi ({availableVehicles.length})</option>
+                            <option value="">{format(t.adminPages.bookings.allLocationsCount, { count: availableVehicles.length })}</option>
                             {Array.from(
                               new Map(locations.map((loc) => [loc.code || loc.name, loc])).values()
                             ).map((loc) => (
@@ -1549,26 +1565,26 @@ function AdminBookingsContent() {
                             >
                               <div className="space-y-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-semibold text-slate-900">{d.user?.name || 'Driver'}</span>
+                                  <span className="font-semibold text-slate-900">{d.user?.name || t.adminPages.bookings.driverFallback}</span>
                                   {d.licenseNumber && (
-                                    <span className="text-[10px] font-mono tabular-nums text-slate-500">SIM: {d.licenseNumber}</span>
+                                    <span className="text-[10px] font-mono tabular-nums text-slate-500">{t.adminPages.bookings.licensePrefix} {d.licenseNumber}</span>
                                   )}
                                   <span className="rounded border border-success-200 bg-success-50 px-1.5 py-0.5 text-[10px] font-semibold text-success-700">
-                                    ONLINE
+                                    {t.adminPages.bookings.onlineTag}
                                   </span>
                                   {isDriverLocationMismatch && (
                                     <span className="rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[10px] font-medium text-danger-700">
-                                      Beda Lokasi: {driverHubName}
+                                      {format(t.adminPages.bookings.driverMismatchTag, { hub: driverHubName })}
                                     </span>
                                   )}
                                   {isChosenVehicleMismatch && (
                                     <span className="rounded border border-danger-200 bg-danger-50 px-1.5 py-0.5 text-[10px] font-medium text-danger-700">
-                                      Mobil di {chosenHubName}
+                                      {format(t.adminPages.bookings.vehicleMismatchTag, { hub: chosenHubName })}
                                     </span>
                                   )}
                                 </div>
                                 <div className="font-mono text-[11px] tabular-nums text-slate-600">
-                                  {d.user?.phone || 'No phone'}
+                                  {d.user?.phone || t.adminPages.bookings.noPhone}
                                 </div>
 
                                 {hasVehicle ? (
@@ -1584,10 +1600,10 @@ function AdminBookingsContent() {
                                 ) : (
                                   <div className="flex flex-col gap-1 pt-0.5">
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="text-[11px] font-medium text-slate-500">Pilih Kendaraan:</span>
+                                      <span className="text-[11px] font-medium text-slate-500">{t.adminPages.bookings.chooseVehicleLabel}</span>
                                       {isLoadingVehicles ? (
                                         <span className="flex items-center gap-1 text-[10px] text-slate-500">
-                                          <Spinner size="sm" className="text-slate-600" /> Memuat armada...
+                                          <Spinner size="sm" className="text-slate-600" /> {t.adminPages.bookings.loadingVehicles}
                                         </span>
                                       ) : (
                                         <select
@@ -1600,7 +1616,7 @@ function AdminBookingsContent() {
                                           }
                                           className="cursor-pointer rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 focus:border-brand-500 focus:outline-none"
                                         >
-                                          <option value="">-- Pilih Armada ({availableVehicles.length} tersedia) --</option>
+                                          <option value="">{format(t.adminPages.bookings.chooseVehicleOption, { count: availableVehicles.length })}</option>
                                           {availableVehicles.map((v) => {
                                             const hub = v.currentOperationalLocation?.name || v.homeLocation?.name;
                                             return (
@@ -1614,7 +1630,9 @@ function AdminBookingsContent() {
                                     </div>
                                     {availableVehicles.length === 0 && !isLoadingVehicles && (
                                       <span className="text-[10px] font-medium text-warning-700">
-                                        Tidak ada kendaraan AVAILABLE {vehicleLocationFilter ? 'di lokasi ini' : ''}. Ubah filter pool di atas.
+                                        {vehicleLocationFilter
+                                          ? t.adminPages.bookings.noAvailableVehiclesInHub
+                                          : t.adminPages.bookings.noAvailableVehiclesAny}
                                       </span>
                                     )}
                                   </div>
@@ -1622,7 +1640,10 @@ function AdminBookingsContent() {
 
                                 {isDriverLocationMismatch && (
                                   <p className="pt-0.5 text-[10px] font-medium text-danger-700">
-                                    Driver berada di {driverHubName}. Tidak dapat ditugaskan ke order {interventionBooking?.operationalLocation?.name}.
+                                    {format(t.adminPages.bookings.driverMismatchNote, {
+                                      driverHub: driverHubName,
+                                      order: interventionBooking?.operationalLocation?.name,
+                                    })}
                                   </p>
                                 )}
                               </div>
@@ -1634,14 +1655,18 @@ function AdminBookingsContent() {
                                   onClick={() => handleManualAssign(d.id, chosenVehicle || undefined)}
                                   title={
                                     isDriverLocationMismatch || isChosenVehicleMismatch
-                                      ? `Driver/armada berada di lokasi berbeda dengan pesanan (${interventionBooking?.operationalLocation?.name || 'lokasi order'})`
+                                      ? format(t.adminPages.bookings.mismatchTitle, {
+                                          loc:
+                                            interventionBooking?.operationalLocation?.name ||
+                                            t.adminPages.bookings.orderLocationFallback,
+                                        })
                                       : !hasVehicle && !chosenVehicle
-                                      ? 'Pilih kendaraan terlebih dahulu'
+                                      ? t.adminPages.bookings.pickVehicleFirstTitle
                                       : undefined
                                   }
                                   className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
                                 >
-                                  {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Tugaskan Driver'}
+                                  {isAssigning ? <Spinner size="sm" className="text-white" /> : t.adminPages.bookings.assignDriverBtn}
                                 </button>
                               </div>
                             </div>
@@ -1660,7 +1685,7 @@ function AdminBookingsContent() {
                 onClick={() => setInterventionBooking(null)}
                 className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
               >
-                Tutup
+                {t.common.close}
               </button>
             </div>
           </div>
@@ -1678,8 +1703,11 @@ function AdminBookingsContent() {
               setRejectPendingError(null);
             }
           }}
-          title="Tolak Pesanan Perjalanan"
-          description={`Pemesanan #${rejectingPendingBooking.bookingNumber} oleh ${rejectingPendingBooking.user?.name || 'User'}`}
+          title={t.adminPages.bookings.rejectOrderModalTitle}
+          description={format(t.adminPages.bookings.rejectOrderModalDesc, {
+            number: rejectingPendingBooking.bookingNumber,
+            user: rejectingPendingBooking.user?.name || t.adminPages.bookings.defaultUser,
+          })}
           maxWidth="md"
         >
           <div className="space-y-4">
@@ -1688,19 +1716,19 @@ function AdminBookingsContent() {
             )}
 
             <div className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-xs font-medium leading-relaxed text-warning-700">
-              Berikan alasan penolakan pemesanan perjalanan (misal: armada penuh, di luar jam dinas, atau keperluan tidak sesuai).
+              {t.adminPages.bookings.rejectOrderInstructions}
             </div>
 
             <div>
               <label htmlFor="rejectPendingReason" className="mb-1.5 block text-xs font-semibold text-slate-700">
-                Alasan Penolakan <span className="text-brand-500">*</span>
+                {t.adminPages.bookings.rejectReasonLabel} <span className="text-brand-500">*</span>
               </label>
               <textarea
                 id="rejectPendingReason"
                 rows={3}
                 value={rejectPendingReason}
                 onChange={(e) => setRejectPendingReason(e.target.value)}
-                placeholder="Contoh: Seluruh armada Innova sedang digunakan dinas direksi pada jam tersebut."
+                placeholder={t.adminPages.bookings.rejectOrderPlaceholder}
                 className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
               />
             </div>
@@ -1716,7 +1744,7 @@ function AdminBookingsContent() {
                 disabled={isRejectingPending}
                 className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
-                Batal
+                {t.common.cancel}
               </button>
               <button
                 type="button"
@@ -1725,7 +1753,7 @@ function AdminBookingsContent() {
                 className="flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-danger-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-danger-700 disabled:opacity-50"
               >
                 {isRejectingPending ? <Spinner size="sm" /> : <Icon name="close" className="size-3.5" />}
-                <span>{isRejectingPending ? 'Memproses...' : 'Tolak Pesanan'}</span>
+                <span>{isRejectingPending ? t.adminPages.bookings.processingBtn : t.adminPages.bookings.rejectOrderBtn}</span>
               </button>
             </div>
           </div>
@@ -1743,27 +1771,31 @@ function AdminBookingsContent() {
               setRejectError(null);
             }
           }}
-          title="Tolak Dokumen Nota Dinas"
-          description={`Booking #${rejectingBooking.bookingNumber} (${rejectingBooking.pickupLocation} → ${rejectingBooking.destination})`}
+          title={t.adminPages.bookings.rejectNotaModalTitle}
+          description={format(t.adminPages.bookings.rejectNotaModalDesc, {
+            number: rejectingBooking.bookingNumber,
+            pickup: rejectingBooking.pickupLocation,
+            dest: rejectingBooking.destination,
+          })}
           maxWidth="md"
         >
           <div className="space-y-4">
             {rejectError && <ErrorBanner message={rejectError} onDismiss={() => setRejectError(null)} />}
 
             <div className="rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs font-medium leading-relaxed text-danger-700">
-              Berikan alasan penolakan dokumen Nota Dinas agar pemesan/driver mengetahui revisi yang diperlukan (misal: foto blur, salah dokumen, tidak terbaca, dll).
+              {t.adminPages.bookings.rejectNotaInstructions}
             </div>
 
             <div>
               <label htmlFor="rejectReason" className="mb-1.5 block text-xs font-semibold text-slate-700">
-                Alasan Penolakan <span className="text-brand-500">*</span>
+                {t.adminPages.bookings.rejectReasonLabel} <span className="text-brand-500">*</span>
               </label>
               <textarea
                 id="rejectReason"
                 rows={3}
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Contoh: Foto nota dinas blur, nomor surat tidak terbaca. Harap foto ulang dengan jelas."
+                placeholder={t.adminPages.bookings.rejectNotaPlaceholder}
                 className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
               />
             </div>
@@ -1779,7 +1811,7 @@ function AdminBookingsContent() {
                 disabled={isRejecting}
                 className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
-                Batal
+                {t.common.cancel}
               </button>
               <button
                 type="button"
@@ -1788,7 +1820,7 @@ function AdminBookingsContent() {
                 className="flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-danger-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-danger-700 disabled:opacity-50"
               >
                 {isRejecting ? <Spinner size="sm" /> : <Icon name="close" className="size-3.5" />}
-                <span>{isRejecting ? 'Memproses...' : 'Tolak Nota Dinas'}</span>
+                <span>{isRejecting ? t.adminPages.bookings.processingBtn : t.adminPages.bookings.rejectNotaBtn}</span>
               </button>
             </div>
           </div>
@@ -1800,9 +1832,11 @@ function AdminBookingsContent() {
         isOpen={Boolean(cancellingBooking)}
         onClose={() => setCancellingBooking(null)}
         onConfirm={handleCancelConfirm}
-        title="Cancel Booking"
-        message={`Are you sure you want to cancel booking #${cancellingBooking?.bookingNumber}?`}
-        confirmLabel="Cancel Booking"
+        title={t.adminPages.bookings.cancelModalTitle}
+        message={format(t.adminPages.bookings.cancelModalMessage, {
+          number: cancellingBooking?.bookingNumber,
+        })}
+        confirmLabel={t.adminPages.bookings.cancelModalConfirmBtn}
         isDestructive={true}
         isLoading={isCancelling}
       />
@@ -1818,12 +1852,13 @@ function AdminBookingsContent() {
 }
 
 export default function AdminBookingsPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <div className="py-20 text-center text-sm text-slate-500">
           <Spinner size="lg" className="mb-2" />
-          <p>Loading bookings management...</p>
+          <p>{t.adminPages.bookings.loadingSuspense}</p>
         </div>
       }
     >

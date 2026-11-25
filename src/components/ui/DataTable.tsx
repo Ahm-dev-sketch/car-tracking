@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Icon } from "./Icon";
+import { useTranslation } from "@/components/providers/LanguageProvider";
 
 export interface Column<T> {
   header: string;
@@ -27,9 +28,11 @@ export function DataTable<T extends object>({
   data,
   keyField = "id" as keyof T,
   isLoading = false,
-  emptyMessage = "No records found",
+  emptyMessage,
   onRowClick,
 }: DataTableProps<T>) {
+  const { t, format } = useTranslation();
+  const resolvedEmptyMessage = emptyMessage ?? t.table.defaultEmpty;
   const renderCell = (column: Column<T>, row: T) =>
     column.cell
       ? column.cell(row)
@@ -58,10 +61,10 @@ export function DataTable<T extends object>({
         event.currentTarget.focus({ preventScroll: true });
         onRowClick?.(row);
       }}
-      aria-label={`View record ${index + 1}`}
+      aria-label={format(t.table.viewRecordAria, { n: index + 1 })}
       className={`inline-flex min-h-9 min-w-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${mobile ? "w-full py-2.5 px-4" : "p-1.5"}`}
     >
-      {mobile && <span>View record</span>}
+      {mobile && <span>{t.table.viewRecord}</span>}
       <Icon name="arrow" className="size-4" />
     </button>
   );
@@ -81,7 +84,7 @@ export function DataTable<T extends object>({
           />
         )}
         <p className="text-sm font-medium text-slate-500">
-          {isLoading ? "Loading data..." : emptyMessage}
+          {isLoading ? t.table.loadingData : resolvedEmptyMessage}
         </p>
       </div>
     );
@@ -105,7 +108,7 @@ export function DataTable<T extends object>({
                 ))}
                 {onRowClick && (
                   <th scope="col" className="w-16 px-3">
-                    <span className="sr-only">Record details</span>
+                    <span className="sr-only">{t.table.recordDetailsSr}</span>
                   </th>
                 )}
               </tr>
@@ -135,7 +138,7 @@ export function DataTable<T extends object>({
         </div>
       </div>
 
-      <ul className="grid min-w-0 gap-3 md:hidden" aria-label="Records">
+      <ul className="grid min-w-0 gap-3 md:hidden" aria-label={t.table.recordsAria}>
         {data.map((row, rowIndex) => (
           <li
             key={String(row[keyField] ?? rowIndex)}
@@ -147,7 +150,7 @@ export function DataTable<T extends object>({
                 {columns.map((column, index) => (
                   <div key={index} className="grid min-w-0 gap-1 py-2.5 first:pt-0 last:pb-0">
                     <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      {column.header || "Value"}
+                      {column.header || t.table.fallbackFieldLabel}
                     </dt>
                     <dd className="min-w-0 text-sm font-medium text-slate-800 wrap-anywhere">
                       {renderCell(column, row)}

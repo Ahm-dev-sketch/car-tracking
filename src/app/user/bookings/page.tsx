@@ -15,6 +15,8 @@ import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateServiceType, translateStatus } from '@/lib/i18n';
 import { saveSnapshot, getSnapshot, getOfflineQueue, processOfflineQueue } from '@/lib/offline-sync';
 import {
   clearPendingRejectedAcks,
@@ -71,6 +73,8 @@ interface Booking {
 }
 
 function UserBookingsContent() {
+  const { locale, t, format } = useTranslation();
+  const dateLocale = locale === 'id' ? 'id-ID' : 'en-US';
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
@@ -232,7 +236,7 @@ function UserBookingsContent() {
         setPage(targetPage);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to load bookings');
+        setApiError(err.error?.message || t.userPages.bookings.failedLoad);
       }
     } catch {
       applySnapshot();
@@ -365,10 +369,10 @@ function UserBookingsContent() {
         window.dispatchEvent(new Event('bookings:changed'));
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to cancel booking');
+        setApiError(err.error?.message || t.userPages.bookings.failedCancel);
       }
     } catch {
-      setApiError('Network error cancelling booking');
+      setApiError(t.userPages.bookings.networkCancelError);
     } finally {
       setIsCancelling(false);
     }
@@ -399,14 +403,17 @@ function UserBookingsContent() {
           json?.message ||
           json?.error?.message ||
           (res.status === 413
-            ? 'Ukuran berkas melebihi batas maksimal 10MB'
+            ? t.userPages.bookings.uploadSizeError
             : res.status === 404
-            ? 'Data pesanan booking tidak ditemukan'
+            ? t.userPages.bookings.uploadNotFoundError
             : res.status === 403
-            ? 'Akses ditolak: Anda tidak memiliki wewenang mengunggah nota dinas pada pesanan ini'
+            ? t.userPages.bookings.uploadForbiddenError
             : res.status >= 500
-            ? `Terjadi kesalahan server (${res.status}): Gagal memproses penyimpanan nota dinas`
-            : `Gagal mengunggah nota dinas (${res.status}: ${res.statusText || 'Error'})`);
+            ? format(t.userPages.bookings.uploadServerError, { status: res.status })
+            : format(t.userPages.bookings.uploadGenericError, {
+                status: res.status,
+                statusText: res.statusText || 'Error',
+              }));
         setUploadError(errorMsg);
         return;
       }
@@ -427,7 +434,7 @@ function UserBookingsContent() {
       setUploadFile(null);
     } catch (err: any) {
       console.error('[Upload Nota Dinas UI Error]:', err);
-      setUploadError(err?.message || 'Terjadi kesalahan jaringan saat mengunggah nota dinas');
+      setUploadError(err?.message || t.userPages.bookings.uploadNetworkError);
     } finally {
       setIsUploading(false);
     }
@@ -435,7 +442,7 @@ function UserBookingsContent() {
 
   const columns: Column<Booking>[] = [
     {
-      header: 'Booking #',
+      header: t.userPages.bookings.colBookingNumber,
       accessorKey: 'bookingNumber',
       cell: (b) => (
         <div>
@@ -448,7 +455,7 @@ function UserBookingsContent() {
                   : 'border-brand-200 bg-brand-50 text-brand-700'
               }`}
             >
-              {b.serviceType === 'STANDBY' ? 'Standby' : 'Drop Off'}
+              {translateServiceType(locale, b.serviceType, true)}
             </span>
             {b.operationalLocation && (
               <span className="text-[10px] font-medium text-slate-500">
@@ -460,7 +467,7 @@ function UserBookingsContent() {
       ),
     },
     {
-      header: 'Route',
+      header: t.userPages.bookings.colRoute,
       cell: (b) => (
         <div className="max-w-[220px]">
           <div className="truncate font-medium text-slate-900">{b.pickupLocation}</div>
@@ -472,17 +479,17 @@ function UserBookingsContent() {
       ),
     },
     {
-      header: 'Departure',
+      header: t.userPages.bookings.colDeparture,
       cell: (b) => (
         <div className="text-xs tabular-nums">
           <div className="font-medium text-slate-900">
-            {new Date(b.departureAt).toLocaleDateString([], {
+            {new Date(b.departureAt).toLocaleDateString(dateLocale, {
               month: 'short',
               day: 'numeric',
             })}
           </div>
           <div className="text-slate-500">
-            {new Date(b.departureAt).toLocaleTimeString([], {
+            {new Date(b.departureAt).toLocaleTimeString(dateLocale, {
               hour: '2-digit',
               minute: '2-digit',
             })}
@@ -491,7 +498,7 @@ function UserBookingsContent() {
       ),
     },
     {
-      header: 'Vehicle',
+      header: t.userPages.bookings.colVehicle,
       cell: (b) =>
         b.vehicle ? (
           <div>
@@ -499,30 +506,33 @@ function UserBookingsContent() {
             <div className="text-[11px] text-slate-500">{b.vehicle.brand}</div>
           </div>
         ) : (
-          <span className="text-xs italic text-slate-400">Unassigned</span>
+          <span className="text-xs italic text-slate-400">{t.userPages.bookings.unassignedVehicle}</span>
         ),
     },
     {
-      header: 'Status',
-      cell: (b) => (
-        <div className="space-y-1">
-          {b.status === 'OFFLINE_PENDING' ? (
-            <span className="inline-flex max-w-full items-center rounded border border-warning-200 bg-warning-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-warning-700">
-              MENUNGGU SYNC (OFFLINE)
-            </span>
-          ) : (
-            <StatusBadge status={b.status} hasNotaDinas={Boolean(b.notaDinasUrl)} />
-          )}
-          {b.etaSeconds !== undefined && b.etaSeconds !== null && (
-            <div className="text-[10px] tabular-nums text-slate-500">
-              ETA: {formatEta(b.etaSeconds, b.etaEstimated)}
-            </div>
-          )}
-        </div>
-      ),
+      header: t.userPages.bookings.colStatus,
+      cell: (b) => {
+        const etaStr = formatEta(b.etaSeconds, b.etaEstimated, locale);
+        return (
+          <div className="space-y-1">
+            {b.status === 'OFFLINE_PENDING' ? (
+              <span className="inline-flex max-w-full items-center rounded border border-warning-200 bg-warning-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-warning-700">
+                {t.userPages.bookings.offlinePendingBadge}
+              </span>
+            ) : (
+              <StatusBadge status={b.status} hasNotaDinas={Boolean(b.notaDinasUrl)} />
+            )}
+            {etaStr && (
+              <div className="text-[10px] tabular-nums text-slate-500">
+                {format(t.userPages.bookings.etaPrefix, { eta: etaStr })}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
-      header: 'Actions',
+      header: t.userPages.bookings.colActions,
       cell: (b) => {
         const canCancel = [
           'PENDING',
@@ -542,7 +552,7 @@ function UserBookingsContent() {
                 href={`/user/tracking?vehicleId=${b.vehicle.id}`}
                 className="inline-flex min-h-11 items-center rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
               >
-                Track
+                {t.userPages.bookings.trackBtn}
               </Link>
             )}
             {b.status === 'PENDING_COMPLETION' && (
@@ -557,7 +567,11 @@ function UserBookingsContent() {
                     : 'bg-brand-600 text-white hover:bg-brand-700'
                 }`}
               >
-                {b.rejectedReason ? 'Revisi Nota' : b.notaDinasUrl ? 'Ganti Nota' : 'Upload Nota'}
+                {b.rejectedReason
+                  ? t.userPages.bookings.reviseNotaBtn
+                  : b.notaDinasUrl
+                  ? t.userPages.bookings.replaceNotaBtn
+                  : t.userPages.bookings.uploadNotaBtn}
               </button>
             )}
             <button
@@ -565,7 +579,7 @@ function UserBookingsContent() {
               onClick={() => handleOpenBookingDetails(b)}
               className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
-              Details
+              {t.userPages.bookings.detailsBtn}
             </button>
             {canCancel && (
               <button
@@ -573,7 +587,7 @@ function UserBookingsContent() {
                 onClick={() => setCancellingBooking(b)}
                 className="cursor-pointer rounded-lg border border-transparent px-2 py-1 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
               >
-                Cancel
+                {t.userPages.bookings.cancelBtn}
               </button>
             )}
           </div>
@@ -602,8 +616,8 @@ function UserBookingsContent() {
       {/* Header */}
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">My Bookings</h1>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">Track your trip reservations and assignments</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.userPages.bookings.heading}</h1>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.userPages.bookings.description}</p>
         </div>
         <button
           type="button"
@@ -611,30 +625,30 @@ function UserBookingsContent() {
           className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 self-start rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 sm:self-auto"
         >
           <Icon name="plus" className="size-4" />
-          <span>New Reservation</span>
+          <span>{t.userPages.bookings.newBookingBtn}</span>
         </button>
       </div>
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total Pemesanan</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.statTotal}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Mencari Driver</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.statSearching}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-warning-600">{pendingCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Perjalanan Aktif</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.statActive}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{activeCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Perlu Nota Dinas</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.statNeedNota}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{needUploadCount}</p>
           {awaitingVerifyCount > 0 && (
             <p className="mt-1 text-[10px] font-medium tabular-nums leading-relaxed text-slate-400">
-              {awaitingVerifyCount} menunggu verifikasi
+              {format(t.userPages.bookings.awaitingVerifyNote, { count: awaitingVerifyCount })}
             </p>
           )}
         </div>
@@ -647,13 +661,13 @@ function UserBookingsContent() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Location filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Location</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.locationLabel}</span>
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Locations</option>
+              <option value="">{t.userPages.bookings.allLocations}</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.name} ({loc.code})
@@ -664,25 +678,25 @@ function UserBookingsContent() {
 
           {/* Status filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Status</span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.statusLabel}</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             >
-              <option value="">All Statuses</option>
-              <option value="SEARCHING_DRIVER">Searching Driver</option>
-              <option value="DRIVER_NOTIFIED">Driver Notified</option>
-              <option value="DRIVER_ASSIGNED">Driver Assigned</option>
-              <option value="DRIVER_EN_ROUTE">Driver En Route</option>
-              <option value="ARRIVED">Arrived</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="PENDING_COMPLETION">Menunggu Nota Dinas</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
-              <option value="ADMIN_INTERVENTION">Admin Intervention</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Cancelled</option>
+              <option value="">{t.userPages.bookings.allStatuses}</option>
+              <option value="SEARCHING_DRIVER">{translateStatus(locale, 'SEARCHING_DRIVER')}</option>
+              <option value="DRIVER_NOTIFIED">{translateStatus(locale, 'DRIVER_NOTIFIED')}</option>
+              <option value="DRIVER_ASSIGNED">{translateStatus(locale, 'DRIVER_ASSIGNED')}</option>
+              <option value="DRIVER_EN_ROUTE">{translateStatus(locale, 'DRIVER_EN_ROUTE')}</option>
+              <option value="ARRIVED">{translateStatus(locale, 'ARRIVED')}</option>
+              <option value="IN_PROGRESS">{translateStatus(locale, 'IN_PROGRESS')}</option>
+              <option value="PENDING_COMPLETION">{translateStatus(locale, 'PENDING_COMPLETION', false)}</option>
+              <option value="COMPLETED">{translateStatus(locale, 'COMPLETED')}</option>
+              <option value="NO_DRIVER_AVAILABLE">{translateStatus(locale, 'NO_DRIVER_AVAILABLE')}</option>
+              <option value="ADMIN_INTERVENTION">{translateStatus(locale, 'ADMIN_INTERVENTION')}</option>
+              <option value="REJECTED">{translateStatus(locale, 'REJECTED')}</option>
+              <option value="CANCELLED">{translateStatus(locale, 'CANCELLED')}</option>
             </select>
           </div>
         </div>
@@ -694,7 +708,7 @@ function UserBookingsContent() {
         data={bookings}
         isLoading={isLoading}
         onRowClick={(b) => handleOpenBookingDetails(b)}
-        emptyMessage="No reservations found"
+        emptyMessage={t.userPages.bookings.emptyMessage}
       />
 
       {/* Pagination */}
@@ -709,14 +723,16 @@ function UserBookingsContent() {
       <Drawer
         isOpen={Boolean(selectedBooking)}
         onClose={() => setSelectedBooking(null)}
-        title={selectedBooking ? `Reservation #${selectedBooking.bookingNumber}` : 'Booking'}
+        title={selectedBooking ? format(t.userPages.bookings.drawerTitle, { number: selectedBooking.bookingNumber }) : t.userPages.bookings.drawerFallbackTitle}
         description={
           selectedBooking
-            ? `Created ${new Date(selectedBooking.createdAt).toLocaleDateString([], {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}`
+            ? format(t.userPages.bookings.drawerCreated, {
+                date: new Date(selectedBooking.createdAt).toLocaleDateString(dateLocale, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                }),
+              })
             : ''
         }
         footer={
@@ -731,7 +747,7 @@ function UserBookingsContent() {
                       href={`/user/tracking?vehicleId=${selectedBooking.vehicle.id}`}
                       className="inline-flex min-h-9 items-center rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
                     >
-                      Track Vehicle Live
+                      {t.userPages.bookings.trackLiveBtn}
                     </Link>
                   )}
                 {selectedBooking.status === 'PENDING_COMPLETION' && (
@@ -750,10 +766,10 @@ function UserBookingsContent() {
                     <Icon name="download" className="size-3.5 rotate-180" />
                     <span>
                       {selectedBooking.rejectedReason
-                        ? 'Revisi Dokumen Nota Dinas'
+                        ? t.userPages.bookings.reviseNotaFullBtn
                         : selectedBooking.notaDinasUrl
-                        ? 'Ganti Nota Dinas'
-                        : 'Upload Nota Dinas'}
+                        ? t.userPages.bookings.replaceNotaFullBtn
+                        : t.userPages.bookings.uploadNotaFullBtn}
                     </span>
                   </button>
                 )}
@@ -773,7 +789,7 @@ function UserBookingsContent() {
                   }}
                   className="min-h-9 cursor-pointer rounded-lg border border-transparent px-3.5 text-xs font-medium text-danger-700 transition-colors hover:bg-danger-50"
                 >
-                  Cancel Reservation
+                  {t.userPages.bookings.cancelBookingBtn}
                 </button>
               )}
             </div>
@@ -794,11 +810,11 @@ function UserBookingsContent() {
               <div className="space-y-1 rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs">
                 <div className="flex items-center gap-1.5 font-semibold text-danger-700">
                   <Icon name="close" className="size-3.5 text-danger-600" />
-                  <span>Reservasi Ditolak Admin</span>
+                  <span>{t.userPages.bookings.rejectedBannerTitle}</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-danger-700">
-                  <span className="font-semibold">Alasan:</span>{' '}
-                  {selectedBooking.rejectedReason || 'Tidak ada catatan alasan penolakan.'}
+                  <span className="font-semibold">{t.userPages.bookings.reasonPrefix}</span>{' '}
+                  {selectedBooking.rejectedReason || t.userPages.bookings.noRejectedReason}
                 </p>
               </div>
             )}
@@ -806,7 +822,7 @@ function UserBookingsContent() {
             {/* Service Type & Operational Hub */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Jenis Layanan</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.serviceTypeLabel}</span>
                 <span
                   className={`mt-1 inline-block rounded border px-2 py-0.5 text-[11px] font-semibold ${
                     selectedBooking.serviceType === 'STANDBY'
@@ -815,13 +831,13 @@ function UserBookingsContent() {
                   }`}
                 >
                   {selectedBooking.serviceType === 'STANDBY'
-                    ? 'Standby (Operasional Seharian)'
-                    : 'Drop Off (Sekali Jalan)'}
+                    ? t.userPages.bookings.standbyFullLabel
+                    : t.userPages.bookings.dropOffFullLabel}
                 </span>
               </div>
               {selectedBooking.operationalLocation && (
                 <div className="text-right">
-                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Hub Operasional</span>
+                  <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.hubLabel}</span>
                   <span className="font-semibold text-slate-900">
                     {selectedBooking.operationalLocation.name} ({selectedBooking.operationalLocation.code})
                   </span>
@@ -834,7 +850,7 @@ function UserBookingsContent() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-700">
                   <Icon name="bookings" className="size-4 text-brand-600" />
-                  <span>Dokumen Nota Dinas</span>
+                  <span>{t.userPages.bookings.notaSectionTitle}</span>
                 </span>
                 <span
                   className={`rounded border px-2 py-0.5 text-[10px] font-medium ${
@@ -848,12 +864,12 @@ function UserBookingsContent() {
                   }`}
                 >
                   {selectedBooking.status !== 'REJECTED' && selectedBooking.rejectedReason
-                    ? 'Ditolak (Perlu Revisi)'
+                    ? t.userPages.bookings.notaStatusRejected
                     : selectedBooking.notaDinasUrl
                     ? selectedBooking.status === 'PENDING_COMPLETION'
-                      ? 'Terunggah, Menunggu Verifikasi'
-                      : 'Terlampir'
-                    : 'Belum Dilampirkan'}
+                      ? t.userPages.bookings.notaStatusPendingVerify
+                      : t.userPages.bookings.notaStatusAttached
+                    : t.userPages.bookings.notaStatusMissing}
                 </span>
               </div>
 
@@ -861,13 +877,13 @@ function UserBookingsContent() {
                 <div className="space-y-1 rounded-lg border border-danger-200 bg-danger-50 p-2.5 text-xs">
                   <div className="flex items-center gap-1.5 font-semibold text-danger-700">
                     <Icon name="close" className="size-3.5 text-danger-600" />
-                    <span>Nota Dinas Ditolak Admin</span>
+                    <span>{t.userPages.bookings.notaRejectedAdminTitle}</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-danger-700">
-                    <span className="font-semibold">Alasan:</span> {selectedBooking.rejectedReason}
+                    <span className="font-semibold">{t.userPages.bookings.reasonPrefix}</span> {selectedBooking.rejectedReason}
                   </p>
                   <p className="text-[10px] text-slate-500">
-                    Silakan unggah dokumen perbaikan melalui tombol Unggah Revisi di bawah.
+                    {t.userPages.bookings.notaRejectedAdminHint}
                   </p>
                 </div>
               )}
@@ -875,12 +891,12 @@ function UserBookingsContent() {
               {selectedBooking.notaDinasUrl ? (
                 <div className="space-y-1.5 pt-1 text-xs">
                   <p className="truncate text-[11px] text-slate-600">
-                    File: <span className="font-semibold text-slate-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
+                    {t.userPages.bookings.filePrefix} <span className="font-semibold text-slate-900">{selectedBooking.notaDinasFilename || 'nota-dinas.pdf'}</span>
                   </p>
                   {selectedBooking.status === 'PENDING_COMPLETION' && !selectedBooking.rejectedReason && (
                     <p className="flex items-start gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-[11px] font-medium leading-relaxed text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-400">
                       <Icon name="clock" className="mt-px size-3.5 shrink-0" />
-                      <span>Nota Dinas sudah diunggah. Menunggu verifikasi admin KCIC.</span>
+                      <span>{t.userPages.bookings.notaUploadedWaiting}</span>
                     </p>
                   )}
                   <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -891,7 +907,7 @@ function UserBookingsContent() {
                       className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <Icon name="download" className="size-3.5" />
-                      <span>Lihat / Unduh Dokumen</span>
+                      <span>{t.userPages.bookings.viewDownloadDocBtn}</span>
                     </a>
                     {selectedBooking.status === 'PENDING_COMPLETION' && (
                       <button
@@ -899,7 +915,7 @@ function UserBookingsContent() {
                         onClick={() => setUploadBooking(selectedBooking)}
                         className="cursor-pointer rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-600 underline-offset-2 transition-colors hover:text-brand-700 hover:underline"
                       >
-                        {selectedBooking.rejectedReason ? 'Unggah Dokumen Revisi' : 'Unggah Ulang'}
+                        {selectedBooking.rejectedReason ? t.userPages.bookings.uploadRevisionBtn : t.userPages.bookings.reuploadBtn}
                       </button>
                     )}
                   </div>
@@ -908,8 +924,8 @@ function UserBookingsContent() {
                 <div className="space-y-2 pt-1 text-xs">
                   <p className="text-[11px] leading-relaxed text-slate-600">
                     {selectedBooking.status === 'PENDING_COMPLETION'
-                      ? 'Trip telah selesai. Silakan unggah Nota Dinas untuk diverifikasi oleh admin KCIC.'
-                      : 'Belum ada nota dinas yang dilampirkan pada pesanan ini.'}
+                      ? t.userPages.bookings.tripFinishedNeedNota
+                      : t.userPages.bookings.noNotaAttached}
                   </p>
                   {selectedBooking.status === 'PENDING_COMPLETION' && (
                     <button
@@ -918,7 +934,7 @@ function UserBookingsContent() {
                       className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg bg-brand-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-brand-700"
                     >
                       <Icon name="download" className="size-3.5 rotate-180" />
-                      <span>Unggah Nota Dinas Sekarang</span>
+                      <span>{t.userPages.bookings.uploadNotaNowBtn}</span>
                     </button>
                   )}
                 </div>
@@ -928,11 +944,11 @@ function UserBookingsContent() {
             {/* Route details */}
             <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Pickup</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.pickupLabel}</span>
                 <span className="font-medium text-slate-900">{selectedBooking.pickupLocation}</span>
               </div>
               <div className="border-t border-slate-200 pt-2">
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Destination</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.destinationLabel}</span>
                 <span className="font-medium text-slate-900">{selectedBooking.destination}</span>
               </div>
             </div>
@@ -940,23 +956,25 @@ function UserBookingsContent() {
             {/* Trip Schedule & Purpose */}
             <div className="grid grid-cols-2 gap-3 border-b border-slate-200 pb-3 text-xs">
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Departure</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.departureLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
-                  {new Date(selectedBooking.departureAt).toLocaleString()}
+                  {new Date(selectedBooking.departureAt).toLocaleString(dateLocale)}
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Expected Return</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.expectedReturnLabel}</span>
                 <span className="font-medium tabular-nums text-slate-900">
-                  {new Date(selectedBooking.expectedReturnAt).toLocaleString()}
+                  {new Date(selectedBooking.expectedReturnAt).toLocaleString(dateLocale)}
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Passengers</span>
-                <span className="font-medium tabular-nums text-slate-900">{selectedBooking.passengerCount} Persons</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.passengersLabel}</span>
+                <span className="font-medium tabular-nums text-slate-900">
+                  {format(t.userPages.bookings.passengersCount, { count: selectedBooking.passengerCount })}
+                </span>
               </div>
               <div>
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Purpose</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.purposeLabel}</span>
                 <span className="font-medium text-slate-900">{selectedBooking.purpose}</span>
               </div>
             </div>
@@ -964,7 +982,7 @@ function UserBookingsContent() {
             {/* Vehicle info */}
             {selectedBooking.vehicle && (
               <div className="space-y-1.5 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Assigned Asset</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.assignedAssetLabel}</span>
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <span className="font-mono font-semibold tabular-nums text-slate-900">
@@ -1009,20 +1027,20 @@ function UserBookingsContent() {
             {/* Driver info */}
             {selectedBooking.driver && (
               <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3 text-xs">
-                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">Assigned Driver</span>
+                <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.userPages.bookings.assignedDriverLabel}</span>
                 <div className="font-semibold text-slate-900">
                   {selectedBooking.driver.user.name}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-slate-600">
                   <span className="inline-flex items-center gap-1 font-medium text-success-700">
                     <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-success-600" />
-                    Kontak Terproteksi In-App
+                    {t.userPages.bookings.protectedInAppContact}
                   </span>
                   <Link
                     href={`/user/tracking?vehicleId=${selectedBooking.vehicle?.id || ''}`}
                     className="font-semibold text-brand-600 underline-offset-2 hover:text-brand-700 hover:underline"
                   >
-                    Buka Tracking & Chat
+                    {t.userPages.bookings.openTrackingChatBtn}
                   </Link>
                 </div>
               </div>
@@ -1031,7 +1049,7 @@ function UserBookingsContent() {
             {/* Notes */}
             {selectedBooking.notes && (
               <div className="border-t border-slate-200 pt-2 text-xs text-slate-600">
-                <span className="block font-medium text-slate-700">Notes:</span>
+                <span className="block font-medium text-slate-700">{t.userPages.bookings.notesPrefix}</span>
                 <p className="mt-0.5 leading-relaxed">{selectedBooking.notes}</p>
               </div>
             )}
@@ -1043,7 +1061,7 @@ function UserBookingsContent() {
       <Modal
         isOpen={Boolean(cancellingBooking)}
         onClose={() => setCancellingBooking(null)}
-        title="Cancel Reservation"
+        title={t.userPages.bookings.cancelModalTitle}
         maxWidth="sm"
         footer={
           <>
@@ -1053,7 +1071,7 @@ function UserBookingsContent() {
               disabled={isCancelling}
               className="min-h-11 cursor-pointer rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Keep Booking
+              {t.userPages.bookings.keepBookingBtn}
             </button>
             <button
               type="button"
@@ -1062,24 +1080,24 @@ function UserBookingsContent() {
               className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg bg-danger-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-danger-700 disabled:opacity-50"
             >
               {isCancelling && <Spinner size="sm" className="text-white" />}
-              Cancel Reservation
+              {t.userPages.bookings.confirmCancelBtn}
             </button>
           </>
         }
       >
         <div className="space-y-3">
           <p className="text-xs leading-relaxed text-slate-600">
-            Are you sure you want to cancel booking #{cancellingBooking?.bookingNumber}?
+            {format(t.userPages.bookings.cancelModalMessage, { number: cancellingBooking?.bookingNumber || '' })}
           </p>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-slate-600">
-              Reason for cancellation (optional)
+              {t.userPages.bookings.cancelReasonLabel}
             </label>
             <input
               type="text"
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="e.g. Schedule changed, trip postponed"
+              placeholder={t.userPages.bookings.cancelReasonPlaceholder}
               className="min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             />
           </div>
@@ -1096,8 +1114,12 @@ function UserBookingsContent() {
             setUploadFile(null);
             setUploadError(null);
           }}
-          title="Lampirkan Dokumen Nota Dinas"
-          description={`Booking #${uploadBooking.bookingNumber} (${uploadBooking.pickupLocation} → ${uploadBooking.destination})`}
+          title={t.userPages.bookings.uploadModalTitle}
+          description={format(t.userPages.bookings.uploadModalDesc, {
+            number: uploadBooking.bookingNumber,
+            pickup: uploadBooking.pickupLocation,
+            dest: uploadBooking.destination,
+          })}
           maxWidth="md"
         >
           <div className="space-y-4">
@@ -1107,22 +1129,22 @@ function UserBookingsContent() {
               <div className="space-y-1 rounded-lg border border-danger-200 bg-danger-50 p-3 text-xs">
                 <div className="flex items-center gap-1.5 font-semibold text-danger-700">
                   <Icon name="close" className="size-3.5 text-danger-600" />
-                  <span>Catatan Penolakan Nota Dinas Sebelumnya:</span>
+                  <span>{t.userPages.bookings.prevRejectionTitle}</span>
                 </div>
-                <p className="text-[11px] font-medium leading-relaxed text-danger-700">"{uploadBooking.rejectedReason}"</p>
+                <p className="text-[11px] font-medium leading-relaxed text-danger-700">&quot;{uploadBooking.rejectedReason}&quot;</p>
                 <p className="text-[10px] italic text-slate-500">
-                  Pastikan dokumen/foto revisi yang Anda unggah sudah jelas dan sesuai dengan catatan admin.
+                  {t.userPages.bookings.prevRejectionHint}
                 </p>
               </div>
             ) : (
               <div className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-xs font-medium leading-relaxed text-warning-700">
-                Perjalanan telah selesai. Sesuai ketentuan operasional KCIC, silakan lampirkan Nota Dinas (format PDF, JPG, PNG, atau WebP, maks. 10MB) untuk diverifikasi oleh admin.
+                {t.userPages.bookings.uploadInstructions}
               </div>
             )}
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                Pilih File Dokumen / Foto Nota Dinas
+                {t.userPages.bookings.chooseFileLabel}
               </label>
               <input
                 type="file"
@@ -1143,7 +1165,7 @@ function UserBookingsContent() {
                   <span className="text-[11px] tabular-nums text-slate-500">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
                 <span className="rounded border border-success-200 bg-success-50 px-2 py-0.5 text-[10px] font-medium uppercase text-success-700">
-                  Siap Diunggah
+                  {t.userPages.bookings.readyToUploadBadge}
                 </span>
               </div>
             )}
@@ -1159,7 +1181,7 @@ function UserBookingsContent() {
                 disabled={isUploading}
                 className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
-                Batal
+                {t.common.cancel}
               </button>
               <button
                 type="button"
@@ -1168,7 +1190,7 @@ function UserBookingsContent() {
                 className="flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
               >
                 {isUploading ? <Spinner size="sm" /> : <Icon name="download" className="size-3.5 rotate-180" />}
-                <span>{isUploading ? 'Mengunggah...' : 'Unggah Nota Dinas'}</span>
+                <span>{isUploading ? t.userPages.bookings.uploadingBtn : t.userPages.bookings.submitUploadBtn}</span>
               </button>
             </div>
           </div>
@@ -1189,12 +1211,13 @@ function UserBookingsContent() {
 }
 
 export default function UserBookingsPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <div className="py-20 text-center text-sm text-slate-500">
           <Spinner size="lg" className="mb-2" />
-          <p>Loading bookings...</p>
+          <p>{t.userPages.bookings.loadingSuspense}</p>
         </div>
       }
     >

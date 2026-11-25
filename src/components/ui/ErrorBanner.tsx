@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Icon } from './Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 export function ErrorBanner({
   message,
@@ -12,6 +13,7 @@ export function ErrorBanner({
   onDismiss?: () => void;
   className?: string;
 }) {
+  const { t } = useTranslation();
   if (!message) return null;
 
   return (
@@ -28,7 +30,7 @@ export function ErrorBanner({
           type="button"
           onClick={onDismiss}
           className="-mr-1 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-danger-700/70 transition-colors hover:bg-danger-100 hover:text-danger-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
-          aria-label="Dismiss error"
+          aria-label={t.common.dismissError}
         >
           <Icon name="close" className="size-4" />
         </button>

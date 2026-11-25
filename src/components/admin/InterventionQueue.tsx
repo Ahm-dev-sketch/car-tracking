@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { FleetMap, VehicleMarkerData } from '@/components/map';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 import { formatEta } from '@/components/booking/DispatchProgress';
 import { Icon } from '@/components/ui/Icon';
 
@@ -48,6 +49,7 @@ export interface InterventionBooking {
 }
 
 export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
+  const { locale, t, format } = useTranslation();
   const [bookings, setBookings] = useState<InterventionBooking[]>([]);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<CandidateDriver[]>([]);
@@ -106,17 +108,17 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
           setCandidates(json.data || []);
         } else {
           const err = await res.json();
-          setActionError(err.error?.message || 'Failed to load driver candidates');
+          setActionError(err.error?.message || t.admin.interventionQueue.errorLoadCandidates);
         }
       } catch {
-        setActionError('Network error loading candidate drivers');
+        setActionError(t.admin.interventionQueue.errorNetworkCandidates);
       } finally {
         setLoadingCandidates(false);
       }
     };
 
     fetchCandidates();
-  }, [selectedBookingId]);
+  }, [selectedBookingId, t.admin.interventionQueue.errorLoadCandidates, t.admin.interventionQueue.errorNetworkCandidates]);
 
   const handleManualAssign = async (driverId: string) => {
     if (!selectedBookingId) return;
@@ -132,15 +134,15 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
       });
 
       if (res.ok) {
-        setSuccessMessage('Driver manually assigned successfully.');
+        setSuccessMessage(t.admin.interventionQueue.assignSuccess);
         onAssigned?.();
         await fetchInterventions();
       } else {
         const err = await res.json();
-        setActionError(err.error?.message || 'Failed to manually assign driver');
+        setActionError(err.error?.message || t.admin.interventionQueue.errorAssign);
       }
     } catch {
-      setActionError('Network error during manual assignment');
+      setActionError(t.admin.interventionQueue.errorNetworkAssign);
     } finally {
       setAssigningDriverId(null);
     }
@@ -172,7 +174,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500" role="status">
         <Spinner size="md" className="mb-2" />
-        <p className="font-medium">Checking dispatch intervention queue...</p>
+        <p className="font-medium">{t.admin.interventionQueue.checkingQueue}</p>
       </div>
     );
   }
@@ -182,13 +184,13 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
       <div className="flex flex-col gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3.5 text-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2.5">
           <span className="relative inline-flex size-2 shrink-0 rounded-full bg-success-600" aria-hidden="true" />
-          <span className="font-semibold text-success-700">Intervention Queue Clear</span>
+          <span className="font-semibold text-success-700">{t.admin.interventionQueue.queueClear}</span>
           <span className="font-medium text-success-700">
-            — All auto-dispatch requests have been fulfilled or assigned.
+            {t.admin.interventionQueue.queueClearDesc}
           </span>
         </div>
         <span className="shrink-0 rounded-full border border-success-200 bg-white px-2.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-success-700">
-          0 PENDING ESCALATIONS
+          {t.admin.interventionQueue.pendingBadge}
         </span>
       </div>
     );
@@ -200,12 +202,12 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
         <div className="flex items-center gap-2.5">
           <span className="relative inline-flex size-2 shrink-0 rounded-full bg-warning-600 status-ping" aria-hidden="true" />
           <h2 className="text-sm font-semibold tracking-tight text-slate-900">
-            Admin Intervention Queue <span className="font-mono tabular-nums text-slate-400">({bookings.length})</span>
+            {t.admin.interventionQueue.queueHeader} <span className="font-mono tabular-nums text-slate-400">({bookings.length})</span>
           </h2>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-warning-200 bg-warning-50 px-2.5 py-0.5 text-[11px] font-medium text-warning-700">
           <Icon name="alert" className="size-3 shrink-0" />
-          Auto-dispatch timeout reached — Manual driver assignment required
+          {t.admin.interventionQueue.timeoutBadge}
         </span>
       </div>
 
@@ -254,31 +256,31 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
 
             {selectedBooking.operationalLocation && (
               <div className="font-medium text-slate-500">
-                <span className="font-semibold text-slate-700">Hub: </span>
+                <span className="font-semibold text-slate-700">{t.admin.interventionQueue.hubLabel} </span>
                 {selectedBooking.operationalLocation.name} ({selectedBooking.operationalLocation.code})
               </div>
             )}
 
             <div className="space-y-2 border-t border-slate-100 pt-2">
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Pickup</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.admin.interventionQueue.pickup}</span>
                 <span className="font-medium text-slate-800">{selectedBooking.pickupLocation}</span>
               </div>
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Destination</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.admin.interventionQueue.destination}</span>
                 <span className="font-medium text-slate-800">{selectedBooking.destination}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Passengers</span>
-                <span className="font-medium tabular-nums text-slate-800">{selectedBooking.passengerCount} Persons</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.admin.interventionQueue.passengers}</span>
+                <span className="font-medium tabular-nums text-slate-800">{format(t.common.personCount, { count: selectedBooking.passengerCount })}</span>
               </div>
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Departure</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.admin.interventionQueue.departure}</span>
                 <span className="font-mono font-medium tabular-nums text-slate-800">
-                  {new Date(selectedBooking.departureAt).toLocaleTimeString([], {
+                  {new Date(selectedBooking.departureAt).toLocaleTimeString(locale === 'id' ? 'id-ID' : 'en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
                   })}
@@ -288,7 +290,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
 
             {selectedBooking.purpose && (
               <div className="border-t border-slate-100 pt-2">
-                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Purpose</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">{t.admin.interventionQueue.purpose}</span>
                 <p className="mt-0.5 font-medium text-slate-700">{selectedBooking.purpose}</p>
               </div>
             )}
@@ -298,7 +300,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
           <div className="space-y-3 lg:col-span-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Eligible Candidate Drivers <span className="font-mono tabular-nums">({candidates.length})</span>
+                {t.admin.interventionQueue.eligibleDrivers} <span className="font-mono tabular-nums">({candidates.length})</span>
               </span>
               {loadingCandidates && <Spinner size="sm" />}
             </div>
@@ -317,18 +319,18 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
             {candidates.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center text-xs font-medium text-slate-500">
                 {loadingCandidates
-                  ? 'Scanning online drivers near pickup location...'
-                  : 'No active eligible drivers found with fresh GPS in this location.'}
+                  ? t.admin.interventionQueue.scanning
+                  : t.admin.interventionQueue.noCandidates}
               </div>
             ) : (
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {candidates.map((c) => {
-                  const driverName = c.driverName || c.name || 'Driver';
+                  const driverName = c.driverName || c.name || t.nav.roles.DRIVER;
                   const plate = c.plateNumber || c.vehiclePlateNumber || '—';
                   const cleanPhone = c.phone ? c.phone.replace(/\D/g, '') : '';
                   const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : null;
                   const isAssigning = assigningDriverId === c.driverId;
-                  const etaText = formatEta(c.etaSeconds, c.etaEstimated);
+                  const etaText = formatEta(c.etaSeconds, c.etaEstimated, locale);
 
                   return (
                     <div
@@ -341,7 +343,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                           {c.phone && <span className="font-mono tabular-nums text-slate-400">({c.phone})</span>}
                           {etaText && (
                             <span className="inline-flex items-center gap-1 rounded-full border border-info-200 bg-info-50 px-2 py-0.5 font-mono text-[10px] font-medium tabular-nums text-info-700">
-                              ETA: {etaText}
+                              {t.admin.interventionQueue.etaPrefix} {etaText}
                             </span>
                           )}
                         </div>
@@ -353,7 +355,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                               • {c.vehicleBrand} {c.vehicleModel}
                             </span>
                           )}
-                          {c.seatingCapacity && <span>• {c.seatingCapacity} seats</span>}
+                          {c.seatingCapacity && <span>• {c.seatingCapacity} {t.common.seats}</span>}
                         </div>
                       </div>
 
@@ -366,7 +368,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                           >
                             <Icon name="message" className="size-3.5 shrink-0" />
-                            <span>WhatsApp</span>
+                            <span>{t.admin.interventionQueue.whatsappBtn}</span>
                           </a>
                         )}
 
@@ -376,7 +378,7 @@ export function InterventionQueue({ onAssigned }: { onAssigned?: () => void }) {
                           onClick={() => handleManualAssign(c.driverId)}
                           className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {isAssigning ? <Spinner size="sm" className="text-white" /> : 'Assign Driver'}
+                          {isAssigning ? <Spinner size="sm" className="text-white" /> : t.admin.interventionQueue.assignDriverBtn}
                         </button>
                       </div>
                     </div>

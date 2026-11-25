@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { getDictionary, type Locale } from '@/lib/i18n';
 
 interface GreetingClockProps {
   userName?: string | null;
@@ -10,24 +12,19 @@ interface GreetingClockProps {
   className?: string;
 }
 
-const DAYS_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-const MONTHS_ID = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-];
-
-function getGreetingInfo(date: Date) {
+function getGreetingInfo(date: Date, locale: Locale) {
+  const dict = getDictionary(locale);
   const hour = date.getHours();
   if (hour >= 4 && hour < 11) {
-    return { text: 'Selamat Pagi', icon: 'sun' as const, bg: 'bg-warning-50 text-warning-600' };
+    return { text: dict.greeting.morning, icon: 'sun' as const, bg: 'bg-warning-50 text-warning-600' };
   }
   if (hour >= 11 && hour < 15) {
-    return { text: 'Selamat Siang', icon: 'sun' as const, bg: 'bg-warning-50 text-warning-600' };
+    return { text: dict.greeting.afternoon, icon: 'sun' as const, bg: 'bg-warning-50 text-warning-600' };
   }
   if (hour >= 15 && hour < 18) {
-    return { text: 'Selamat Sore', icon: 'sun' as const, bg: 'bg-warning-50 text-warning-600' };
+    return { text: dict.greeting.evening, icon: 'sun' as const, bg: 'bg-warning-50 text-warning-600' };
   }
-  return { text: 'Selamat Malam', icon: 'moon' as const, bg: 'bg-info-100 text-info-600' };
+  return { text: dict.greeting.night, icon: 'moon' as const, bg: 'bg-info-100 text-info-600' };
 }
 
 function pad(num: number): string {
@@ -40,6 +37,7 @@ export function GreetingClock({
   variant = 'banner',
   className = '',
 }: GreetingClockProps) {
+  const { locale, t } = useTranslation();
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -56,7 +54,7 @@ export function GreetingClock({
       return (
         <div className={`hidden xl:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-400 ${className}`}>
           <Icon name="clock" className="size-3.5" />
-          <span className="tabular-nums">Memuat waktu...</span>
+          <span className="tabular-nums">{t.greeting.loadingTime}</span>
         </div>
       );
     }
@@ -67,10 +65,10 @@ export function GreetingClock({
     );
   }
 
-  const { text: greetingText, icon: greetingIcon, bg: greetingBg } = getGreetingInfo(now);
-  const dayName = DAYS_ID[now.getDay()];
+  const { text: greetingText, icon: greetingIcon, bg: greetingBg } = getGreetingInfo(now, locale);
+  const dayName = t.greeting.days[now.getDay()];
   const dateNum = now.getDate();
-  const monthName = MONTHS_ID[now.getMonth()];
+  const monthName = t.greeting.months[now.getMonth()];
   const year = now.getFullYear();
   const dateFormatted = `${dayName}, ${dateNum} ${monthName} ${year}`;
   const timeFormatted = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} WIB`;

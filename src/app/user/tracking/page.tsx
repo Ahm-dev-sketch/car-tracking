@@ -11,6 +11,7 @@ import { GPSBadge } from '@/components/ui/GPSBadge';
 import { RelativeTime } from '@/components/ui/RelativeTime';
 import { Spinner } from '@/components/ui/Spinner';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 import { Icon } from '@/components/ui/Icon';
 import { reverseGeocodeWithCache } from '@/lib/client-geocode-cache';
 import { TripCommunicationWidget } from '@/components/communication/TripCommunicationWidget';
@@ -66,6 +67,7 @@ interface ActiveBookingInfo {
 }
 
 function UserTrackingContent() {
+  const { locale, t, format } = useTranslation();
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const initialVehicleId = searchParams.get('vehicleId');
@@ -226,7 +228,7 @@ function UserTrackingContent() {
       pts.push({
         lat: selectedBooking.pickupLat,
         lng: selectedBooking.pickupLng,
-        label: 'Jemput: ' + selectedBooking.pickupLocation,
+        label: t.userPages.tracking.pickupPointPrefix + selectedBooking.pickupLocation,
         type: 'pickup',
       });
     }
@@ -239,12 +241,12 @@ function UserTrackingContent() {
       pts.push({
         lat: selectedBooking.destinationLat,
         lng: selectedBooking.destinationLng,
-        label: 'Tujuan: ' + selectedBooking.destination,
+        label: t.userPages.tracking.destinationPointPrefix + selectedBooking.destination,
         type: 'destination',
       });
     }
     return pts;
-  }, [selectedBooking]);
+  }, [selectedBooking, t.userPages.tracking.pickupPointPrefix, t.userPages.tracking.destinationPointPrefix]);
 
   const distanceToPickup = useMemo(() => {
     if (!selectedVehicle || !selectedBooking?.pickupLat || !selectedBooking?.pickupLng) return null;
@@ -286,10 +288,10 @@ function UserTrackingContent() {
   }, [selectedVehicle?.lat, selectedVehicle?.lng]);
 
   const bookingSummary = selectedBooking && (
-    <section className="space-y-3" aria-label="Active booking">
+    <section className="space-y-3" aria-label={t.userPages.tracking.activeBookingAria}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-          Perjalanan aktif Anda
+          {t.userPages.tracking.activeTripLabel}
         </p>
         <StatusBadge status={selectedBooking.status} hasNotaDinas={Boolean(selectedBooking.notaDinasUrl)} />
       </div>
@@ -312,19 +314,19 @@ function UserTrackingContent() {
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-snug tracking-tight text-slate-900">
               {selectedBooking.status === 'ARRIVED'
-                ? 'Driver sudah tiba di titik jemput!'
+                ? t.userPages.tracking.statusArrivedMsg
                 : distanceToPickup?.proximity === 'near'
-                ? 'Driver sudah sangat dekat!'
+                ? t.userPages.tracking.statusNearMsg
                 : selectedBooking.status === 'IN_PROGRESS'
-                ? 'Perjalanan sedang berlangsung'
-                : 'Driver sedang menuju titik jemput'}
+                ? t.userPages.tracking.statusInProgressMsg
+                : t.userPages.tracking.statusEnRouteMsg}
             </p>
             <p className="mt-0.5 text-xs font-medium text-slate-500">
               {distanceToPickup
-                ? `Jarak ke penjemputan: ${distanceToPickup.text}`
+                ? format(t.userPages.tracking.distanceToPickup, { dist: distanceToPickup.text })
                 : selectedBooking.etaSeconds
-                ? `Estimasi kedatangan: ${formatEta(selectedBooking.etaSeconds, selectedBooking.etaEstimated)}`
-                : 'Memantau pergerakan armada secara langsung'}
+                ? format(t.userPages.tracking.etaArrival, { eta: formatEta(selectedBooking.etaSeconds, selectedBooking.etaEstimated, locale) ?? '' })
+                : t.userPages.tracking.monitoringLive}
             </p>
           </div>
         </div>
@@ -339,10 +341,10 @@ function UserTrackingContent() {
         <Icon name="route" className="mt-0.5 size-4 shrink-0 text-slate-400" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-slate-500">
-            <span className="font-semibold text-slate-700">Jemput:</span> {selectedBooking.pickupLocation}
+            <span className="font-semibold text-slate-700">{t.userPages.tracking.pickupPrefix}</span> {selectedBooking.pickupLocation}
           </p>
           <p className="mt-1 truncate font-semibold text-slate-900">
-            <span className="font-semibold text-slate-700">Tujuan:</span> {selectedBooking.destination}
+            <span className="font-semibold text-slate-700">{t.userPages.tracking.destinationPrefix}</span> {selectedBooking.destination}
           </p>
         </div>
       </div>
@@ -356,17 +358,17 @@ function UserTrackingContent() {
       {/* Header */}
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">Closer to your next stop</p>
-          <h1 className="page-heading mt-2">Your journey, live.</h1>
+          <p className="eyebrow">{t.userPages.tracking.eyebrow}</p>
+          <h1 className="page-heading mt-2">{t.userPages.tracking.heading}</h1>
           <p className="mt-3 text-sm font-medium leading-relaxed text-slate-500">
-            Keep your vehicle and driver in view.
+            {t.userPages.tracking.description}
           </p>
         </div>
 
         {/* Realtime WS status indicator */}
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-            Location feed
+            {t.userPages.tracking.locationFeed}
           </span>
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider ${
@@ -381,7 +383,7 @@ function UserTrackingContent() {
                 connectionState === 'open' ? 'bg-success-600' : 'bg-slate-400'
               }`}
             />
-            {connectionState === 'open' ? 'Connected' : 'Polling'}
+            {connectionState === 'open' ? t.userPages.tracking.connected : t.userPages.tracking.polling}
           </span>
         </div>
       </div>
@@ -393,7 +395,7 @@ function UserTrackingContent() {
       {isLoading ? (
         <div className="surface py-20 text-center text-sm font-medium text-slate-500" role="status">
           <Spinner size="lg" className="mb-2" />
-          <p>Locating active vehicles...</p>
+          <p>{t.userPages.tracking.locatingActive}</p>
         </div>
       ) : mergedVehicles.length === 0 ? (
         <div className="surface px-6 py-12 text-center sm:py-16">
@@ -401,10 +403,10 @@ function UserTrackingContent() {
             <Icon name="pin" className="size-6" />
           </span>
           <p className="text-base font-semibold tracking-tight text-slate-900">
-            No active vehicle trips reporting live GPS
+            {t.userPages.tracking.noActiveTitle}
           </p>
           <p className="mx-auto mt-1.5 max-w-sm text-xs font-medium leading-relaxed text-slate-500">
-            Tracking is displayed once a driver starts a trip or an online driver shares telemetry.
+            {t.userPages.tracking.noActiveDesc}
           </p>
         </div>
       ) : (
@@ -427,7 +429,7 @@ function UserTrackingContent() {
 
               <div className="border-b border-slate-100 pb-3">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Tracked vehicles ({mergedVehicles.length})
+                  {format(t.userPages.tracking.trackedVehicles, { count: mergedVehicles.length })}
                 </span>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {mergedVehicles.map((v) => (
@@ -463,12 +465,12 @@ function UserTrackingContent() {
                               {selectedVehicle.driverName}
                             </span>
                             <span className="shrink-0 rounded-full border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-brand-700">
-                              Driver KCIC
+                              {t.userPages.tracking.kcicDriverBadge}
                             </span>
                           </div>
                           <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
                             <span className="inline-block size-1.5 rounded-full bg-success-600" aria-hidden="true" />
-                            <span>Kontak Terproteksi (In-App Saja)</span>
+                            <span>{t.userPages.tracking.protectedContact}</span>
                           </p>
                         </div>
                       </div>
@@ -478,10 +480,10 @@ function UserTrackingContent() {
                         <TripCommunicationWidget
                           bookingId={selectedBooking?.id}
                           currentUserId={(session?.user as any)?.id || 'passenger-user'}
-                          currentUserName={session?.user?.name || 'Penumpang'}
+                          currentUserName={session?.user?.name || t.comms.passengerSubtitle}
                           currentUserRole="USER"
                           partnerId={selectedBooking?.driver?.user?.id || selectedBooking?.driver?.id}
-                          partnerName={selectedVehicle.driverName || 'Driver KCIC'}
+                          partnerName={selectedVehicle.driverName || t.userPages.tracking.kcicDriverBadge}
                           partnerRole="DRIVER"
                           variant="buttons"
                         />
@@ -506,7 +508,7 @@ function UserTrackingContent() {
                     <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 text-xs">
                       <div>
                         <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                          Movement
+                          {t.userPages.tracking.movementLabel}
                         </span>
                         <div className="mt-1">
                           <MovementBadge movement={selectedVehicle.movement} />
@@ -514,7 +516,7 @@ function UserTrackingContent() {
                       </div>
                       <div>
                         <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                          Accuracy
+                          {t.userPages.tracking.accuracyLabel}
                         </span>
                         <div className="mt-1">
                           <GPSBadge accuracyM={selectedVehicle.accuracyM} />
@@ -522,7 +524,7 @@ function UserTrackingContent() {
                         {typeof selectedVehicle.accuracyM === 'number' && selectedVehicle.accuracyM > 100 && (
                           <div className="mt-1.5 flex items-start gap-1 rounded border border-warning-200 bg-warning-50 px-1.5 py-1 text-[10px] font-medium leading-snug text-warning-700">
                             <Icon name="alert" className="mt-px size-3 shrink-0" />
-                            <span>Posisi estimasi seluler/Wi-Fi (radius &plusmn;{Math.round(selectedVehicle.accuracyM)} m)</span>
+                            <span>{format(t.userPages.tracking.cellWifiEstimated, { m: Math.round(selectedVehicle.accuracyM) })}</span>
                           </div>
                         )}
                       </div>
@@ -531,7 +533,7 @@ function UserTrackingContent() {
                     {driverCurrentAddress && (
                       <div className="border-t border-slate-100 pt-3 text-xs">
                         <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                          Posisi terkini armada
+                          {t.userPages.tracking.currentFleetPos}
                         </span>
                         <p className="mt-1 flex items-start gap-1.5 font-medium text-slate-700">
                           <Icon name="pin" className="mt-px size-3.5 shrink-0 text-brand-600" />
@@ -542,7 +544,7 @@ function UserTrackingContent() {
 
                     <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                        Last update
+                        {t.userPages.tracking.lastUpdateLabel}
                       </span>
                       <div className="font-medium text-slate-500">
                         <RelativeTime date={selectedVehicle.recordedAt} />
@@ -551,7 +553,7 @@ function UserTrackingContent() {
                   </div>
                 </div>
               ) : (
-                <p className="text-xs italic text-slate-600">Pilih kendaraan untuk melihat detail posisi</p>
+                <p className="text-xs italic text-slate-600">{t.userPages.tracking.selectVehicleHint}</p>
               )}
             </div>
           </div>
@@ -567,7 +569,6 @@ export default function UserTrackingPage() {
       fallback={
         <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
-          <p>Loading tracking map...</p>
         </div>
       }
     >

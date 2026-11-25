@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 
 type Phase = 'hidden' | 'in' | 'out';
 
@@ -16,6 +17,7 @@ function isStandalone(): boolean {
 }
 
 export function LaunchSplash() {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>('hidden');
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export function LaunchSplash() {
           <div className="h-0.5 w-9 rounded-full bg-brand-600" />
           <div className="text-xl font-semibold tracking-tight text-slate-900">KCIC Fleet</div>
           <div className="text-[9px] font-semibold uppercase tracking-[0.32em] text-slate-400">
-            Workplace Mobility
+            {t.auth.brandTagline}
           </div>
         </div>
       </div>

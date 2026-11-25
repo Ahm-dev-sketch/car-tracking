@@ -3,6 +3,8 @@
 import React from 'react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Icon } from '@/components/ui/Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { DEFAULT_LOCALE, formatEtaText, translateStatus, type Locale } from '@/lib/i18n';
 
 export interface DispatchProgressProps {
   status: string;
@@ -16,23 +18,11 @@ export interface DispatchProgressProps {
 
 export function formatEta(
   etaSeconds: number | null | undefined,
-  etaEstimated?: boolean
+  etaEstimated?: boolean,
+  locale: Locale = DEFAULT_LOCALE
 ): string | null {
-  if (etaSeconds === null || etaSeconds === undefined || etaSeconds < 0) return null;
-  const mins = Math.max(1, Math.round(etaSeconds / 60));
-  if (etaEstimated) {
-    return `~${mins} min (estimate)`;
-  }
-  return `${mins} min`;
+  return formatEtaText(locale, etaSeconds, etaEstimated);
 }
-
-const STEPS = [
-  { key: 'SEARCHING_DRIVER', label: 'Searching for driver…' },
-  { key: 'DRIVER_NOTIFIED', label: 'Driver notified' },
-  { key: 'DRIVER_ASSIGNED', label: 'Driver assigned' },
-  { key: 'DRIVER_EN_ROUTE', label: 'Driver en route' },
-  { key: 'ARRIVED', label: 'Driver arrived' },
-];
 
 export function DispatchProgress({
   status,
@@ -42,8 +32,17 @@ export function DispatchProgress({
   compact = false,
   hasNotaDinas,
 }: DispatchProgressProps) {
+  const { locale, t } = useTranslation();
   const normStatus = status?.toUpperCase() || '';
-  const etaText = formatEta(etaSeconds, etaEstimated);
+  const etaText = formatEta(etaSeconds, etaEstimated, locale);
+
+  const steps = [
+    { key: 'SEARCHING_DRIVER', label: t.dispatch.stepFinding },
+    { key: 'DRIVER_NOTIFIED', label: t.dispatch.stepNotified },
+    { key: 'DRIVER_ASSIGNED', label: t.dispatch.stepAssigned },
+    { key: 'DRIVER_EN_ROUTE', label: t.dispatch.stepEnRoute },
+    { key: 'ARRIVED', label: t.dispatch.stepArrived },
+  ];
 
   // If status is one of the failure or cancellation states
   if (normStatus === 'NO_DRIVER_AVAILABLE') {
@@ -52,12 +51,12 @@ export function DispatchProgress({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Icon name="alert" className="size-4 shrink-0 text-slate-500" />
-            <span className="font-semibold text-slate-900">No Driver Available</span>
+            <span className="font-semibold text-slate-900">{t.dispatch.noDriverTitle}</span>
           </div>
           <StatusBadge status="NO_DRIVER_AVAILABLE" />
         </div>
         <p className="mt-2 leading-relaxed text-slate-600">
-          Auto-dispatch could not find an available online driver at this location.
+          {t.dispatch.noDriverDesc}
         </p>
       </div>
     );
@@ -72,12 +71,12 @@ export function DispatchProgress({
               <span className="absolute inset-0 rounded-full bg-warning-600" />
               <span className="absolute inset-0 rounded-full bg-warning-600 status-ping" />
             </span>
-            <span className="font-semibold text-warning-700">Dispatch Escalated to Admin</span>
+            <span className="font-semibold text-warning-700">{t.dispatch.escalationTitle}</span>
           </div>
           <StatusBadge status="ADMIN_INTERVENTION" />
         </div>
         <p className="mt-2 leading-relaxed text-warning-700">
-          Auto-dispatch retries exhausted. A fleet manager will assign a driver manually.
+          {t.dispatch.escalationDesc}
         </p>
       </div>
     );
@@ -98,16 +97,16 @@ export function DispatchProgress({
 
   const statusLabel =
     normStatus === 'SEARCHING_DRIVER'
-      ? 'Searching for driver…'
+      ? t.dispatch.stepFinding
       : normStatus === 'DRIVER_NOTIFIED'
-      ? 'Driver notified'
+      ? t.dispatch.stepNotified
       : normStatus === 'DRIVER_ASSIGNED'
-      ? 'Driver assigned'
+      ? t.dispatch.stepAssigned
       : normStatus === 'DRIVER_EN_ROUTE'
-      ? 'Driver en route'
+      ? t.dispatch.stepEnRoute
       : normStatus === 'ARRIVED'
-      ? 'Driver arrived'
-      : normStatus.replace(/_/g, ' ');
+      ? t.dispatch.stepArrived
+      : translateStatus(locale, normStatus, hasNotaDinas);
 
   if (compact) {
     // Anything before DRIVER_ASSIGNED is still in flight; crimson marks the live step.
@@ -157,7 +156,7 @@ export function DispatchProgress({
             )}
           </span>
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-            Dispatch progress
+            {t.dispatch.liveTitle}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -172,7 +171,7 @@ export function DispatchProgress({
 
       {/* Timeline: completed = success green, active = KCIC crimson */}
       <ol className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-5 sm:divide-x sm:divide-y-0">
-        {STEPS.map((step, idx) => {
+        {steps.map((step, idx) => {
           const stepTargetIdx = stepOrder.indexOf(step.key);
           const isDone = currentIdx > stepTargetIdx;
           const isCurrent = currentIdx === stepTargetIdx;
@@ -234,8 +233,8 @@ export function DispatchProgress({
           />
           <span>
             {hasNotaDinas
-              ? 'Nota Dinas sudah diunggah dan sedang menunggu verifikasi admin.'
-              : 'Perjalanan telah selesai. Silakan lampirkan Nota Dinas untuk verifikasi & persetujuan admin.'}
+              ? t.dispatch.notaUploadedNote
+              : t.dispatch.notaMissingNote}
           </span>
         </div>
       )}

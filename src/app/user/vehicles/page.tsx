@@ -8,6 +8,8 @@ import { Drawer } from '@/components/ui/Drawer';
 import { Pagination } from '@/components/ui/Pagination';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateTransmission, translateVehicleType } from '@/lib/i18n';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
 import { Icon } from '@/components/ui/Icon';
 import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
@@ -44,6 +46,7 @@ interface Vehicle {
 }
 
 function UserVehiclesContent() {
+  const { locale, t, format } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -130,10 +133,10 @@ function UserVehiclesContent() {
         setPage(targetPage);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to load vehicles');
+        setApiError(err.error?.message || t.userPages.vehicles.failedLoad);
       }
     } catch {
-      setApiError('Network error loading vehicles');
+      setApiError(t.userPages.vehicles.networkError);
     } finally {
       setIsLoading(false);
     }
@@ -187,10 +190,10 @@ function UserVehiclesContent() {
       {/* Header */}
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">A ride for your workday</p>
-          <h1 className="page-heading mt-2">Find your next ride.</h1>
+          <p className="eyebrow">{t.userPages.vehicles.eyebrow}</p>
+          <h1 className="page-heading mt-2">{t.userPages.vehicles.heading}</h1>
           <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
-            Choose a vehicle. Make room for your next journey.
+            {t.userPages.vehicles.description}
           </p>
         </div>
         <button
@@ -198,7 +201,7 @@ function UserVehiclesContent() {
           onClick={() => handleOpenBooking()}
           className="button-primary self-start"
         >
-          <Icon name="plus" className="size-4" /><span>Reservasi baru</span>
+          <Icon name="plus" className="size-4" /><span>{t.userPages.vehicles.newBookingBtn}</span>
         </button>
       </div>
 
@@ -214,27 +217,27 @@ function UserVehiclesContent() {
             />
             <input
               type="text"
-              placeholder="Search vehicles..."
-              aria-label="Search by plate number, brand or model"
+              placeholder={t.userPages.vehicles.searchPlaceholder}
+              aria-label={t.userPages.vehicles.searchAria}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
             />
           </div>
           <button type="submit" className="button-secondary">
-            Cari
+            {t.userPages.vehicles.searchBtn}
           </button>
         </form>
 
         <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 xl:flex xl:flex-wrap">
           {/* Operational Location Filter */}
           <select
-            aria-label="Filter by operational location"
+            aria-label={t.userPages.vehicles.locationAria}
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
             className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
-            <option value="">All Locations</option>
+            <option value="">{t.userPages.vehicles.allLocations}</option>
             {locations.map((loc) => (
               <option key={loc.id} value={loc.id}>
                 {loc.name} ({loc.code})
@@ -244,30 +247,30 @@ function UserVehiclesContent() {
 
           {/* Seats Filter */}
           <select
-            aria-label="Filter by seating capacity"
+            aria-label={t.userPages.vehicles.capacityAria}
             value={seatsFilter}
             onChange={(e) => setSeatsFilter(e.target.value)}
             className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
-            <option value="">All Capacities</option>
-            <option value="4">4+ Seats</option>
-            <option value="5">5+ Seats</option>
-            <option value="7">7+ Seats</option>
-            <option value="10">10+ Seats</option>
+            <option value="">{t.userPages.vehicles.allCapacities}</option>
+            <option value="4">{format(t.userPages.vehicles.seatsMinOption, { n: 4 })}</option>
+            <option value="5">{format(t.userPages.vehicles.seatsMinOption, { n: 5 })}</option>
+            <option value="7">{format(t.userPages.vehicles.seatsMinOption, { n: 7 })}</option>
+            <option value="10">{format(t.userPages.vehicles.seatsMinOption, { n: 10 })}</option>
           </select>
 
           {/* Status Filter */}
           <select
-            aria-label="Filter by availability"
+            aria-label={t.userPages.vehicles.availabilityAria}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="h-10 cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15"
           >
-            <option value="">All Statuses</option>
-            <option value="AVAILABLE">Available</option>
-            <option value="RESERVED">Reserved</option>
-            <option value="IN_USE">In Use</option>
-            <option value="MAINTENANCE">Maintenance</option>
+            <option value="">{t.userPages.vehicles.allStatuses}</option>
+            <option value="AVAILABLE">{t.statuses.AVAILABLE}</option>
+            <option value="RESERVED">{t.statuses.RESERVED}</option>
+            <option value="IN_USE">{t.statuses.IN_USE}</option>
+            <option value="MAINTENANCE">{t.statuses.MAINTENANCE}</option>
           </select>
         </div>
       </div>
@@ -276,11 +279,11 @@ function UserVehiclesContent() {
       {isLoading ? (
         <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
-          <div>Loading fleet catalog...</div>
+          <div>{t.userPages.vehicles.loadingCatalog}</div>
         </div>
       ) : vehicles.length === 0 ? (
         <div className="surface px-6 py-14 text-center text-sm font-medium text-slate-500">
-          No vehicles match the selected criteria.
+          {t.userPages.vehicles.emptyFilter}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -305,7 +308,7 @@ function UserVehiclesContent() {
                     <div className="flex flex-col items-center text-slate-300">
                       <Icon name="car" className="size-10" />
                       <span className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-400">
-                        {v.vehicleType}
+                        {translateVehicleType(locale, v.vehicleType)}
                       </span>
                     </div>
                   )}
@@ -345,25 +348,25 @@ function UserVehiclesContent() {
                   <div className="mt-auto grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-xs">
                     <div>
                       <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                        Capacity
+                        {t.userPages.vehicles.capacityLabel}
                       </span>
                       <span className="font-medium text-slate-700 tabular-nums">
-                        {v.seatingCapacity} seats
+                        {format(t.userPages.vehicles.seatsUnit, { count: v.seatingCapacity })}
                       </span>
                     </div>
                     <div>
                       <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                        Gearbox
+                        {t.userPages.vehicles.gearboxLabel}
                       </span>
                       <span className="font-medium text-slate-700">
-                        {v.transmission || 'Automatic'}
+                        {translateTransmission(locale, v.transmission || 'AUTOMATIC')}
                       </span>
                     </div>
                   </div>
 
                   {v.currentDriver?.user && (
                     <div className="truncate border-t border-slate-100 pt-3 text-[11px] font-medium text-slate-500">
-                      Driver:{' '}
+                      {t.userPages.vehicles.driverLabel}{' '}
                       <span className="font-semibold text-slate-700">{v.currentDriver.user.name}</span>
                     </div>
                   )}
@@ -376,14 +379,14 @@ function UserVehiclesContent() {
                     onClick={() => setSelectedVehicle(v)}
                     className="button-secondary flex-1"
                   >
-                    Detail
+                    {t.userPages.vehicles.detailBtn}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleOpenBooking(v)}
                     className="button-primary flex-1"
                   >
-                    Pesan
+                    {t.userPages.vehicles.bookBtn}
                   </button>
                 </div>
               </MotionBentoCard>
@@ -404,7 +407,7 @@ function UserVehiclesContent() {
       <Drawer
         isOpen={Boolean(selectedVehicle)}
         onClose={() => setSelectedVehicle(null)}
-        title={selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model}` : 'Vehicle'}
+        title={selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model}` : t.userPages.vehicles.drawerFallbackTitle}
         description={selectedVehicle?.plateNumber}
         footer={
           selectedVehicle ? (
@@ -417,7 +420,7 @@ function UserVehiclesContent() {
               }}
               className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
-              Pesan kendaraan ini
+              {t.userPages.vehicles.bookThisVehicleBtn}
             </button>
           ) : null
         }
@@ -433,14 +436,14 @@ function UserVehiclesContent() {
             )}
 
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Status</span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{t.userPages.vehicles.statusLabel}</span>
               <StatusBadge status={selectedVehicle.status} />
             </div>
 
             {/* Locations in Drawer */}
             <div className="space-y-2 border-b border-slate-100 pb-3 text-xs">
               <div className="flex items-center justify-between gap-3">
-                <span className="font-medium text-slate-500">Home Base:</span>
+                <span className="font-medium text-slate-500">{t.userPages.vehicles.homeBaseLabel}</span>
                 {selectedVehicle.homeLocation ? (
                   <LocationBadge
                     type="home"
@@ -448,11 +451,11 @@ function UserVehiclesContent() {
                     code={selectedVehicle.homeLocation.code}
                   />
                 ) : (
-                  <span className="text-slate-400">Not assigned</span>
+                  <span className="text-slate-400">{t.userPages.vehicles.notAssigned}</span>
                 )}
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="font-medium text-slate-500">Current Location:</span>
+                <span className="font-medium text-slate-500">{t.userPages.vehicles.currentLocationLabel}</span>
                 {(selectedVehicle.currentLocation || selectedVehicle.currentOperationalLocation) ? (
                   <LocationBadge
                     type="current"
@@ -460,30 +463,30 @@ function UserVehiclesContent() {
                     code={(selectedVehicle.currentLocation || selectedVehicle.currentOperationalLocation)?.code}
                   />
                 ) : (
-                  <span className="text-slate-400">Not assigned</span>
+                  <span className="text-slate-400">{t.userPages.vehicles.notAssigned}</span>
                 )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 border-b border-slate-100 pb-3">
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Type</span>
-                <span className="font-medium text-slate-800">{selectedVehicle.vehicleType}</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{t.userPages.vehicles.typeLabel}</span>
+                <span className="font-medium text-slate-800">{translateVehicleType(locale, selectedVehicle.vehicleType)}</span>
               </div>
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Capacity</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{t.userPages.vehicles.capacitySpec}</span>
                 <span className="font-medium text-slate-800 tabular-nums">
-                  {selectedVehicle.seatingCapacity} Passengers
+                  {format(t.userPages.vehicles.passengersCount, { count: selectedVehicle.seatingCapacity })}
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Transmission</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{t.userPages.vehicles.transmissionLabel}</span>
                 <span className="font-medium text-slate-800">
-                  {selectedVehicle.transmission || 'Automatic'}
+                  {translateTransmission(locale, selectedVehicle.transmission || 'AUTOMATIC')}
                 </span>
               </div>
               <div>
-                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Plate</span>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{t.userPages.vehicles.plateLabel}</span>
                 <span className="font-mono font-medium tabular-nums text-slate-800">
                   {selectedVehicle.plateNumber}
                 </span>
@@ -493,7 +496,7 @@ function UserVehiclesContent() {
             {selectedVehicle.currentDriver?.user && (
               <div className="pt-1">
                 <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  Assigned Driver
+                  {t.userPages.vehicles.assignedDriverLabel}
                 </span>
                 <div className="mt-1">
                   <div className="font-medium text-slate-800">{selectedVehicle.currentDriver.user.name}</div>
@@ -530,7 +533,6 @@ export default function UserVehiclesPage() {
       fallback={
         <div className="py-20 text-center text-sm font-medium text-slate-500">
           <Spinner size="lg" className="mb-2" />
-          <p>Loading fleet...</p>
         </div>
       }
     >

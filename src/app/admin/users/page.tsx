@@ -9,6 +9,8 @@ import { FormField } from '@/components/ui/FormField';
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateRole } from '@/lib/i18n';
 
 interface UserItem {
   id: string;
@@ -31,6 +33,7 @@ interface RoleItem {
 }
 
 export default function AdminUsersPage() {
+  const { locale, t, format } = useTranslation();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -80,10 +83,10 @@ export default function AdminUsersPage() {
         setPage(targetPage);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to load users');
+        setApiError(err.error?.message || t.adminPages.users.failedLoad);
       }
     } catch {
-      setApiError('Network error loading users');
+      setApiError(t.adminPages.users.networkLoadError);
     } finally {
       setIsLoading(false);
     }
@@ -139,10 +142,10 @@ export default function AdminUsersPage() {
         fetchUsers(1);
       } else {
         const err = await res.json();
-        setCreateError(err.error?.message || 'Failed to create user');
+        setCreateError(err.error?.message || t.common.genericError);
       }
     } catch {
-      setCreateError('Network error creating user');
+      setCreateError(t.common.networkError);
     } finally {
       setIsSubmittingCreate(false);
     }
@@ -166,10 +169,10 @@ export default function AdminUsersPage() {
         setNewPassword('');
       } else {
         const err = await res.json();
-        setResetError(err.error?.message || 'Failed to reset password');
+        setResetError(err.error?.message || t.adminPages.users.failedResetPassword);
       }
     } catch {
-      setResetError('Network error resetting password');
+      setResetError(t.adminPages.users.networkResetPassword);
     } finally {
       setIsSubmittingReset(false);
     }
@@ -191,10 +194,10 @@ export default function AdminUsersPage() {
         fetchUsers(page);
       } else {
         const err = await res.json();
-        setApiError(err.error?.message || 'Failed to update user status');
+        setApiError(err.error?.message || t.adminPages.users.failedUpdateStatus);
       }
     } catch {
-      setApiError('Network error updating user');
+      setApiError(t.adminPages.users.networkUpdateStatus);
     } finally {
       setIsToggling(false);
     }
@@ -202,7 +205,7 @@ export default function AdminUsersPage() {
 
   const columns: Column<UserItem>[] = [
     {
-      header: 'User',
+      header: t.adminPages.users.colUser,
       cell: (u) => (
         <div>
           <span className="font-medium text-slate-900">{u.name}</span>
@@ -211,12 +214,12 @@ export default function AdminUsersPage() {
       ),
     },
     {
-      header: 'Phone',
+      header: t.adminPages.users.colPhone,
       accessorKey: 'phone',
       cell: (u) => <span className="font-mono text-xs tabular-nums text-slate-700">{u.phone}</span>,
     },
     {
-      header: 'Role',
+      header: t.adminPages.users.colRole,
       cell: (u) => {
         const color =
           u.role.code === 'ADMIN'
@@ -226,13 +229,13 @@ export default function AdminUsersPage() {
             : 'border-slate-200 bg-white text-slate-600';
         return (
           <span className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${color}`}>
-            {u.role.code}
+            {translateRole(locale, u.role.code)}
           </span>
         );
       },
     },
     {
-      header: 'Status',
+      header: t.adminPages.users.colStatus,
       cell: (u) => (
         <span
           className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${
@@ -241,12 +244,12 @@ export default function AdminUsersPage() {
               : 'border-slate-200 bg-slate-100 text-slate-500'
           }`}
         >
-          {u.isActive ? 'ACTIVE' : 'INACTIVE'}
+          {u.isActive ? t.adminPages.users.statusActiveBadge : t.adminPages.users.statusInactiveBadge}
         </span>
       ),
     },
     {
-      header: 'Actions',
+      header: t.adminPages.users.colActions,
       cell: (u) => (
         <div className="flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
@@ -258,7 +261,7 @@ export default function AdminUsersPage() {
             }}
             className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
-            Reset Password
+            {t.adminPages.users.resetPasswordBtn}
           </button>
 
           <button
@@ -270,7 +273,7 @@ export default function AdminUsersPage() {
                 : 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100'
             }`}
           >
-            {u.isActive ? 'Deactivate' : 'Activate'}
+            {u.isActive ? t.adminPages.users.deactivateBtn : t.adminPages.users.activateBtn}
           </button>
         </div>
       ),
@@ -285,8 +288,8 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">User Management</h1>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">Control employee and system user accounts, roles, and credentials</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.adminPages.users.heading}</h1>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.adminPages.users.description}</p>
         </div>
         <button
           type="button"
@@ -294,26 +297,26 @@ export default function AdminUsersPage() {
           className="button-primary inline-flex cursor-pointer items-center gap-1.5 self-start sm:self-auto"
         >
           <Icon name="plus" className="size-4" />
-          <span>Create User</span>
+          <span>{t.adminPages.users.createUserBtn}</span>
         </button>
       </div>
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total User</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.users.statTotal}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Aktif</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.users.statActive}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{activeCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Admin</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.users.statAdmin}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{adminCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Driver</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.users.statDriver}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{driverCount}</p>
         </div>
       </div>
@@ -329,14 +332,14 @@ export default function AdminUsersPage() {
             </span>
             <input
               type="text"
-              placeholder="Search user name or email..."
+              placeholder={t.adminPages.users.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-xs font-medium text-slate-900 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
             />
           </div>
           <button type="submit" className="button-primary shrink-0 px-3 text-xs">
-            Search
+            {t.adminPages.users.searchBtn}
           </button>
         </form>
       </div>
@@ -345,7 +348,7 @@ export default function AdminUsersPage() {
         columns={columns}
         data={users}
         isLoading={isLoading}
-        emptyMessage="No users found"
+        emptyMessage={t.adminPages.users.emptyMessage}
       />
 
       <Pagination
@@ -359,38 +362,38 @@ export default function AdminUsersPage() {
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title="Create System User"
+        title={t.adminPages.users.createModalTitle}
         maxWidth="md"
       >
         {createError && <ErrorBanner message={createError} className="mb-4" onDismiss={() => setCreateError(null)} />}
 
         <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <FormField label="Full Name" required>
+          <FormField label={t.adminPages.users.fullNameLabel} required>
             <input
               type="text"
               required
-              placeholder="Jane Doe"
+              placeholder={t.adminPages.users.namePlaceholder}
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
             />
           </FormField>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Email Address" required>
+            <FormField label={t.adminPages.users.emailLabel} required>
               <input
                 type="email"
                 required
-                placeholder="user@company.com"
+                placeholder={t.adminPages.users.emailPlaceholder}
                 value={formEmail}
                 onChange={(e) => setFormEmail(e.target.value)}
               />
             </FormField>
 
-            <FormField label="Phone Number" required>
+            <FormField label={t.adminPages.users.phoneLabel} required>
               <input
                 type="tel"
                 required
-                placeholder="081234567890"
+                placeholder={t.adminPages.users.phonePlaceholder}
                 value={formPhone}
                 onChange={(e) => setFormPhone(e.target.value)}
                 className="tabular-nums"
@@ -399,7 +402,7 @@ export default function AdminUsersPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Assign Role" required>
+            <FormField label={t.adminPages.users.assignRoleLabel} required>
               <select
                 required
                 value={formRoleId}
@@ -407,13 +410,13 @@ export default function AdminUsersPage() {
               >
                 {roles.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.code} ({r.name})
+                    {translateRole(locale, r.code)} ({r.code})
                   </option>
                 ))}
               </select>
             </FormField>
 
-            <FormField label="Initial Password" required hint="Min 8 characters">
+            <FormField label={t.adminPages.users.initialPasswordLabel} required hint={t.adminPages.users.passwordHint}>
               <input
                 type="password"
                 required
@@ -431,7 +434,7 @@ export default function AdminUsersPage() {
               onClick={() => setIsCreateOpen(false)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -439,7 +442,7 @@ export default function AdminUsersPage() {
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isSubmittingCreate && <Spinner size="sm" className="text-white" />}
-              Create User
+              {t.adminPages.users.createUserBtn}
             </button>
           </div>
         </form>
@@ -449,14 +452,14 @@ export default function AdminUsersPage() {
       <Modal
         isOpen={Boolean(resettingUser)}
         onClose={() => setResettingUser(null)}
-        title="Reset User Password"
-        description={resettingUser ? `Reset password for ${resettingUser.name}` : ''}
+        title={t.adminPages.users.resetModalTitle}
+        description={resettingUser ? format(t.adminPages.users.resetModalDesc, { name: resettingUser.name }) : ''}
         maxWidth="sm"
       >
         {resetError && <ErrorBanner message={resetError} className="mb-4" onDismiss={() => setResetError(null)} />}
 
         <form onSubmit={handleResetSubmit} className="space-y-4">
-          <FormField label="New Password" required hint="Min 8 characters">
+          <FormField label={t.adminPages.users.newPasswordLabel} required hint={t.adminPages.users.passwordHint}>
             <input
               type="password"
               required
@@ -474,7 +477,7 @@ export default function AdminUsersPage() {
               onClick={() => setResettingUser(null)}
               className="min-h-9 cursor-pointer rounded-lg border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              Cancel
+              {t.common.cancel}
             </button>
             <button
               type="submit"
@@ -482,7 +485,7 @@ export default function AdminUsersPage() {
               className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-brand-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
             >
               {isSubmittingReset && <Spinner size="sm" className="text-white" />}
-              Update Password
+              {t.adminPages.users.updatePasswordBtn}
             </button>
           </div>
         </form>
@@ -493,13 +496,9 @@ export default function AdminUsersPage() {
         isOpen={Boolean(togglingUser)}
         onClose={() => setTogglingUser(null)}
         onConfirm={handleToggleActiveConfirm}
-        title={togglingUser?.isActive ? 'Deactivate User' : 'Activate User'}
-        message={
-          togglingUser?.isActive
-            ? `Are you sure you want to deactivate ${togglingUser?.name}? They will no longer be able to log in.`
-            : `Are you sure you want to activate ${togglingUser?.name}?`
-        }
-        confirmLabel={togglingUser?.isActive ? 'Deactivate' : 'Activate'}
+        title={togglingUser?.isActive ? t.adminPages.users.deactivateModalTitle : t.adminPages.users.activateModalTitle}
+        message={format(t.adminPages.users.toggleModalDesc, { name: togglingUser?.name || '' })}
+        confirmLabel={togglingUser?.isActive ? t.adminPages.users.deactivateBtn : t.adminPages.users.activateBtn}
         isDestructive={togglingUser?.isActive}
         isLoading={isToggling}
       />

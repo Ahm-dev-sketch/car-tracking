@@ -9,6 +9,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Icon } from '@/components/ui/Icon';
 import { ExportReportModal } from '@/components/admin/ExportReportModal';
+import { useTranslation } from '@/components/providers/LanguageProvider';
+import { translateStatus } from '@/lib/i18n';
 
 interface AdminTrip {
   id: string;
@@ -44,6 +46,8 @@ interface AdminTrip {
 }
 
 export default function AdminTripsPage() {
+  const { locale, t, format } = useTranslation();
+  const dateLocale = locale === 'id' ? 'id-ID' : 'en-US';
   const [trips, setTrips] = useState<AdminTrip[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -83,10 +87,10 @@ export default function AdminTripsPage() {
         setPage(targetPage);
       } else {
         const err = await res.json();
-        setError(err.error?.message || 'Failed to load trips');
+        setError(err.error?.message || t.adminPages.trips.failedLoad);
       }
     } catch {
-      setError('Network error loading trips');
+      setError(t.adminPages.trips.networkLoadError);
     } finally {
       setIsLoading(false);
     }
@@ -98,61 +102,61 @@ export default function AdminTripsPage() {
 
   const columns: Column<AdminTrip>[] = [
     {
-      header: 'Trip Date',
-      cell: (t) => (
+      header: t.adminPages.trips.colDate,
+      cell: (trip) => (
         <div className="text-xs tabular-nums">
           <div className="font-medium text-slate-900">
-            {new Date(t.startedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {new Date(trip.startedAt).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
           <div className="text-slate-500">
-            {new Date(t.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {new Date(trip.startedAt).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       ),
     },
     {
-      header: 'Vehicle',
-      cell: (t) => (
+      header: t.adminPages.trips.colVehicle,
+      cell: (trip) => (
         <div className="text-xs">
-          <span className="font-mono font-semibold tabular-nums text-slate-900">{t.vehicle.plateNumber}</span>
-          <span className="block text-slate-500">{t.vehicle.brand} {t.vehicle.model}</span>
+          <span className="font-mono font-semibold tabular-nums text-slate-900">{trip.vehicle.plateNumber}</span>
+          <span className="block text-slate-500">{trip.vehicle.brand} {trip.vehicle.model}</span>
         </div>
       ),
     },
     {
-      header: 'Driver',
-      cell: (t) => (
+      header: t.adminPages.trips.colDriver,
+      cell: (trip) => (
         <div className="text-xs">
-          <span className="font-medium text-slate-900">{t.driver.user.name}</span>
-          <span className="block font-mono text-[11px] tabular-nums text-slate-500">{t.driver.user.phone}</span>
+          <span className="font-medium text-slate-900">{trip.driver.user.name}</span>
+          <span className="block font-mono text-[11px] tabular-nums text-slate-500">{trip.driver.user.phone}</span>
         </div>
       ),
     },
     {
-      header: 'Booking Ref',
-      cell: (t) =>
-        t.booking ? (
+      header: t.adminPages.trips.colBookingRef,
+      cell: (trip) =>
+        trip.booking ? (
           <div className="text-xs">
-            <span className="font-medium tabular-nums text-slate-900">{t.booking.bookingNumber}</span>
-            <span className="block max-w-[150px] truncate text-slate-500">{t.booking.purpose}</span>
+            <span className="font-medium tabular-nums text-slate-900">{trip.booking.bookingNumber}</span>
+            <span className="block max-w-[150px] truncate text-slate-500">{trip.booking.purpose}</span>
           </div>
         ) : (
-          <span className="text-xs italic text-slate-400">Ad-hoc dispatch</span>
+          <span className="text-xs italic text-slate-400">{t.adminPages.trips.adHocDispatch}</span>
         ),
     },
     {
-      header: 'Duration & Dist',
-      cell: (t) => {
-        let durationText = 'Active';
-        if (t.endedAt) {
-          const diffMs = new Date(t.endedAt).getTime() - new Date(t.startedAt).getTime();
+      header: t.adminPages.trips.colDurationDist,
+      cell: (trip) => {
+        let durationText = translateStatus(locale, 'ACTIVE');
+        if (trip.endedAt) {
+          const diffMs = new Date(trip.endedAt).getTime() - new Date(trip.startedAt).getTime();
           const mins = Math.round(diffMs / 60000);
-          durationText = `${mins} mins`;
+          durationText = `${mins} ${locale === 'id' ? 'menit' : 'mins'}`;
         }
         const distText =
-          t.distanceMeters !== null && t.distanceMeters !== undefined
-            ? `${(t.distanceMeters / 1000).toFixed(1)} km`
-            : '—';
+          trip.distanceMeters !== null && trip.distanceMeters !== undefined
+            ? `${(trip.distanceMeters / 1000).toFixed(1)} km`
+            : t.common.noDataDash;
 
         return (
           <div className="text-xs">
@@ -163,33 +167,33 @@ export default function AdminTripsPage() {
       },
     },
     {
-      header: 'Status',
-      cell: (t) => <StatusBadge status={t.status} />,
+      header: t.adminPages.trips.colStatus,
+      cell: (trip) => <StatusBadge status={trip.status} />,
     },
     {
-      header: 'Actions',
-      cell: (t) => (
+      header: t.adminPages.trips.colActions,
+      cell: (trip) => (
         <button
           type="button"
-          onClick={() => setSelectedTrip(t)}
+          onClick={() => setSelectedTrip(trip)}
           className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
         >
-          Details
+          {t.adminPages.trips.detailsBtn}
         </button>
       ),
     },
   ];
 
-  const activeCount = trips.filter((t) => t.status === 'ACTIVE').length;
-  const completedCount = trips.filter((t) => t.status === 'COMPLETED').length;
-  const totalDistanceKm = trips.reduce((sum, t) => sum + (t.distanceMeters ?? 0), 0) / 1000;
+  const activeCount = trips.filter((trip) => trip.status === 'ACTIVE').length;
+  const completedCount = trips.filter((trip) => trip.status === 'COMPLETED').length;
+  const totalDistanceKm = trips.reduce((sum, trip) => sum + (trip.distanceMeters ?? 0), 0) / 1000;
 
   return (
     <div className="space-y-6">
       <div className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Trip Audit &amp; Records</h1>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">Comprehensive history of all vehicle tracking sessions and routes</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t.adminPages.trips.heading}</h1>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{t.adminPages.trips.description}</p>
         </div>
         <button
           type="button"
@@ -197,26 +201,26 @@ export default function AdminTripsPage() {
           className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 self-start rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 sm:self-auto"
         >
           <Icon name="download" className="size-4" />
-          <span>Download Laporan Excel</span>
+          <span>{t.adminPages.trips.downloadExcelBtn}</span>
         </button>
       </div>
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Total Perjalanan</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.statTotal}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{totalRecords}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Berlangsung</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.statActive}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-brand-600">{activeCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Selesai</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.statCompleted}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-success-600">{completedCount}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Jarak Halaman Ini</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.statPageDistance}</p>
           <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">
             {totalDistanceKm.toFixed(1)} <span className="text-xs font-medium text-slate-500">km</span>
           </p>
@@ -228,16 +232,16 @@ export default function AdminTripsPage() {
       {/* Filter */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">Status</span>
+          <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.statusLabel}</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="min-h-9 cursor-pointer rounded-lg border border-slate-300 bg-white px-2.5 text-xs text-slate-800 transition-colors focus:border-brand-500 focus:outline-none focus:ring-3 focus:ring-brand-500/15"
           >
-            <option value="">All Statuses</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="ABORTED">ABORTED</option>
+            <option value="">{t.adminPages.trips.allStatusesOption}</option>
+            <option value="ACTIVE">{translateStatus(locale, 'ACTIVE')}</option>
+            <option value="COMPLETED">{translateStatus(locale, 'COMPLETED')}</option>
+            <option value="ABORTED">{translateStatus(locale, 'ABORTED')}</option>
           </select>
         </div>
       </div>
@@ -246,8 +250,8 @@ export default function AdminTripsPage() {
         columns={columns}
         data={trips}
         isLoading={isLoading}
-        emptyMessage="No trip records found"
-        onRowClick={(t) => setSelectedTrip(t)}
+        emptyMessage={t.adminPages.trips.emptyMessage}
+        onRowClick={(trip) => setSelectedTrip(trip)}
       />
 
       <Pagination
@@ -261,22 +265,22 @@ export default function AdminTripsPage() {
       <Drawer
         isOpen={Boolean(selectedTrip)}
         onClose={() => setSelectedTrip(null)}
-        title="Trip Record Details"
-        description={selectedTrip ? `Vehicle: ${selectedTrip.vehicle.plateNumber}` : ''}
+        title={t.adminPages.trips.drawerTitle}
+        description={selectedTrip ? format(t.adminPages.trips.drawerDesc, { plate: selectedTrip.vehicle.plateNumber }) : ''}
       >
         {selectedTrip && (
           <div className="space-y-4 text-xs">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <span className="font-medium uppercase tracking-wider text-slate-500">Status</span>
+              <span className="font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.statusLabel}</span>
               <StatusBadge status={selectedTrip.status} />
             </div>
 
             <div className="space-y-2 border-b border-slate-200 pb-3">
-              <span className="font-medium uppercase tracking-wider text-slate-500">Operator &amp; Vehicle</span>
+              <span className="font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.operatorVehicleLabel}</span>
               <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3">
                 <div className="font-semibold text-slate-900">{selectedTrip.driver.user.name}</div>
-                <div className="font-mono tabular-nums text-slate-600">License: {selectedTrip.driver.licenseNumber}</div>
-                <div className="font-mono tabular-nums text-slate-600">Phone: {selectedTrip.driver.user.phone}</div>
+                <div className="font-mono tabular-nums text-slate-600">{t.adminPages.trips.licensePrefix} {selectedTrip.driver.licenseNumber}</div>
+                <div className="font-mono tabular-nums text-slate-600">{t.adminPages.trips.phonePrefix} {selectedTrip.driver.user.phone}</div>
               </div>
               <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3">
                 <div className="font-mono font-semibold tabular-nums text-slate-900">{selectedTrip.vehicle.plateNumber}</div>
@@ -285,14 +289,14 @@ export default function AdminTripsPage() {
             </div>
 
             <div className="space-y-2 border-b border-slate-200 pb-3">
-              <span className="font-medium uppercase tracking-wider text-slate-500">GPS Telemetry Range</span>
+              <span className="font-medium uppercase tracking-wider text-slate-500">{t.adminPages.trips.telemetryRangeLabel}</span>
               <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-2.5 font-mono text-[11px] tabular-nums text-slate-700">
-                <div>Start Point: {selectedTrip.startLat.toFixed(5)}, {selectedTrip.startLng.toFixed(5)}</div>
+                <div>{t.adminPages.trips.startPointPrefix} {selectedTrip.startLat.toFixed(5)}, {selectedTrip.startLng.toFixed(5)}</div>
                 {selectedTrip.endLat !== null && selectedTrip.endLat !== undefined && (
-                  <div>End Point: {selectedTrip.endLat.toFixed(5)}, {selectedTrip.endLng?.toFixed(5)}</div>
+                  <div>{t.adminPages.trips.endPointPrefix} {selectedTrip.endLat.toFixed(5)}, {selectedTrip.endLng?.toFixed(5)}</div>
                 )}
                 {selectedTrip.distanceMeters !== null && selectedTrip.distanceMeters !== undefined && (
-                  <div>Distance: {(selectedTrip.distanceMeters / 1000).toFixed(2)} km</div>
+                  <div>{t.adminPages.trips.distancePrefix} {(selectedTrip.distanceMeters / 1000).toFixed(2)} km</div>
                 )}
               </div>
             </div>
@@ -300,7 +304,7 @@ export default function AdminTripsPage() {
             {selectedTrip.booking && (
               <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3">
                 <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-500">
-                  Associated Reservation
+                  {t.adminPages.trips.associatedBookingLabel}
                 </span>
                 <div className="font-semibold tabular-nums text-slate-900">{selectedTrip.booking.bookingNumber}</div>
                 <div className="text-slate-600">{selectedTrip.booking.purpose}</div>

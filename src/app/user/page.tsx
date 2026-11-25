@@ -10,6 +10,7 @@ import { IosInstallHint } from '@/components/providers/InstallPrompt';
 import { Icon as OverviewIcon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { selectNextDeparture } from '@/lib/booking-status';
+import { useTranslation } from '@/components/providers/LanguageProvider';
 import { MotionBentoCard } from '@/components/ui/MotionBentoCard';
 
 interface Booking {
@@ -47,6 +48,8 @@ export default function UserOverviewPage() {
   const { data: session, status } = useSession();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [availableCount, setAvailableCount] = useState<number>(0);
+  const { locale, t, format } = useTranslation();
+  const dateLocale = locale === 'id' ? 'id-ID' : 'en-US';
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -95,24 +98,24 @@ export default function UserOverviewPage() {
     <div className="min-w-0 space-y-6 pb-[max(1rem,env(safe-area-inset-bottom))] text-slate-900 sm:space-y-8">
       <IosInstallHint />
 
-      <GreetingClock userName={session?.user?.name} roleLabel="Passenger" />
+      <GreetingClock userName={session?.user?.name} roleLabel={t.userPages.home.roleLabel} />
 
       <header className="mb-7 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">KCIC Fleet / Passenger workspace</p>
-          <h1 className="page-heading mt-2">Let&rsquo;s get you moving.</h1>
+          <p className="eyebrow">{t.userPages.home.eyebrow}</p>
+          <h1 className="page-heading mt-2">{t.userPages.home.heading}</h1>
           <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-500">
-            Your journeys, without the back and forth.
+            {t.userPages.home.subheading}
           </p>
         </div>
         <div className="flex flex-col gap-2 min-[380px]:flex-row sm:shrink-0">
           <Link href="/user/vehicles" className={primaryAction}>
             <OverviewIcon name="plus" className="h-[18px] w-[18px]" />
-            Pesan kendaraan
+            {t.userPages.home.bookVehicleBtn}
           </Link>
           <Link href="/user/tracking" className={secondaryAction}>
             <OverviewIcon name="tracking" className="h-[18px] w-[18px]" />
-            Lacak langsung
+            {t.userPages.home.liveTrackingBtn}
           </Link>
         </div>
       </header>
@@ -124,13 +127,13 @@ export default function UserOverviewPage() {
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  In focus
+                  {t.userPages.home.inFocusEyebrow}
                 </p>
                 <h2
                   id="active-booking-heading"
                   className="mt-1.5 text-lg font-semibold tracking-tight text-slate-900"
                 >
-                  Booking aktif Anda
+                  {t.userPages.home.activeBookingTitle}
                 </h2>
               </div>
               <div className="flex size-10 items-center justify-center rounded-lg border border-brand-200 bg-brand-50 text-brand-600">
@@ -144,7 +147,7 @@ export default function UserOverviewPage() {
                 className="flex min-h-72 flex-1 flex-col items-center justify-center gap-3 text-sm font-medium text-slate-500"
               >
                 <Spinner size="md" />
-                Finding your latest journey...
+                {t.userPages.home.findingLatest}
               </div>
             ) : activeBooking ? (
               <div className="flex flex-1 flex-col p-5 sm:p-6">
@@ -167,7 +170,7 @@ export default function UserOverviewPage() {
                       className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-slate-300 dark:bg-slate-500 ring-2 ring-white dark:ring-[#1e293b]"
                     />
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                      Jemput
+                      {t.userPages.home.pickupLabel}
                     </p>
                     <p className="mt-1 wrap-anywhere text-sm font-medium leading-snug text-slate-600">
                       {activeBooking.pickupLocation}
@@ -179,7 +182,7 @@ export default function UserOverviewPage() {
                       className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-brand-600 ring-2 ring-white dark:ring-[#1e293b]"
                     />
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                      Tujuan
+                      {t.userPages.home.destinationLabel}
                     </p>
                     <p className="mt-1 wrap-anywhere text-lg font-semibold leading-snug tracking-tight text-slate-900 sm:text-xl">
                       {activeBooking.destination}
@@ -201,11 +204,11 @@ export default function UserOverviewPage() {
                         </p>
                       </>
                     ) : (
-                      <p className="text-sm font-medium text-slate-500">Vehicle assignment pending</p>
+                      <p className="text-sm font-medium text-slate-500">{t.userPages.home.vehiclePending}</p>
                     )}
                     {activeBooking.driver && (
                       <p className="mt-1 wrap-anywhere text-xs font-medium text-slate-600">
-                        Driver &middot; {activeBooking.driver.user.name}
+                        {format(t.userPages.home.driverPrefix, { name: activeBooking.driver.user.name })}
                       </p>
                     )}
                   </div>
@@ -214,9 +217,9 @@ export default function UserOverviewPage() {
                 <div className="mt-3 flex items-start gap-2 text-xs font-medium text-slate-500">
                   <OverviewIcon name="calendar" className="size-4 shrink-0 text-slate-400" />
                   <span>
-                    Departure &middot;{' '}
+                    {t.userPages.home.departurePrefix}
                     <time dateTime={activeBooking.departureAt} className="tabular-nums">
-                      {new Date(activeBooking.departureAt).toLocaleDateString([], {
+                      {new Date(activeBooking.departureAt).toLocaleDateString(dateLocale, {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
@@ -228,7 +231,7 @@ export default function UserOverviewPage() {
 
                 <div className="mt-auto flex flex-col gap-2 pt-6 min-[380px]:flex-row">
                   <Link href="/user/bookings" className={`${secondaryAction} flex-1`}>
-                    Lihat booking
+                    {t.userPages.home.viewBookingBtn}
                     <OverviewIcon name="arrow" className="h-4 w-4" />
                   </Link>
                   {activeBooking.vehicle &&
@@ -238,7 +241,7 @@ export default function UserOverviewPage() {
                         className={`${primaryAction} flex-1`}
                       >
                         <OverviewIcon name="tracking" className="h-4 w-4" />
-                        Lacak kendaraan
+                        {t.userPages.home.trackVehicleBtn}
                       </Link>
                     )}
                 </div>
@@ -249,13 +252,13 @@ export default function UserOverviewPage() {
                   <OverviewIcon name="route" className="size-6" />
                 </div>
                 <h3 className="text-xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-2xl">
-                  A clear road ahead.
+                  {t.userPages.home.clearRoadTitle}
                 </h3>
                 <p className="mt-2 max-w-sm text-sm font-medium leading-relaxed text-slate-500">
-                  Tidak ada booking aktif saat ini. Temukan kendaraan untuk perjalanan kerja Anda berikutnya.
+                  {t.userPages.home.clearRoadDesc}
                 </p>
                 <Link href="/user/vehicles" className={`${primaryAction} mt-6`}>
-                  Pesan kendaraan
+                  {t.userPages.home.bookVehicleBtn}
                   <OverviewIcon name="arrow" className="h-4 w-4" />
                 </Link>
               </div>
@@ -272,7 +275,7 @@ export default function UserOverviewPage() {
                   id="next-departure-heading"
                   className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400"
                 >
-                  Next departure
+                  {t.userPages.home.nextDepartureTitle}
                 </h2>
                 <OverviewIcon name="calendar" className="size-4 text-slate-400" />
               </div>
@@ -282,7 +285,7 @@ export default function UserOverviewPage() {
                   className="flex min-h-28 items-center gap-2.5 px-4 text-sm font-medium text-slate-500"
                 >
                   <Spinner size="sm" />
-                  Checking your schedule...
+                  {t.userPages.home.checkingSchedule}
                 </div>
               ) : upcomingBooking ? (
                 <div className="px-4 py-4">
@@ -291,13 +294,13 @@ export default function UserOverviewPage() {
                     className="flex flex-wrap items-baseline gap-x-3 gap-y-1"
                   >
                     <span className="text-2xl font-semibold tracking-tight text-slate-900 tabular-nums">
-                      {new Date(upcomingBooking.departureAt).toLocaleDateString([], {
+                      {new Date(upcomingBooking.departureAt).toLocaleDateString(dateLocale, {
                         month: 'short',
                         day: 'numeric',
                       })}
                     </span>
                     <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 tabular-nums">
-                      {new Date(upcomingBooking.departureAt).toLocaleTimeString([], {
+                      {new Date(upcomingBooking.departureAt).toLocaleTimeString(dateLocale, {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
@@ -311,10 +314,10 @@ export default function UserOverviewPage() {
               ) : (
                 <div className="px-4 py-4">
                   <p className="text-base font-semibold tracking-tight text-slate-900">
-                    No upcoming trips scheduled.
+                    {t.userPages.home.noUpcomingTitle}
                   </p>
                   <p className="mt-1.5 text-xs font-medium leading-relaxed text-slate-500">
-                    Departure berikutnya akan muncul di sini setelah Anda memesan.
+                    {t.userPages.home.noUpcomingDesc}
                   </p>
                 </div>
               )}
@@ -332,14 +335,14 @@ export default function UserOverviewPage() {
                   id="fleet-heading"
                   className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400"
                 >
-                  Available fleet
+                  {t.userPages.home.availableFleetTitle}
                 </h2>
                 <OverviewIcon name="car" className="size-4 text-slate-400" />
               </div>
               <div className="mt-2.5 font-mono text-3xl font-semibold leading-none tracking-tight text-slate-900 tabular-nums">
                 {isLoading ? <Spinner size="sm" /> : availableCount}
               </div>
-              <p className="mt-2 text-[11px] font-medium text-slate-500">Vehicles ready for assignment</p>
+              <p className="mt-2 text-[11px] font-medium text-slate-500">{t.userPages.home.availableFleetDesc}</p>
               </MotionBentoCard>
             </section>
             <section aria-labelledby="recent-count-heading" className="min-w-0">
@@ -352,14 +355,14 @@ export default function UserOverviewPage() {
                   id="recent-count-heading"
                   className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400"
                 >
-                  Recent bookings
+                  {t.userPages.home.recentBookingsHeading}
                 </h2>
                 <OverviewIcon name="bookings" className="size-4 text-slate-400" />
               </div>
               <div className="mt-2.5 font-mono text-3xl font-semibold leading-none tracking-tight text-slate-900 tabular-nums">
                 {isLoading ? <Spinner size="sm" /> : bookings.length}
               </div>
-              <p className="mt-2 text-[11px] font-medium text-slate-500">In your latest activity</p>
+              <p className="mt-2 text-[11px] font-medium text-slate-500">{t.userPages.home.recentBookingsCardDesc}</p>
               </MotionBentoCard>
             </section>
           </div>
@@ -372,20 +375,20 @@ export default function UserOverviewPage() {
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-100 px-5 py-4 sm:px-6">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Your journey log
+                {t.userPages.home.yourJourneyLogEyebrow}
               </p>
               <h2
                 id="recent-bookings-heading"
                 className="mt-1.5 text-lg font-semibold tracking-tight text-slate-900"
               >
-                Recent bookings
+                {t.userPages.home.recentBookingsHeading}
               </h2>
             </div>
             <Link
               href="/user/bookings"
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
             >
-              Lihat semua
+              {t.userPages.home.viewAllBtn}
               <OverviewIcon name="arrow" className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -396,7 +399,7 @@ export default function UserOverviewPage() {
               className="flex flex-col items-center justify-center gap-3 py-14 text-sm font-medium text-slate-500"
             >
               <Spinner size="md" />
-              Loading your recent bookings...
+              {t.userPages.home.loadingRecent}
             </div>
           ) : bookings.length === 0 ? (
             <div className="flex flex-col items-center px-6 py-12 text-center sm:py-16">
@@ -404,13 +407,13 @@ export default function UserOverviewPage() {
                 <OverviewIcon name="bookings" className="size-6" />
               </div>
               <h3 className="text-base font-semibold tracking-tight text-slate-900">
-                Your first journey starts here.
+                {t.userPages.home.emptyTitle}
               </h3>
               <p className="mt-2 max-w-sm text-sm font-medium leading-relaxed text-slate-500">
-                Anda belum pernah meminta booking kendaraan. Telusuri armada untuk perjalanan berikutnya.
+                {t.userPages.home.emptyDesc}
               </p>
               <Link href="/user/vehicles" className={`${secondaryAction} mt-6`}>
-                Browse vehicles
+                {t.userPages.home.browseVehiclesBtn}
                 <OverviewIcon name="arrow" className="h-4 w-4" />
               </Link>
             </div>
@@ -445,7 +448,7 @@ export default function UserOverviewPage() {
                         <span>
                           Depart{' '}
                           <time dateTime={booking.departureAt} className="tabular-nums">
-                            {new Date(booking.departureAt).toLocaleDateString([], {
+                            {new Date(booking.departureAt).toLocaleDateString(dateLocale, {
                               month: 'short',
                               day: 'numeric',
                               hour: '2-digit',
@@ -468,14 +471,14 @@ export default function UserOverviewPage() {
                           className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                         >
                           <OverviewIcon name="tracking" className="h-3.5 w-3.5" />
-                          Lacak
+                          {t.userPages.home.trackBtn}
                         </Link>
                       )}
                     <Link
                       href="/user/bookings"
                       className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
                     >
-                      Detail
+                      {t.userPages.home.detailsBtn}
                       <OverviewIcon name="arrow" className="h-3.5 w-3.5" />
                     </Link>
                   </div>

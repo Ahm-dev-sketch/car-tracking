@@ -10,6 +10,7 @@ import { Icon } from '@/components/ui/Icon';
 import { GreetingClock } from '@/components/ui/GreetingClock';
 import { resetInstallDismissal } from '@/components/providers/InstallPrompt';
 import { onExplicitLogout } from '@/lib/auth-lifecycle';
+import { applyPendingOfflineBadgeDeduction } from '@/lib/user-booking-badge';
 import { getNavigation, isNavigationActive } from './navigation';
 
 interface NotificationItem {
@@ -83,41 +84,83 @@ export function NavBar() {
     return () => { cancelled = true; clearTimeout(initialTimer); clearInterval(interval); };
   }, [session?.user]);
 
+  const isActionBadgeTarget = (href: string) =>
+    (role === 'ADMIN' && href === '/admin/bookings') ||
+    (role === 'USER' && href === '/user/bookings');
+  const badgeText = pendingActionCount > 99 ? '99+' : pendingActionCount;
+  const badgeAriaLabel =
+    role === 'ADMIN'
+      ? `${pendingActionCount} pesanan butuh aksi`
+      : `${pendingActionCount} booking aktif atau ditolak`;
+
   useEffect(() => {
-    if (!session?.user || role !== 'ADMIN') {
+    const endpoint =
+      role === 'ADMIN'
+        ? '/api/admin/bookings/action-required'
+        : role === 'USER'
+        ? '/api/user/bookings/action-required'
+        : null;
+
+    if (!session?.user || !endpoint) {
+      setPendingActionCount(0);
       return;
     }
+
     let cancelled = false;
     const loadPendingCount = async () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
-        const response = await fetch('/api/admin/bookings/action-required');
+        const response = await fetch(endpoint);
         if (response.ok) {
           const json = await response.json();
           if (!cancelled && typeof json.data?.count === 'number' && !json.warning) {
-            setPendingActionCount(json.data.count);
+            const count =
+              role === 'USER'
+                ? applyPendingOfflineBadgeDeduction(json.data.count, session.user.id)
+                : json.data.count;
+            setPendingActionCount(count);
           }
         }
       } catch {
         // Keep previous count on connection interruption.
       }
     };
+
     const initialTimer = setTimeout(() => {
       void loadPendingCount();
     }, 600);
     const interval = setInterval(() => {
       void loadPendingCount();
     }, 25000);
-    const onBookingChanged = () => { void loadPendingCount(); };
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void loadPendingCount();
+      }
+    };
+    const onBookingChanged = (event: Event) => {
+      const detail = event instanceof CustomEvent ? (event.detail as { count?: unknown } | null) : null;
+      if (detail && typeof detail.count === 'number') {
+        const count =
+          role === 'USER'
+            ? applyPendingOfflineBadgeDeduction(detail.count, session.user.id)
+            : detail.count;
+        setPendingActionCount(count);
+        return;
+      }
+      void loadPendingCount();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('bookings:changed', onBookingChanged);
 
     return () => {
       cancelled = true;
       clearTimeout(initialTimer);
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('bookings:changed', onBookingChanged);
     };
-  }, [session?.user, role]);
+  }, [session?.user, session?.user?.id, role]);
 
   const markNotificationRead = async (id: string) => {
     try {
@@ -140,7 +183,7 @@ export function NavBar() {
           </Link>
           <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Main navigation">
             {links.map((link) => {
-              const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
+              const showBadge = isActionBadgeTarget(link.href) && pendingActionCount > 0;
               return (
                 <Link
                   key={link.href}
@@ -151,10 +194,10 @@ export function NavBar() {
                   <span>{link.label}</span>
                   {showBadge && (
                     <span
-                      aria-label={`${pendingActionCount} pesanan butuh aksi`}
+                      aria-label={badgeAriaLabel}
                       className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-semibold tabular-nums leading-none text-white"
                     >
-                      {pendingActionCount > 99 ? '99+' : pendingActionCount}
+                      {badgeText}
                     </span>
                   )}
                 </Link>
@@ -182,7 +225,7 @@ export function NavBar() {
       <nav className="mobile-dock" aria-label="Mobile navigation">
         {dockLinks.map((link) => {
           const isActive = isNavigationActive(pathname, link.href);
-          const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
+          const showBadge = isActionBadgeTarget(link.href) && pendingActionCount > 0;
           return (
             <Link
               key={link.href}
@@ -195,10 +238,10 @@ export function NavBar() {
                 <Icon name={link.icon} className="size-5" />
                 {showBadge && (
                   <span
-                    aria-label={`${pendingActionCount} pesanan butuh aksi`}
+                    aria-label={badgeAriaLabel}
                     className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-500 px-1 text-[9px] font-semibold tabular-nums leading-none text-white ring-2 ring-white dark:ring-[#111827]"
                   >
-                    {pendingActionCount > 99 ? '99+' : pendingActionCount}
+                    {badgeText}
                   </span>
                 )}
               </span>
@@ -232,7 +275,7 @@ export function NavBar() {
         </div>
         <nav aria-label="Workspace navigation" className="space-y-0.5">
           {links.map((link) => {
-            const showBadge = role === 'ADMIN' && link.href === '/admin/bookings' && pendingActionCount > 0;
+            const showBadge = isActionBadgeTarget(link.href) && pendingActionCount > 0;
             const active = isNavigationActive(pathname, link.href);
             return (
               <Link
@@ -249,10 +292,10 @@ export function NavBar() {
                 <span className="flex-1">{link.label}</span>
                 {showBadge && (
                   <span
-                    aria-label={`${pendingActionCount} pesanan butuh aksi`}
+                    aria-label={badgeAriaLabel}
                     className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-500 px-1.5 text-xs font-semibold tabular-nums text-white"
                   >
-                    {pendingActionCount > 99 ? '99+' : pendingActionCount}
+                    {badgeText}
                   </span>
                 )}
                 <Icon name="chevronRight" className="size-4 text-slate-300 dark:text-slate-400" />

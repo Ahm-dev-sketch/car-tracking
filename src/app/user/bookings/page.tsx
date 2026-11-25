@@ -16,6 +16,13 @@ import { Icon } from '@/components/ui/Icon';
 import { BookingModal, LocationOption } from '@/components/booking/BookingModal';
 import { DispatchProgress, formatEta } from '@/components/booking/DispatchProgress';
 import { saveSnapshot, getSnapshot, getOfflineQueue, processOfflineQueue } from '@/lib/offline-sync';
+import {
+  clearPendingRejectedAcks,
+  enqueuePendingRejectedAck,
+  getPendingRejectedAcks,
+  getSeenRejectedIds,
+  markRejectedSeenLocally,
+} from '@/lib/user-booking-badge';
 
 interface Booking {
   id: string;
@@ -32,6 +39,7 @@ interface Booking {
   notaDinasUrl?: string | null;
   notaDinasFilename?: string | null;
   rejectedReason?: string | null;
+  rejectionSeenAt?: string | null;
   createdAt: string;
   etaSeconds?: number | null;
   etaEstimated?: boolean;
@@ -65,7 +73,7 @@ interface Booking {
 function UserBookingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
@@ -210,7 +218,13 @@ function UserBookingsContent() {
       const res = await fetch(`/api/bookings?${params.toString()}`);
       if (res.ok) {
         const json = await res.json();
-        const list: Booking[] = json.data || [];
+        const rawList: Booking[] = json.data || [];
+        const localSeenSet = new Set(session?.user?.id ? getSeenRejectedIds(session.user.id) : []);
+        const list = rawList.map((b) =>
+          b.status === 'REJECTED' && !b.rejectionSeenAt && localSeenSet.has(b.id)
+            ? { ...b, rejectionSeenAt: new Date().toISOString() }
+            : b
+        );
         saveSnapshot('user_bookings', list);
         setBookings(mergePendingOffline(list));
         setTotalRecords(json.pagination?.total ?? list.length);
@@ -227,6 +241,53 @@ function UserBookingsContent() {
     }
   };
 
+  const acknowledgeRejectedBooking = async (booking: Booking) => {
+    if (booking.status !== 'REJECTED' || booking.rejectionSeenAt) return;
+    const userId = session?.user?.id;
+    const seenTimestamp = new Date().toISOString();
+
+    if (userId) {
+      markRejectedSeenLocally(userId, booking.id);
+    }
+    setBookings((prev) =>
+      prev.map((b) => (b.id === booking.id ? { ...b, rejectionSeenAt: seenTimestamp } : b))
+    );
+    setSelectedBooking((prev) =>
+      prev && prev.id === booking.id ? { ...prev, rejectionSeenAt: seenTimestamp } : prev
+    );
+
+    try {
+      const res = await fetch('/api/user/bookings/action-required', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: booking.id }),
+      });
+      if (res.ok) {
+        if (userId) clearPendingRejectedAcks(userId, [booking.id]);
+        const json = await res.json().catch(() => null);
+        const nextCount = typeof json?.data?.count === 'number' ? json.data.count : undefined;
+        window.dispatchEvent(
+          nextCount !== undefined
+            ? new CustomEvent('bookings:changed', { detail: { count: nextCount } })
+            : new Event('bookings:changed')
+        );
+        return;
+      }
+    } catch {
+      // Offline / network failure falls back to pending local sync
+    }
+
+    if (userId) {
+      enqueuePendingRejectedAck(userId, booking.id);
+    }
+    window.dispatchEvent(new Event('bookings:changed'));
+  };
+
+  const handleOpenBookingDetails = (booking: Booking) => {
+    setSelectedBooking(booking);
+    void acknowledgeRejectedBooking(booking);
+  };
+
   useEffect(() => {
     fetchBookings(1);
     syncUrlParams({
@@ -239,9 +300,30 @@ function UserBookingsContent() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleSync = () => {
+    const handleSync = async () => {
+      const userId = session?.user?.id;
+      if (userId) {
+        const pendingAckIds = getPendingRejectedAcks(userId);
+        if (pendingAckIds.length > 0) {
+          try {
+            const ackRes = await fetch('/api/user/bookings/action-required', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bookingIds: pendingAckIds }),
+            });
+            if (ackRes.ok) {
+              clearPendingRejectedAcks(userId, pendingAckIds);
+            }
+          } catch {
+            // Keep pending acks for next online retry
+          }
+        }
+      }
       processOfflineQueue()
-        .then(() => fetchBookings(1))
+        .then(() => {
+          void fetchBookings(1);
+          window.dispatchEvent(new Event('bookings:changed'));
+        })
         .catch(() => {
           // non-fatal: retry on next online/sync event
         });
@@ -254,7 +336,7 @@ function UserBookingsContent() {
       window.removeEventListener('online', handleSync);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [session?.user?.id]);
 
   const handleCancelConfirm = async () => {
     if (!cancellingBooking) return;
@@ -280,6 +362,7 @@ function UserBookingsContent() {
         setCancellingBooking(null);
         setCancelReason('');
         fetchBookings(page);
+        window.dispatchEvent(new Event('bookings:changed'));
       } else {
         const err = await res.json();
         setApiError(err.error?.message || 'Failed to cancel booking');
@@ -339,6 +422,7 @@ function UserBookingsContent() {
       } else {
         fetchBookings(page);
       }
+      window.dispatchEvent(new Event('bookings:changed'));
       setUploadBooking(null);
       setUploadFile(null);
     } catch (err: any) {
@@ -478,7 +562,7 @@ function UserBookingsContent() {
             )}
             <button
               type="button"
-              onClick={() => setSelectedBooking(b)}
+              onClick={() => handleOpenBookingDetails(b)}
               className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               Details
@@ -597,6 +681,7 @@ function UserBookingsContent() {
               <option value="COMPLETED">Completed</option>
               <option value="NO_DRIVER_AVAILABLE">No Driver Available</option>
               <option value="ADMIN_INTERVENTION">Admin Intervention</option>
+              <option value="REJECTED">Rejected</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
           </div>
@@ -608,7 +693,7 @@ function UserBookingsContent() {
         columns={columns}
         data={bookings}
         isLoading={isLoading}
-        onRowClick={(b) => setSelectedBooking(b)}
+        onRowClick={(b) => handleOpenBookingDetails(b)}
         emptyMessage="No reservations found"
       />
 
@@ -705,6 +790,19 @@ function UserBookingsContent() {
               hasNotaDinas={Boolean(selectedBooking.notaDinasUrl)}
             />
 
+            {selectedBooking.status === 'REJECTED' && (
+              <div className="space-y-1 rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs">
+                <div className="flex items-center gap-1.5 font-semibold text-danger-700">
+                  <Icon name="close" className="size-3.5 text-danger-600" />
+                  <span>Reservasi Ditolak Admin</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-danger-700">
+                  <span className="font-semibold">Alasan:</span>{' '}
+                  {selectedBooking.rejectedReason || 'Tidak ada catatan alasan penolakan.'}
+                </p>
+              </div>
+            )}
+
             {/* Service Type & Operational Hub */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
               <div>
@@ -740,7 +838,7 @@ function UserBookingsContent() {
                 </span>
                 <span
                   className={`rounded border px-2 py-0.5 text-[10px] font-medium ${
-                    selectedBooking.rejectedReason
+                    selectedBooking.status !== 'REJECTED' && selectedBooking.rejectedReason
                       ? 'border-danger-200 bg-danger-50 text-danger-700'
                       : selectedBooking.notaDinasUrl
                       ? selectedBooking.status === 'PENDING_COMPLETION'
@@ -749,7 +847,7 @@ function UserBookingsContent() {
                       : 'border-warning-200 bg-warning-50 text-warning-700'
                   }`}
                 >
-                  {selectedBooking.rejectedReason
+                  {selectedBooking.status !== 'REJECTED' && selectedBooking.rejectedReason
                     ? 'Ditolak (Perlu Revisi)'
                     : selectedBooking.notaDinasUrl
                     ? selectedBooking.status === 'PENDING_COMPLETION'
@@ -759,7 +857,7 @@ function UserBookingsContent() {
                 </span>
               </div>
 
-              {selectedBooking.rejectedReason && (
+              {selectedBooking.status !== 'REJECTED' && selectedBooking.rejectedReason && (
                 <div className="space-y-1 rounded-lg border border-danger-200 bg-danger-50 p-2.5 text-xs">
                   <div className="flex items-center gap-1.5 font-semibold text-danger-700">
                     <Icon name="close" className="size-3.5 text-danger-600" />

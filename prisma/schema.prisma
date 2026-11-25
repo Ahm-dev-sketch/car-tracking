@@ -266,6 +266,7 @@ model Booking {
   status                BookingStatus @default(PENDING)
   cancelledReason       String?       @map("cancelled_reason")
   rejectedReason        String?       @map("rejected_reason")
+  rejectionSeenAt       DateTime?     @map("rejection_seen_at")
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
 
@@ -274,6 +275,7 @@ model Booking {
 
   @@index([status, departureAt])
   @@index([userId])
+  @@index([userId, status, rejectionSeenAt], map: "bookings_user_id_status_rejection_seen_at_idx")
   @@index([vehicleId, departureAt, expectedReturnAt])
   @@index([operationalLocationId])
   @@index([driverId])

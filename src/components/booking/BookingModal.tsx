@@ -527,6 +527,9 @@ export function BookingModal({
 
       const bookingData = json.data || json;
       onSuccess?.(bookingData);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('bookings:changed'));
+      }
       setDestinationCoords(null);
       setDestinationLinkError(null);
 

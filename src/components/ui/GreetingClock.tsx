@@ -54,7 +54,7 @@ export function GreetingClock({
   if (!now) {
     if (variant === 'navbar') {
       return (
-        <div className={`hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-400 ${className}`}>
+        <div className={`hidden xl:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-400 ${className}`}>
           <Icon name="clock" className="size-3.5" />
           <span className="tabular-nums">Memuat waktu...</span>
         </div>
@@ -79,7 +79,7 @@ export function GreetingClock({
   if (variant === 'navbar') {
     return (
       <div
-        className={`hidden lg:inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 ${className}`}
+        className={`hidden xl:inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 ${className}`}
         title={`${dateFormatted} - ${timeFormatted}`}
       >
         <span className={`inline-flex size-5 items-center justify-center rounded-md ${greetingBg}`}>

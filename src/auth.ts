@@ -23,9 +23,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         let email = String(credentials.email).toLowerCase().trim();
         const password = String(credentials.password);
+        const isProduction = process.env.NODE_ENV === 'production';
 
         // Friendly shortcut aliases for local development & testing
-        if (!email.includes('@')) {
+        if (!isProduction && !email.includes('@')) {
           if (email === 'admin') email = 'admin@demo.test';
           else if (email === 'user') email = 'user@demo.test';
           else if (email === 'driver' || email === 'driver1') email = 'driver1@demo.test';
@@ -42,7 +43,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         // Demo account auto-provisioning & resilient fallback for review/testing accounts
-        if (!user && (email.endsWith('@demo.test') || email.endsWith('@test.com'))) {
+        if (!isProduction && !user && (email.endsWith('@demo.test') || email.endsWith('@test.com'))) {
           const isDemoPassword =
             password.toLowerCase() === 'demo1234' ||
             password === 'password123' ||
@@ -116,7 +117,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         let isValid = await bcrypt.compare(password, user.passwordHash);
         
         // Tolerant matching for demo/test accounts (case-insensitive Demo1234 / password123)
-        if (!isValid && (user.email.endsWith('@demo.test') || user.email.endsWith('@test.com'))) {
+        if (!isProduction && !isValid && (user.email.endsWith('@demo.test') || user.email.endsWith('@test.com'))) {
           if (
             password.toLowerCase() === 'demo1234' ||
             password === 'password123' ||

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   queryRawUnsafe: vi.fn(),
   tripFindFirst: vi.fn(),
   tripFindUnique: vi.fn(),
+  bookingFindUnique: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -16,6 +17,9 @@ vi.mock('@/lib/prisma', () => ({
     trip: {
       findFirst: mocks.tripFindFirst,
       findUnique: mocks.tripFindUnique,
+    },
+    booking: {
+      findUnique: mocks.bookingFindUnique,
     },
   },
 }));
@@ -66,6 +70,7 @@ it('rejects POST /api/call/log with invalid status', async () => {
 
 it('logs MISSED call and creates system chat message successfully', async () => {
   mocks.user.mockResolvedValue({ id: 'user-1', name: 'John Doe', role: 'USER' });
+  mocks.bookingFindUnique.mockResolvedValue({ userId: 'user-1', driver: { userId: 'driver-1' } });
   mocks.executeRawUnsafe.mockResolvedValue(1);
   mocks.queryRawUnsafe.mockResolvedValue([
     {
@@ -122,6 +127,7 @@ it('logs MISSED call and creates system chat message successfully', async () => 
 
 it('logs COMPLETED call and formats duration in system message', async () => {
   mocks.user.mockResolvedValue({ id: 'driver-1', name: 'Driver KCIC', role: 'DRIVER' });
+  mocks.bookingFindUnique.mockResolvedValue({ userId: 'user-1', driver: { userId: 'driver-1' } });
   mocks.executeRawUnsafe.mockResolvedValue(1);
   mocks.queryRawUnsafe.mockResolvedValue([
     {
@@ -156,5 +162,24 @@ it('logs COMPLETED call and formats duration in system message', async () => {
   expect(json.success).toBe(true);
   expect(json.data.status).toBe('COMPLETED');
   expect(json.data.message).toBe('Panggilan Suara Berakhir (02:45)');
+});
+
+it('rejects a non-participant USER with 403', async () => {
+  mocks.user.mockResolvedValue({ id: 'stranger', name: 'Stranger', role: 'USER' });
+  mocks.bookingFindUnique.mockResolvedValue({ userId: 'user-1', driver: { userId: 'driver-1' } });
+  mocks.executeRawUnsafe.mockResolvedValue(1);
+
+  const req = new NextRequest('https://example.test/api/call/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bookingId: 'b-101',
+      status: 'MISSED',
+    }),
+  });
+
+  const res = await POST(req, undefined);
+  expect(res.status).toBe(403);
+  expect(mocks.executeRawUnsafe).not.toHaveBeenCalled();
 });
 

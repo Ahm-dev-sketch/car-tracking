@@ -241,7 +241,7 @@ export function NavBar() {
                 onClick={() => setMenuOpen(false)}
                 aria-current={active ? 'page' : undefined}
                 className={`relative flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors ${
-                  active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-100'
+                  active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-[#1e293b]'
                 }`}
               >
                 {active && <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand-500" aria-hidden="true" />}

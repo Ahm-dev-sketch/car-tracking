@@ -56,26 +56,30 @@ interface FleetMapProps {
 const MAP_CHROME_ID = 'kcic-flat-leaflet-chrome';
 const MAP_CHROME_CSS = `
 .leaflet-container { font-family: var(--font-geist-sans), system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+/* Surfaces/text read from the inverted theme tokens so this chrome follows .dark.
+   --color-white is #0f172a under .dark, --color-slate-200 -> #1e293b, etc. */
 .leaflet-popup-content-wrapper {
-  border: 1px solid #e2e8f0; border-radius: 0.75rem; background: #fff;
+  border: 1px solid var(--color-slate-200); border-radius: 0.75rem; background: var(--color-white);
   box-shadow: 0 8px 28px rgba(15,23,42,0.14); padding: 0;
 }
 .leaflet-popup-content { margin: 0.75rem; line-height: 1.45; }
-.leaflet-popup-tip { border: 1px solid #e2e8f0; box-shadow: none; background: #fff; }
+.leaflet-popup-tip { border: 1px solid var(--color-slate-200); box-shadow: none; background: var(--color-white); }
 .leaflet-popup-close-button {
   top: 0.5rem !important; right: 0.5rem !important; width: 1.5rem !important; height: 1.5rem !important;
-  border-radius: 0.375rem; color: #94a3b8 !important; font-size: 1rem !important; line-height: 1.5rem !important;
+  border-radius: 0.375rem; color: var(--color-slate-500) !important; font-size: 1rem !important; line-height: 1.5rem !important;
 }
-.leaflet-popup-close-button:hover { background: #f1f5f9; color: #0f172a !important; }
+.leaflet-popup-close-button:hover { background: var(--color-slate-100); color: var(--color-slate-900) !important; }
 .leaflet-tooltip {
-  border: 1px solid #e2e8f0; border-radius: 0.5rem; background: #fff; color: #334155;
+  border: 1px solid var(--color-slate-200); border-radius: 0.5rem; background: var(--color-white); color: var(--color-slate-700);
   box-shadow: 0 2px 8px rgba(15,23,42,0.08); padding: 0.25rem 0.5rem;
 }
 .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before,
 .leaflet-tooltip-left:before, .leaflet-tooltip-right:before { display: none; }
-.leaflet-bar, .leaflet-bar a { border-color: #e2e8f0; }
-.leaflet-control-attribution { background: rgba(255,255,255,0.82); border-radius: 0.375rem 0 0 0; color: #94a3b8; }
-.leaflet-control-attribution a { color: #64748b; }
+.leaflet-bar, .leaflet-bar a { border-color: var(--color-slate-200); }
+.leaflet-control-attribution { background: rgba(255,255,255,0.82); border-radius: 0.375rem 0 0 0; color: var(--color-slate-500); }
+.leaflet-control-attribution a { color: var(--color-slate-600); }
+.dark .leaflet-control-attribution { background: rgba(15,23,42,0.82); }
+.dark .leaflet-popup-content-wrapper, .dark .leaflet-popup-tip { box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
 /* Leaflet builds divIcon HTML outside React, so the marker pulse is defined here
    instead of relying on a Tailwind class that may not be emitted for this tree.
    Values mirror condition.ts pulseColor: bg-orange-400 / bg-slate-400 / bg-amber-400 */
@@ -154,9 +158,10 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
     : '';
 
   // Flat 2.0 chrome only: 1px ring, soft shadow. The fill colour stays owned by condition.ts.
+  // The halo sits on the (dark-inverted) tile layer, so it must stay light in both themes.
   const ring = isSelected
-    ? 'ring-2 ring-slate-900 scale-110'
-    : 'ring-1 ring-white';
+    ? 'ring-2 ring-[#f8fafc] scale-110'
+    : 'ring-1 ring-[#f8fafc]';
   const shadow = isSelected
     ? 'shadow-[0_4px_12px_rgba(15,23,42,0.35)]'
     : 'shadow-[0_1px_3px_rgba(15,23,42,0.3)]';
@@ -168,7 +173,7 @@ function createVehicleIcon(status: string, movement: string, isSelected: boolean
   return L.divIcon({
     className: 'vehicle-div-icon',
     html: `
-      <div class="relative flex items-center justify-center w-8 h-8 rounded-full text-white cursor-pointer transition-transform ${ring} ${shadow}" style="background-color: ${visual.color};">
+      <div class="relative flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-transform ${ring} ${shadow}" style="background-color: ${visual.color}; color: #fff;">
         ${pulseHtml}
         <svg class="w-4 h-4 relative z-10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
           ${visual.iconSvg}
@@ -187,13 +192,13 @@ function createPointIcon(type: 'pickup' | 'destination', label: string) {
   // Pickup = slate structure, destination = KCIC crimson
   const bg = isPickup ? '#0f172a' : '#c8102e';
   const dot = isPickup
-    ? '<span class="inline-block h-1.5 w-1.5 rounded-full bg-white/90"></span>'
-    : '<span class="inline-block h-1.5 w-1.5 rotate-45 bg-white/90"></span>';
+    ? '<span class="inline-block h-1.5 w-1.5 rounded-full" style="background-color: rgba(255,255,255,0.9);"></span>'
+    : '<span class="inline-block h-1.5 w-1.5 rotate-45" style="background-color: rgba(255,255,255,0.9);"></span>';
   return L.divIcon({
     className: 'route-point-div-icon',
     html: `
       <div class="relative flex items-center justify-center -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-        <div class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-white ring-1 ring-white shadow-[0_2px_6px_rgba(15,23,42,0.28)]" style="background-color: ${bg};">
+        <div class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium shadow-[0_2px_6px_rgba(15,23,42,0.28)]" style="background-color: ${bg}; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.55), 0 2px 6px rgba(15,23,42,0.28);">
           ${dot}
           <span class="max-w-[120px] truncate">${label}</span>
         </div>
@@ -350,8 +355,8 @@ export default function FleetMap({
                       <div className="flex items-center justify-between gap-2 pt-1">
                         <span className="font-medium text-slate-500">Condition:</span>
                         <span
-                          className="rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white"
-                          style={{ backgroundColor: visual.color, borderColor: visual.color }}
+                          className="rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide"
+                          style={{ backgroundColor: visual.color, borderColor: visual.color, color: '#fff' }}
                         >
                           {visual.badgeText}
                         </span>

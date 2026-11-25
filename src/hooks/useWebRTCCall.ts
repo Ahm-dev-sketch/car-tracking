@@ -49,7 +49,7 @@ const getIceServers = (): RTCIceServer[] => {
         credential: turnCredential,
       });
     }
-  } else {
+  } else if (process.env.NODE_ENV !== 'production') {
     // Fallback OpenRelay jika diuji di local tanpa .env TURN
     servers.push(
       {

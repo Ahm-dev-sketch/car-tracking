@@ -141,7 +141,7 @@ function TripRoute({ pickup, destination }: { pickup: string; destination: strin
       <div className="relative min-w-0">
         <span
           aria-hidden="true"
-          className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-slate-300 ring-2 ring-white"
+          className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-slate-300 dark:bg-slate-500 ring-2 ring-white dark:ring-[#1e293b]"
         />
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Pickup</p>
         <p className="mt-1 wrap-anywhere text-sm font-medium leading-snug text-slate-600">{pickup}</p>
@@ -149,7 +149,7 @@ function TripRoute({ pickup, destination }: { pickup: string; destination: strin
       <div className="relative min-w-0">
         <span
           aria-hidden="true"
-          className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-brand-600 ring-2 ring-white"
+          className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-brand-600 ring-2 ring-white dark:ring-[#1e293b]"
         />
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">Destination</p>
         <p className="mt-1 wrap-anywhere text-base font-semibold leading-snug tracking-tight text-slate-900">

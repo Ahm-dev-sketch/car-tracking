@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandling } from '@/lib/errors';
-import { getSessionUser } from '@/lib/auth-guard';
+import { getSessionUser, requireRole } from '@/lib/auth-guard';
 import { getDriverById } from '@/server/drivers/service';
 
 export const GET = withErrorHandling(
   async (_req: NextRequest, context: { params: Promise<{ id: string }> }) => {
-    await getSessionUser();
+    const user = await getSessionUser();
+    requireRole(user, 'ADMIN');
 
     const params = await context?.params;
     const id = params?.id;

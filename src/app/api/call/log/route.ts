@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandling } from '@/lib/errors';
+import { withErrorHandling, ApiError } from '@/lib/errors';
 import { getSessionUser } from '@/lib/auth-guard';
 import { prisma } from '@/lib/prisma';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -48,6 +48,22 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     } catch {
       // non-fatal
     }
+  }
+
+  // Authorize: caller must be the booking passenger, its assigned driver, or an admin.
+  if (!validated.bookingId) {
+    throw new ApiError(403, 'FORBIDDEN', 'Anda tidak diizinkan mengakses percakapan ini.');
+  }
+  const booking = await prisma.booking.findUnique({
+    where: { id: validated.bookingId },
+    select: { userId: true, driver: { select: { userId: true } } },
+  });
+  const isParticipant =
+    booking?.userId === user.id ||
+    booking?.driver?.userId === user.id ||
+    user.role === 'ADMIN';
+  if (!isParticipant) {
+    throw new ApiError(403, 'FORBIDDEN', 'Anda tidak diizinkan mengakses percakapan ini.');
   }
 
   // 1. Log call to fleet_call_logs table if the table exists

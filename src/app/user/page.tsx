@@ -164,7 +164,7 @@ export default function UserOverviewPage() {
                   <div className="relative">
                     <span
                       aria-hidden="true"
-                      className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-slate-300 ring-2 ring-white"
+                      className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-slate-300 dark:bg-slate-500 ring-2 ring-white dark:ring-[#1e293b]"
                     />
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                       Jemput
@@ -176,7 +176,7 @@ export default function UserOverviewPage() {
                   <div className="relative">
                     <span
                       aria-hidden="true"
-                      className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-brand-600 ring-2 ring-white"
+                      className="absolute -left-7 top-1.5 size-2.5 rounded-full bg-brand-600 ring-2 ring-white dark:ring-[#1e293b]"
                     />
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                       Tujuan

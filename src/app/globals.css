@@ -212,6 +212,7 @@
   background-color: rgba(244, 63, 94, 0.15);
   border-color: rgba(251, 113, 133, 0.32);
   color: #fb7185;
+  box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.45);
 }
 .dark .dock-tab[aria-current="page"] .dock-tab-label,
 .dark .dock-tab[aria-expanded="true"] .dock-tab-label { color: #fb7185; }
@@ -556,6 +557,8 @@ p { text-wrap: pretty; }
   background-color: #fff1f2;
   border-color: #fecdd3;
   color: #c8102e;
+  /* State must not rely on colour alone (~1.1:1 fill vs the bar). */
+  box-shadow: inset 0 0 0 1px rgba(200, 16, 46, 0.28);
 }
 .dock-tab:hover:not([aria-current="page"]):not([aria-expanded="true"]) .dock-tab-icon {
   background-color: #f1f5f9;
@@ -606,18 +609,18 @@ p { text-wrap: pretty; }
 .tracking-panel { min-width: 0; }
 .leaflet-container { font-family: var(--font-geist-sans), system-ui, sans-serif; }
 .leaflet-popup-content-wrapper {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-slate-200);
   border-radius: 0.75rem;
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
 }
 .leaflet-popup-content { max-width: min(16rem, calc(100vw - 6rem)); }
 .leaflet-bar {
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid var(--color-slate-200) !important;
   border-radius: 0.625rem;
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08) !important;
 }
-.leaflet-bar a { min-width: 2.75rem; min-height: 2.75rem; display: grid; place-items: center; color: #0f172a; }
+.leaflet-bar a { min-width: 2.75rem; min-height: 2.75rem; display: grid; place-items: center; color: var(--color-slate-900); }
 .leaflet-control-attribution { font-size: 0.625rem; }
 /* Driver live strip: a compact tier-1 pill that sits in page flow directly
    above the dock, separated by its own margin instead of a full-width slab. */

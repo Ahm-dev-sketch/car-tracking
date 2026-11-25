@@ -320,4 +320,14 @@ describe('Auth & Security Unit Tests', () => {
       expect(blocked.resetMs).toBeGreaterThan(0);
     });
   });
+
+  describe('Demo Auth UI Guard', () => {
+    it('hides demo accounts in production unless ALLOW_DEMO_AUTH === "1"', async () => {
+      const { isDemoModeEnabled } = await import('@/lib/demo-auth');
+      expect(isDemoModeEnabled({ NODE_ENV: 'production', ALLOW_DEMO_AUTH: undefined })).toBe(false);
+      expect(isDemoModeEnabled({ NODE_ENV: 'production', ALLOW_DEMO_AUTH: '0' })).toBe(false);
+      expect(isDemoModeEnabled({ NODE_ENV: 'production', ALLOW_DEMO_AUTH: '1' })).toBe(true);
+      expect(isDemoModeEnabled({ NODE_ENV: 'development', ALLOW_DEMO_AUTH: undefined })).toBe(true);
+    });
+  });
 });

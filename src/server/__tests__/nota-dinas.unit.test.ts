@@ -248,7 +248,8 @@ describe('POST /api/bookings/[id]/nota-dinas', () => {
     });
     mocks.uploadFileToStorage.mockResolvedValue({
       success: true,
-      publicUrl: 'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/public/nota-dinas/BK-2026-0001/nota-123.png',
+      publicUrl: '',
+      storagePath: 'nota-dinas/BK-2026-0001/nota-123.png',
       storageProvider: 'supabase',
       filename: 'nota-123.png',
     });
@@ -258,8 +259,7 @@ describe('POST /api/bookings/[id]/nota-dinas', () => {
       userId: 'user-owner',
       status: 'PENDING_COMPLETION',
       rejectedReason: null,
-      notaDinasUrl:
-        'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/public/nota-dinas/BK-2026-0001/nota-123.png',
+      notaDinasUrl: 'nota-dinas/BK-2026-0001/nota-123.png',
       notaDinasFilename: 'Screenshot (352).png',
     });
 
@@ -278,7 +278,7 @@ describe('POST /api/bookings/[id]/nota-dinas', () => {
     const body = await res.json();
 
     expect(body.success).toBe(true);
-    expect(body.url).toContain('https://aisqcrtpmjgqttklm.supabase.co');
+    expect(body.url).toBe('nota-dinas/BK-2026-0001/nota-123.png');
     expect(body.data.notaDinasFilename).toBe('Screenshot (352).png');
     expect(body.data.rejectedReason).toBeNull();
 
@@ -286,8 +286,7 @@ describe('POST /api/bookings/[id]/nota-dinas', () => {
       expect.objectContaining({
         where: { id: 'bk-1' },
         data: expect.objectContaining({
-          notaDinasUrl:
-            'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/public/nota-dinas/BK-2026-0001/nota-123.png',
+          notaDinasUrl: 'nota-dinas/BK-2026-0001/nota-123.png',
           notaDinasFilename: 'Screenshot (352).png',
           rejectedReason: null,
         }),

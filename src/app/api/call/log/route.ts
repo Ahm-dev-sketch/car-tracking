@@ -58,12 +58,31 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     where: { id: validated.bookingId },
     select: { userId: true, driver: { select: { userId: true } } },
   });
+  if (!booking) {
+    throw new ApiError(403, 'FORBIDDEN', 'Anda tidak diizinkan mengakses percakapan ini.');
+  }
   const isParticipant =
-    booking?.userId === user.id ||
-    booking?.driver?.userId === user.id ||
+    booking.userId === user.id ||
+    booking.driver?.userId === user.id ||
     user.role === 'ADMIN';
   if (!isParticipant) {
     throw new ApiError(403, 'FORBIDDEN', 'Anda tidak diizinkan mengakses percakapan ini.');
+  }
+
+  // Derive receiver server-side; never trust a client-controlled receiverId.
+  const validReceivers = [booking.userId, booking.driver?.userId ?? null].filter(
+    (x): x is string => Boolean(x)
+  );
+  let resolvedReceiverId: string | null;
+  if (user.role === 'ADMIN') {
+    resolvedReceiverId =
+      validated.receiverId && validReceivers.includes(validated.receiverId)
+        ? validated.receiverId
+        : null;
+  } else if (booking.userId === user.id) {
+    resolvedReceiverId = booking.driver?.userId ?? null;
+  } else {
+    resolvedReceiverId = booking.userId;
   }
 
   // 1. Log call to fleet_call_logs table if the table exists
@@ -75,7 +94,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       validated.bookingId ?? null,
       validated.tripId ?? null,
       callerId,
-      validated.receiverId ?? null,
+      resolvedReceiverId,
       validated.status,
       validated.durationSeconds
     );
@@ -84,19 +103,17 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     console.warn('[Call Log API] fleet_call_logs table insert skipped or unavailable:', err);
   }
 
-  // 2. Format system message for chat history
-  let chatText = validated.message;
-  if (!chatText) {
-    if (validated.status === 'MISSED') {
-      chatText = 'Panggilan suara tak terjawab (30 detik)';
-    } else if (validated.status === 'COMPLETED') {
-      const mins = Math.floor(validated.durationSeconds / 60);
-      const secs = validated.durationSeconds % 60;
-      const durStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-      chatText = `Panggilan Suara Berakhir (${durStr})`;
-    } else {
-      chatText = 'Panggilan Ditolak';
-    }
+  // 2. Format system message for chat history (server-generated; client `message` is ignored)
+  let chatText: string;
+  if (validated.status === 'MISSED') {
+    chatText = 'Panggilan suara tak terjawab (30 detik)';
+  } else if (validated.status === 'COMPLETED') {
+    const mins = Math.floor(validated.durationSeconds / 60);
+    const secs = validated.durationSeconds % 60;
+    const durStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    chatText = `Panggilan Suara Berakhir (${durStr})`;
+  } else {
+    chatText = 'Panggilan Ditolak';
   }
 
   // 3. Persist system notification into fleet_chat_messages
@@ -113,7 +130,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
           sender_id: callerId,
           sender_name: 'Sistem',
           sender_role: 'SYSTEM',
-          receiver_id: validated.receiverId || null,
+          receiver_id: resolvedReceiverId,
           message: chatText,
           is_read: false,
         })
@@ -142,7 +159,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
         callerId,
         'Sistem',
         'SYSTEM',
-        validated.receiverId ?? null,
+        resolvedReceiverId,
         chatText
       );
       savedMessage = rows[0];
@@ -154,7 +171,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
         sender_id: callerId,
         sender_name: 'Sistem',
         sender_role: 'SYSTEM',
-        receiver_id: validated.receiverId,
+        receiver_id: resolvedReceiverId,
         message: chatText,
         is_read: false,
         created_at: createdAt,

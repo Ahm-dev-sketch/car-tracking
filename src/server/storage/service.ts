@@ -15,6 +15,7 @@ export interface UploadFileOptions {
 export interface StorageUploadResult {
   success: boolean;
   publicUrl: string;
+  storagePath: string;
   storageProvider: 'supabase' | 'local';
   filename: string;
   error?: string;
@@ -26,11 +27,7 @@ export interface StorageUploadResult {
  */
 export function getStorageSupabaseClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    '';
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
 
   if (!url || !key || url === 'https://placeholder.supabase.co') {
     return null;
@@ -85,7 +82,7 @@ export async function uploadFileToStorage(
       if (isNoSuchBucket) {
         try {
           const createBucketRes = await supabase.storage.createBucket(bucket, {
-            public: true,
+            public: false,
             fileSizeLimit: 10 * 1024 * 1024,
             allowedMimeTypes: [
               'application/pdf',
@@ -115,10 +112,10 @@ export async function uploadFileToStorage(
       }
 
       if (!uploadRes.error) {
-        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storagePath);
         return {
           success: true,
-          publicUrl: urlData.publicUrl,
+          publicUrl: '',
+          storagePath,
           storageProvider: 'supabase',
           filename: finalFilename,
         };
@@ -140,6 +137,7 @@ export async function uploadFileToStorage(
           return {
             success: true,
             publicUrl: `/uploads/${bucket}/${finalFilename}`,
+            storagePath: `/uploads/${bucket}/${finalFilename}`,
             storageProvider: 'local',
             filename: finalFilename,
           };
@@ -155,6 +153,7 @@ export async function uploadFileToStorage(
       return {
         success: false,
         publicUrl: '',
+        storagePath: '',
         storageProvider: 'supabase',
         filename: finalFilename,
         error: errorMessage,
@@ -175,6 +174,7 @@ export async function uploadFileToStorage(
       return {
         success: true,
         publicUrl: `/uploads/${bucket}/${finalFilename}`,
+        storagePath: `/uploads/${bucket}/${finalFilename}`,
         storageProvider: 'local',
         filename: finalFilename,
       };
@@ -182,6 +182,7 @@ export async function uploadFileToStorage(
       return {
         success: false,
         publicUrl: '',
+        storagePath: '',
         storageProvider: 'local',
         filename: finalFilename,
         error: `Sistem penyimpanan lokal gagal (${fsErr.message}) dan Supabase Storage belum dikonfigurasi.`,
@@ -192,10 +193,29 @@ export async function uploadFileToStorage(
   return {
     success: false,
     publicUrl: '',
+    storagePath: '',
     storageProvider: 'supabase',
     filename: finalFilename,
     error:
       'Kredensial Supabase Storage (NEXT_PUBLIC_SUPABASE_URL & SUPABASE_SERVICE_ROLE_KEY) belum diset dan sistem file serverless bersifat read-only. Silakan konfigurasikan Environment Variables di Vercel.',
   };
+}
+
+/**
+ * Returns a short-lived signed URL for a private Supabase Storage object,
+ * or null when the client cannot be initialized or signing fails.
+ */
+export async function getSignedStorageUrl(
+  bucket: string,
+  path: string,
+  expiresInSeconds = 60
+): Promise<string | null> {
+  const supabase = getStorageSupabaseClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(path, expiresInSeconds);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
 }
 

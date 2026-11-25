@@ -1216,7 +1216,7 @@ function AdminBookingsContent() {
                   </p>
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <a
-                      href={selectedBooking.notaDinasUrl}
+                      href={`/api/bookings/${selectedBooking.id}/nota-dinas/download`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"

@@ -300,8 +300,6 @@ export const createBookingSchema = z
     notes: z.string().trim().optional().nullable(),
     service_type: z.enum(['DROP_OFF', 'STANDBY']).optional(),
     serviceType: z.enum(['DROP_OFF', 'STANDBY']).optional(),
-    nota_dinas_url: z.string().trim().optional().nullable(),
-    notaDinasUrl: z.string().trim().optional().nullable(),
   })
   .superRefine((data, ctx) => {
     const operationalLoc = data.operational_location_id ?? data.operationalLocationId;
@@ -381,7 +379,6 @@ export const createBookingSchema = z
     const passengerCount = (data.passenger_count ?? data.passengerCount)!;
     const serviceType = (data.service_type ?? data.serviceType ?? 'DROP_OFF') as 'DROP_OFF' | 'STANDBY';
     const purpose = (data.purpose?.trim()) || (serviceType === 'STANDBY' ? 'Layanan Standby' : 'Layanan Drop Off');
-    const notaDinasUrl = data.nota_dinas_url ?? data.notaDinasUrl ?? null;
 
     return {
       vehicleId,
@@ -399,7 +396,6 @@ export const createBookingSchema = z
       purpose,
       notes: data.notes ?? null,
       serviceType,
-      notaDinasUrl,
     };
   });
 

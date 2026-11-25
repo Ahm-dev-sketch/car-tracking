@@ -79,8 +79,8 @@ export async function POST(
 
     // 4. Authorization check: owner, assigned driver, or admin
     const isOwner = booking.userId === user.id;
-    const isDriver = booking.driver?.userId === user.id || booking.driverId === user.id;
-    const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+    const isDriver = booking.driver?.userId === user.id;
+    const isAdmin = user.role === 'ADMIN';
 
     if (!isOwner && !isDriver && !isAdmin) {
       console.error(
@@ -203,7 +203,7 @@ export async function POST(
       originalName,
     });
 
-    if (!uploadResult.success || !uploadResult.publicUrl) {
+    if (!uploadResult.success || !uploadResult.storagePath) {
       console.error('[Upload Nota Dinas Error]: Storage upload failed:', uploadResult.error);
       return NextResponse.json(
         {
@@ -220,13 +220,13 @@ export async function POST(
       );
     }
 
-    const publicUrl = uploadResult.publicUrl;
+    const storedRef = uploadResult.storagePath || uploadResult.publicUrl;
 
     // 9. Update Database Record
     const updated = await prisma.booking.update({
       where: { id },
       data: {
-        notaDinasUrl: publicUrl,
+        notaDinasUrl: storedRef,
         notaDinasFilename: originalName,
         rejectedReason: null,
       },
@@ -247,7 +247,7 @@ export async function POST(
         entityType: 'Booking',
         entityId: id,
         newValue: {
-          notaDinasUrl: publicUrl,
+          notaDinasUrl: storedRef,
           notaDinasFilename: originalName,
           fileSize: file.size,
           storageProvider: uploadResult.storageProvider,
@@ -282,7 +282,7 @@ export async function POST(
     // 11. Return clean structured JSON
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: storedRef,
       data: updated,
     });
   } catch (error: any) {

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   user: vi.fn(),
   bookingFindMany: vi.fn(),
+  getSignedStorageUrl: vi.fn(),
 }));
 
 vi.mock('@/auth', () => ({ auth: mocks.auth }));
@@ -15,6 +16,9 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: mocks.user },
     booking: { findMany: mocks.bookingFindMany },
   },
+}));
+vi.mock('@/server/storage/service', () => ({
+  getSignedStorageUrl: mocks.getSignedStorageUrl,
 }));
 
 import { GET } from '@/app/api/admin/reports/excel/route';
@@ -226,8 +230,7 @@ describe('GET /api/admin/reports/excel', () => {
           destination: 'Kantor Pusat KCIC',
           purpose: 'Inspeksi Jalur',
           notes: null,
-          notaDinasUrl:
-            'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/public/nota-dinas/KCIC-2026-REMOTE/nota-remote.png',
+          notaDinasUrl: 'nota-dinas/KCIC-2026-REMOTE/nota-remote.png',
           notaDinasFilename: 'Screenshot (25).png',
           rejectedReason: null,
           user: {
@@ -242,6 +245,10 @@ describe('GET /api/admin/reports/excel', () => {
           trips: [],
         },
       ]);
+
+      mocks.getSignedStorageUrl.mockResolvedValue(
+        'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/sign/nota-dinas/KCIC-2026-REMOTE/nota-remote.png?token=abc'
+      );
 
       const req = new NextRequest('http://localhost:3000/api/admin/reports/excel');
       const res = await GET(req, undefined as any);
@@ -261,8 +268,13 @@ describe('GET /api/admin/reports/excel', () => {
       // Embedded image should be present
       const images = worksheet?.getImages();
       expect(images && images.length).toBeGreaterThan(0);
+      expect(mocks.getSignedStorageUrl).toHaveBeenCalledWith(
+        'nota-dinas',
+        'nota-dinas/KCIC-2026-REMOTE/nota-remote.png',
+        60
+      );
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/public/nota-dinas/KCIC-2026-REMOTE/nota-remote.png',
+        'https://aisqcrtpmjgqttklm.supabase.co/storage/v1/object/sign/nota-dinas/KCIC-2026-REMOTE/nota-remote.png?token=abc',
         expect.any(Object)
       );
     } finally {

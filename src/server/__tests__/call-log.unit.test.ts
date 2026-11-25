@@ -164,6 +164,70 @@ it('logs COMPLETED call and formats duration in system message', async () => {
   expect(json.data.message).toBe('Panggilan Suara Berakhir (02:45)');
 });
 
+it('ignores client-authored message and derives receiver server-side', async () => {
+  mocks.user.mockResolvedValue({ id: 'user-1', name: 'John Doe', role: 'USER' });
+  mocks.bookingFindUnique.mockResolvedValue({ userId: 'user-1', driver: { userId: 'driver-1' } });
+  mocks.executeRawUnsafe.mockResolvedValue(1);
+  mocks.queryRawUnsafe.mockResolvedValue([
+    {
+      id: 'msg-system-3',
+      booking_id: 'b-101',
+      trip_id: null,
+      sender_id: 'user-1',
+      sender_name: 'Sistem',
+      sender_role: 'SYSTEM',
+      receiver_id: 'driver-1',
+      message: 'Panggilan suara tak terjawab (30 detik)',
+      is_read: false,
+      created_at: '2026-11-10T07:40:00Z',
+    },
+  ]);
+
+  const req = new NextRequest('https://example.test/api/call/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bookingId: 'b-101',
+      receiverId: 'attacker-controlled',
+      status: 'MISSED',
+      durationSeconds: 0,
+      message: 'malicious',
+    }),
+  });
+
+  const res = await POST(req, undefined);
+  expect(res.status).toBe(201);
+
+  const json = await res.json();
+  expect(json.data.message).toBe('Panggilan suara tak terjawab (30 detik)');
+  expect(json.data.message).not.toContain('malicious');
+
+  // receiverId is derived (the other party), not client-controlled
+  expect(mocks.executeRawUnsafe).toHaveBeenCalledWith(
+    expect.stringContaining('INSERT INTO fleet_call_logs'),
+    'b-101',
+    null,
+    'user-1',
+    'driver-1',
+    'MISSED',
+    0
+  );
+
+  // SYSTEM text persisted is server-generated and never contains client input
+  expect(mocks.queryRawUnsafe).toHaveBeenCalledWith(
+    expect.stringContaining('INSERT INTO fleet_chat_messages'),
+    'b-101',
+    null,
+    'user-1',
+    'Sistem',
+    'SYSTEM',
+    'driver-1',
+    'Panggilan suara tak terjawab (30 detik)'
+  );
+  expect(JSON.stringify(mocks.queryRawUnsafe.mock.calls)).not.toContain('malicious');
+  expect(JSON.stringify(mocks.queryRawUnsafe.mock.calls)).not.toContain('attacker-controlled');
+});
+
 it('rejects a non-participant USER with 403', async () => {
   mocks.user.mockResolvedValue({ id: 'stranger', name: 'Stranger', role: 'USER' });
   mocks.bookingFindUnique.mockResolvedValue({ userId: 'user-1', driver: { userId: 'driver-1' } });

@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import { BookingStatus, ServiceType } from '@prisma/client';
+import { getSignedStorageUrl } from '@/server/storage/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -251,8 +252,9 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     worksheet.getColumn(colNumber).width = h.width;
   });
 
-  // 4. Pre-fetch Nota Dinas photos in parallel (supporting both Supabase Storage remote URLs and local files)
+  // 4. Pre-fetch Nota Dinas photos in parallel (local files or private Supabase objects via signed URLs)
   const photoMap = new Map<string, { buffer: Buffer; extension: 'png' | 'jpeg' }>();
+  const publicUploadsDir = path.resolve(process.cwd(), 'public', 'uploads');
 
   await Promise.all(
     bookings.map(async (b) => {
@@ -264,36 +266,32 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
 
       if (isPdf) return;
 
-      const fullNotaUrl = b.notaDinasUrl.startsWith('http')
-        ? b.notaDinasUrl
-        : `${baseUrl}${b.notaDinasUrl}`;
-
       try {
         let rawBuf: Buffer | null = null;
 
-        // Try HTTP/HTTPS fetch (e.g. Supabase Storage remote URL)
-        if (fullNotaUrl && (fullNotaUrl.startsWith('http://') || fullNotaUrl.startsWith('https://'))) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-          try {
-            const resp = await fetch(fullNotaUrl, { signal: controller.signal });
-            if (resp.ok) {
-              const arrayBuffer = await resp.arrayBuffer();
-              rawBuf = Buffer.from(arrayBuffer);
-            }
-          } catch {
-            // fallback to disk or ignore
-          } finally {
-            clearTimeout(timeoutId);
-          }
-        }
-
-        // Try local disk read if not retrieved remotely
-        if (!rawBuf) {
-          const cleanPath = b.notaDinasUrl.replace(/^\//, '');
-          const diskPath = path.join(process.cwd(), 'public', cleanPath);
-          if (fs.existsSync(diskPath)) {
+        // Local filesystem fallback: read only inside public/uploads
+        if (b.notaDinasUrl.startsWith('/uploads/')) {
+          const diskPath = path.resolve(process.cwd(), 'public', b.notaDinasUrl.replace(/^\/+/, ''));
+          if (diskPath.startsWith(publicUploadsDir) && fs.existsSync(diskPath)) {
             rawBuf = await fs.promises.readFile(diskPath);
+          }
+        } else {
+          // Supabase private object key: fetch via short-lived signed URL
+          const signedUrl = await getSignedStorageUrl('nota-dinas', b.notaDinasUrl, 60);
+          if (signedUrl) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+            try {
+              const resp = await fetch(signedUrl, { signal: controller.signal });
+              if (resp.ok) {
+                const arrayBuffer = await resp.arrayBuffer();
+                rawBuf = Buffer.from(arrayBuffer);
+              }
+            } catch {
+              // ignore fetch failure, leave rawBuf null
+            } finally {
+              clearTimeout(timeoutId);
+            }
           }
         }
 

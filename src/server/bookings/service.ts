@@ -29,8 +29,6 @@ export interface CreateBookingInput {
   purpose: string;
   notes?: string | null;
   serviceType?: 'DROP_OFF' | 'STANDBY';
-  notaDinasUrl?: string | null;
-  notaDinasFilename?: string | null;
   status?: BookingStatus;
 }
 
@@ -229,8 +227,6 @@ export async function createBooking(
               purpose: input.purpose,
               notes: input.notes ?? null,
               serviceType: input.serviceType ?? 'DROP_OFF',
-              notaDinasUrl: input.notaDinasUrl ?? null,
-              notaDinasFilename: input.notaDinasFilename ?? null,
               status: input.status ?? BookingStatus.PENDING,
             },
             include: {
